@@ -679,6 +679,7 @@ sub map_spanning_reads_to_genes {
         my $found_overlap = 0;
         foreach my $exon_segment (@$genome_coords_aref) {
             my ($lend, $rend) = @$exon_segment;
+            if ($lend == $rend) { next; } # no single base interval searches
             my $overlaps_aref = $chr_to_interval_tree_href->{$chr}->fetch($lend, $rend);
             if (@$overlaps_aref) {
                 print $test_ofh "$full_read_name coords $lend-$rend overlap: " . join(",", @$overlaps_aref) . "\n" if $DEBUG_SPAN_FLAG;
