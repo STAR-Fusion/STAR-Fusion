@@ -10,33 +10,13 @@ use FindBin;
 use Set::IntervalTree;
 use File::Basename;
 use Data::Dumper;
-use lib ("$FindBin::Bin/lib");
+use lib ("$FindBin::Bin/../lib");
 use SAM_reader;
 use SAM_entry;
 
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
 my $UTILDIR = "$FindBin::Bin/util";
-
-
-=recommended_STAR_settings
-
-  # From Stransky et al. 2014   PMID: 25204415
-
-   STAR --genomeDir Hg19.fa_star_index \
-        --readFilesIn left.fq right.fq \
-        --outSAMstrandField intronMotif \
-        --outFilterIntronMotifs RemoveNoncanonicalUnannotated \
-        --outReadsUnmapped None --chimSegmentMin 15 \
-        --chimJunctionOverhangMin 15 \
-        --alignMatesGapMax 200000 \
-        --alignIntronMax 200000 \
-        --runThreadN 4 \
-        --outSAMtype BAM SortedByCoordinate 
-
-=cut
-
-
 
 ## Options
 my $out_prefix = "star-fusion";
@@ -220,8 +200,8 @@ main: {
     ## Breakpoint-focused
     ####################################################################
     
-
-    my $fusion_predictions_outfile = "$out_prefix.fusion_candidates.txt";
+    
+    my $fusion_predictions_outfile = "$out_prefix.fusion_candidates.preliminary";
     open (my $ofh, ">$fusion_predictions_outfile") or die "Error, cannot write to file: $fusion_predictions_outfile";
     
     print STDERR "-outputting fusion candidates to file: $fusion_predictions_outfile\n";
