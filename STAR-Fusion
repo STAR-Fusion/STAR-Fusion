@@ -7,6 +7,8 @@ use warnings;
 use Carp;
 use Cwd;
 use FindBin;
+use lib ("$FindBin::Bin/lib");
+use Pipeliner;
 
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
@@ -41,6 +43,9 @@ my $ref_cdna = "$FindBin::Bin/resources/gencode.v19.annotation.gtf.exons.cdna.gz
 my $help_flag;
 my $MIN_NOVEL_JUNCTION_SUPPORT = 10;
 my $MIN_ALT_PCT_JUNCTION = 10.0;
+my $Evalue = 1e-3;
+my $tmpdir = "/tmp";
+
 
 my $usage = <<__EOUSAGE__;
 
@@ -64,6 +69,10 @@ my $usage = <<__EOUSAGE__;
 #    --min_alt_pct_junction <float>        default: 10.0  (10% of the dominant isoform junction support)
 #
 #    --out_prefix|O <string>         output file prefix (default: $out_prefix)
+#   
+#  -E <float>                     E-value threshold for blast searches (default: 0.001)
+#
+#  --tmpdir <string>              file for temporary files (default: /tmp)
 #
 ###################################################################################
 
@@ -83,6 +92,10 @@ __EOUSAGE__
               'min_novel_junction_support=i' => \$MIN_NOVEL_JUNCTION_SUPPORT,
               'min_alt_pct_junction=f' => \$MIN_ALT_PCT_JUNCTION,
               'out_prefix|O=s' => \$out_prefix,
+
+              'E=f' => \$Evalue,
+              'tmpdir=s' => \$tmpdir,
+              
     );
 
 
@@ -100,10 +113,46 @@ unless (-s $ref_cdna) {
 }
 
 
+my @required_progs = qw(makeblastdb blastn STAR);
+unless (&ensure_required_progs_are_installed(@required_progs)) {
+    
+    die "Error, required program(s) are missing. Be sure they are installed and available via your PATH setting";
+    
+}
+
+
+
 main: {
      
-     
+    my $pipeliner = new Pipeliner(-verbose => 1);
+    
+    ## predict fusions
 
+    my $cmd = "$UTILDIR/STAR-Fusion.predict "
+        . " -S $chimeric_out_sam "
+        . " -J  $chimeric_junction_file "
+        . " -G $ref_GTF "
+        . " --min_novel_junction_support $MIN_NOVEL_JUNCTION_SUPPORT "
+        . " --min_alt_pct_junction $MIN_ALT_PCT_JUNCTION "
+        . " -O $out_prefix ";
+    
+    $pipeliner->add_command(new Command($cmd, "STAR-Fusion.predict.ok"));
+
+    my $predicted_fusions_file = "$out_prefix.fusion_candidates.preliminary";
+    
+    ## filter fusions
+    
+    $cmd = "$UTILDIR/STAR-Fusion.filter "
+        . " --fusion_preds $predicted_fusions_file "
+        . " --ref_cdna $ref_cdna "
+        . " -E $Evalue "
+        . " --tmpdir $tmpdir ";
+    
+    $pipeliner->add_command(new Command($cmd, "STAR-Fusion.filter.ok"));
+
+    
+    $pipeliner->run();
+    
 
     exit(0);
     
@@ -123,3 +172,26 @@ sub process_cmd {
 
     return;
 }
+
+
+####
+sub ensure_required_progs_are_installed {
+    my (@required_progs) = @_;
+
+    my $missing = 0;
+    
+    foreach my $prog (@required_progs) {
+
+        my $path = `which $prog`;
+        unless ($path && $path =~ /\w/) {
+            $missing++;
+            print STDERR "Error, cannot locate required program: $prog\n";
+        }
+        else {
+            print STDERR "-found prog $prog at $path\n";
+        }
+    }
+    
+    return($missing);
+}
+
