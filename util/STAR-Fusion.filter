@@ -45,6 +45,7 @@ my $cdna_fasta_file;
               'ref_cdna=s' => \$cdna_fasta_file,
               
               'E=f' => \$Evalue,
+              'tmpdir=s' => \$tmpdir,
     );
 
 
