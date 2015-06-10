@@ -1,0 +1,211 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use FindBin;
+use lib ("$FindBin::Bin/../lib");
+use Fasta_reader;
+
+my $usage = "usage: $0 fusion_preds.dat cDNA_sequences.fasta\n\n";
+
+my $fusion_preds_file = $ARGV[0] or die $usage;
+my $cdna_fasta_file = $ARGV[1] or die $usage;
+
+main: {
+    
+
+    my $filter_info_file = "$fusion_preds_file.filt_info";
+    open (my $ofh, ">$filter_info_file") or die "Error, cannot write to $filter_info_file";
+    
+    
+    my %cdna_seqs;
+    my %gene_to_cdna_id = &parse_cdna_seqs_by_gene($cdna_fasta_file, \%cdna_seqs);
+    
+    my @fusions;
+    open (my $fh, $fusion_preds_file) or die "Error, cannot open file $fusion_preds_file";
+    while (<$fh>) {
+        if (/^\#/) { next; }
+        chomp;
+        my $line = $_;
+        my @x = split(/\t/);
+        my $fusion_name = $x[0];
+        my ($geneA, $geneB) = split(/--/, $fusion_name);
+        my $J = $x[1];
+        my $S = $x[2];
+
+        my $score = sqrt($J**2 + $S**2);
+        
+        push (@fusions, { fusion_name => $fusion_name,
+                          geneA => $geneA,
+                          geneB => $geneB,
+                          score => $score, 
+                          line => $line,
+              } );
+        
+    }
+    close $fh;
+    
+    @fusions = reverse sort {$a->{score} <=> $b->{score} } @fusions;
+
+
+    my %AtoB;
+    my %BtoA;
+    
+    foreach my $fusion (@fusions) {
+        
+        my ($geneA, $geneB) = ($fusion->{geneA}, $fusion->{geneB});
+        my @blast_info;
+        
+        my $altB_aref = $AtoB{$geneA};
+        if ($altB_aref) {
+            foreach my $altB (@$altB_aref) {
+                my @blast = &examine_seq_similarity($geneB, $altB, \%cdna_seqs, \%gene_to_cdna_id);
+                if (@blast) {
+                    push (@blast, "ALREADY_SELECTED_$geneA--$altB");
+                    push (@blast_info, @blast);
+                }
+            }
+        }
+        my $altA_aref = $BtoA{$geneB};
+        if ($altA_aref) {
+            foreach my $altA (@$altA_aref) {
+                my @blast = &examine_seq_similarity($altA, $geneA, \%cdna_seqs, \%gene_to_cdna_id);
+                if (@blast) {
+                    push (@blast, "ALREADY_SELECTED_$altA--$geneB");
+                    push (@blast_info, @blast);
+                }
+            }
+        }
+        
+        my $line = $fusion->{line};
+        
+        if (@blast_info) {
+            $line ="#$line"; # comment out the line in the filtered file... an aesthetic.
+        }
+        print $ofh "$line\t" . join("\t", @blast_info) . "\n";
+
+        use Data::Dumper;
+        print STDERR Dumper(\@blast_info);
+        
+        unless (@blast_info) {
+            print "$line\n";
+            push (@{$AtoB{$geneA}}, $geneB);
+            push (@{$BtoA{$geneB}}, $geneA);
+        }
+        
+    }
+
+    close $ofh;
+    
+    exit(0);
+}
+
+####
+sub parse_cdna_seqs_by_gene {
+    my ($cdna_fasta_file, $cdna_seqs_href) = @_;
+
+    my %gene_to_trans;
+
+    my $fasta_reader = new Fasta_reader($cdna_fasta_file);
+    
+    while (my $seq_obj = $fasta_reader->next()) {
+
+        my $header = $seq_obj->get_header();
+
+        my $sequence = $seq_obj->get_sequence();
+
+        $header =~ s/^>//;
+        
+        my ($trans_id, $gene_id, $gene_name, @rest) = split(/\s+/, $header);
+        unless ($gene_id) {
+            die "Error, need format '>trans_id gene_id [gene_name] ... for the header";
+        }
+        
+        $gene_to_trans{$gene_id}->{$trans_id} = 1;
+        if ($gene_name && $gene_id ne $gene_name) {
+            $gene_to_trans{$gene_name}->{$trans_id} = 1;
+        }
+        
+        $cdna_seqs_href->{$trans_id} = $sequence;
+    }
+    
+    return(%gene_to_trans);
+}
+
+####
+sub examine_seq_similarity {
+    my ($geneA, $geneB, $cdna_seqs_href, $gene_to_cdna_id_href) = @_;
+
+    print STDERR "-testing $geneA vs. $geneB\n";
+    
+    my $fileA = "/tmp/$$.gA.fa";
+    my $fileB = "/tmp/$$.gB.fa";
+    
+    unless (exists $gene_to_cdna_id_href->{$geneA}) {
+        die "Error, no transcripts listed for gene: $geneA";
+    }
+    my @trans_ids_A = keys %{$gene_to_cdna_id_href->{$geneA}};
+    open (my $ofh, ">$fileA") or die "Error, cannot write to $fileA";
+    foreach my $transA (@trans_ids_A) {
+        my $cdna_seq = $cdna_seqs_href->{$transA} or die "Error, no cdna seq for $transA";
+        print $ofh ">" . join("::", $geneA, $transA) . "\n$cdna_seq\n";
+    }
+    close $ofh;
+    
+    unless (exists $gene_to_cdna_id_href->{$geneB}) {
+        die "Error, no transcripts listed for gene: $geneB";
+    }
+    my @trans_ids_B = keys %{$gene_to_cdna_id_href->{$geneB}};
+    open ($ofh, ">$fileB") or die "Error, cannot write to file $fileB";
+    foreach my $transB (@trans_ids_B) {
+        my $cdna_seq = $cdna_seqs_href->{$transB} or die "Error, no cdna seq for $transB";
+        print $ofh ">" . join("::", $geneB, $transB) . "\n$cdna_seq\n";
+    }
+    close $ofh;
+
+
+    #print STDERR "do it? ... ";
+    #my $response = <STDIN>;
+    
+    ## blast them:
+    my $cmd = "makeblastdb -in $fileB -dbtype nucl 2>/dev/null 1>&2";
+    &process_cmd($cmd);
+    
+    my $blast_out = "/tmp/$$.blastn";
+    $cmd = "blastn -db $fileB -query $fileA -evalue 1e-3 -outfmt 6 -max_target_seqs 1 > $blast_out 2>/dev/null";
+    &process_cmd($cmd);
+
+    my @blast_hits;
+    if (-s $blast_out) {
+        open (my $fh, $blast_out) or die "Error, cannot open file $blast_out";
+        while (<$fh>) {
+            chomp;
+            my @x = split(/\t/);
+            my $blast_line = join("^", @x);
+            $blast_line =~ s/\s+//g;
+            push (@blast_hits, $blast_line);
+        }
+    }
+    
+
+    return(@blast_hits);
+}
+
+
+
+####
+sub process_cmd {
+    my ($cmd) = @_;
+
+    print STDERR "CMD: $cmd\n";
+        
+    my $ret = system($cmd);
+    if ($ret) {
+
+        die "Error, cmd $cmd died with ret $ret";
+    }
+    
+    return;
+}
+    
+        
