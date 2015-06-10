@@ -5,13 +5,63 @@ use warnings;
 use FindBin;
 use lib ("$FindBin::Bin/../lib");
 use Fasta_reader;
+use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);                                                 
 
-my $usage = "usage: $0 fusion_preds.dat cDNA_sequences.fasta\n\n";
 
-my $fusion_preds_file = $ARGV[0] or die $usage;
-my $cdna_fasta_file = $ARGV[1] or die $usage;
+my $Evalue = 1e-3;
+my $tmpdir = "/tmp";
+
+my $usage = <<__EOUSAGE__;
+
+########################################################################
+#
+# Required:
+#
+#  --fusion_preds <string>        preliminary fusion predictions
+#
+#  --ref_cdna <string>            reference cDNA sequences fasta file (generated specially based on gtf -see docs) 
+#
+# Optional: 
+#
+#  -E <float>                     E-value threshold for blast searches (default: $Evalue)
+#
+#  --tmpdir <string>              file for temporary files (default: $tmpdir)
+#
+########################################################################  
+
+
+__EOUSAGE__
+
+    ;
+
+my $help_flag;
+
+my $fusion_preds_file;
+my $cdna_fasta_file;
+
+&GetOptions ( 'h' => \$help_flag, 
+              
+              'fusion_preds=s' => \$fusion_preds_file,
+              'ref_cdna=s' => \$cdna_fasta_file,
+              
+              'E=f' => \$Evalue,
+    );
+
+
+if ($help_flag) {
+    die $usage;
+}
+
+unless ($fusion_preds_file && $cdna_fasta_file) {
+    die $usage;
+}
+
 
 main: {
+
+    unless (-d $tmpdir) {
+        mkdir $tmpdir or die "Error, cannot mkdir $tmpdir";
+    }
     
 
     my $filter_info_file = "$fusion_preds_file.filt_info";
@@ -138,8 +188,8 @@ sub examine_seq_similarity {
 
     print STDERR "-testing $geneA vs. $geneB\n";
     
-    my $fileA = "/tmp/$$.gA.fa";
-    my $fileB = "/tmp/$$.gB.fa";
+    my $fileA = "$tmpdir/$$.gA.fa";
+    my $fileB = "$tmpdir/$$.gB.fa";
     
     unless (exists $gene_to_cdna_id_href->{$geneA}) {
         die "Error, no transcripts listed for gene: $geneA";
@@ -171,8 +221,8 @@ sub examine_seq_similarity {
     my $cmd = "makeblastdb -in $fileB -dbtype nucl 2>/dev/null 1>&2";
     &process_cmd($cmd);
     
-    my $blast_out = "/tmp/$$.blastn";
-    $cmd = "blastn -db $fileB -query $fileA -evalue 1e-3 -outfmt 6 -max_target_seqs 1 > $blast_out 2>/dev/null";
+    my $blast_out = "$tmpdir/$$.blastn";
+    $cmd = "blastn -db $fileB -query $fileA -evalue $Evalue -outfmt 6 -max_target_seqs 1 > $blast_out 2>/dev/null";
     &process_cmd($cmd);
 
     my @blast_hits;
