@@ -1,0 +1,125 @@
+#!/usr/bin/env perl
+
+# contributed by Brian Haas, Broad Institute, 2015
+
+use strict;
+use warnings;
+use Carp;
+use Cwd;
+use FindBin;
+
+use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
+
+my $UTILDIR = "$FindBin::Bin/util";
+
+
+=recommended_STAR_settings
+
+  # From Stransky et al. 2014   PMID: 25204415
+
+   STAR --genomeDir Hg19.fa_star_index \
+        --readFilesIn left.fq right.fq \
+        --outSAMstrandField intronMotif \
+        --outFilterIntronMotifs RemoveNoncanonicalUnannotated \
+        --outReadsUnmapped None --chimSegmentMin 15 \
+        --chimJunctionOverhangMin 15 \
+        --alignMatesGapMax 200000 \
+        --alignIntronMax 200000 \
+        --runThreadN 4 \
+        --outSAMtype BAM SortedByCoordinate 
+
+=cut
+
+
+
+## Options
+my $out_prefix = "star-fusion";
+my $chimeric_junction_file;
+my $chimeric_out_sam;
+my $ref_GTF = "$FindBin::Bin/resources/gencode.v19.annotation.gtf.exons.gz";
+my $ref_cdna = "$FindBin::Bin/resources/gencode.v19.annotation.gtf.exons.cdna.gz";
+my $help_flag;
+my $MIN_NOVEL_JUNCTION_SUPPORT = 10;
+my $MIN_ALT_PCT_JUNCTION = 10.0;
+
+my $usage = <<__EOUSAGE__;
+
+###################################################################################
+#
+#  Required:
+#
+#    --chimeric_out_sam|S <string>      Chimeric.out.sam file
+#
+#    --chimeric_junction|J <string>     Chimeric.out.junction file
+#
+#  Optional:
+#
+#    --ref_GTF|G <string>               reference annotation GTF file (ie. gencode.gtf)
+#
+#    --ref_cdna|C <string>              reference cDNA sequences fasta file (generated specially based on gtf -see docs)
+#
+#    --min_novel_junction_support <int>    default: 10  (minimum of 10 junction reads required if breakpoint
+#                                                        lacks involvement of only reference junctions)
+#
+#    --min_alt_pct_junction <float>        default: 10.0  (10% of the dominant isoform junction support)
+#
+#    --out_prefix|O <string>         output file prefix (default: $out_prefix)
+#
+###################################################################################
+
+
+__EOUSAGE__
+
+    ;
+
+
+&GetOptions ( 'h' => \$help_flag,
+              
+              'chimeric_out_sam|S=s' => \$chimeric_out_sam,
+              'chimeric_junction|J=s' => \$chimeric_junction_file,
+              'ref_GTF|G=s' => \$ref_GTF,
+              'ref_cdna|C=s' => \$ref_cdna,
+              
+              'min_novel_junction_support=i' => \$MIN_NOVEL_JUNCTION_SUPPORT,
+              'min_alt_pct_junction=f' => \$MIN_ALT_PCT_JUNCTION,
+              'out_prefix|O=s' => \$out_prefix,
+    );
+
+
+if ($help_flag) {
+    die $usage;
+}
+unless ($chimeric_out_sam && $chimeric_junction_file) {
+    die $usage;
+}
+unless (-s $ref_GTF) {
+    die "Error, cannot locate reference annotation file: $ref_GTF";
+}
+unless (-s $ref_cdna) {
+    die "Error, cannot locate reference cdna file: $ref_cdna";
+}
+
+
+main: {
+     
+     
+
+
+    exit(0);
+    
+}
+
+####
+sub process_cmd {
+    my ($cmd) = @_;
+    
+    print STDERR "CMD: $cmd\n";
+    
+    my $ret = system($cmd);
+    
+    if ($ret) {
+        die "Error, CMD: $cmd died with ret $ret";
+    }
+
+    return;
+}
