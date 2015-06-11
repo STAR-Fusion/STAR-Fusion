@@ -9,6 +9,7 @@ use Cwd;
 use FindBin;
 use lib ("$FindBin::Bin/lib");
 use Pipeliner;
+use Set::IntervalTree;
 
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
@@ -114,7 +115,8 @@ unless (-s $ref_cdna) {
 
 
 my @required_progs = qw(makeblastdb blastn STAR);
-unless (&ensure_required_progs_are_installed(@required_progs)) {
+
+if (&missing_required_program_installed(@required_progs)) {
     
     die "Error, required program(s) are missing. Be sure they are installed and available via your PATH setting";
     
@@ -136,7 +138,7 @@ main: {
         . " --min_alt_pct_junction $MIN_ALT_PCT_JUNCTION "
         . " -O $out_prefix ";
     
-    $pipeliner->add_command(new Command($cmd, "STAR-Fusion.predict.ok"));
+    $pipeliner->add_commands(new Command($cmd, "STAR-Fusion.predict.ok"));
 
     my $predicted_fusions_file = "$out_prefix.fusion_candidates.preliminary";
     
@@ -148,7 +150,7 @@ main: {
         . " -E $Evalue "
         . " --tmpdir $tmpdir ";
     
-    $pipeliner->add_command(new Command($cmd, "STAR-Fusion.filter.ok"));
+    $pipeliner->add_commands(new Command($cmd, "STAR-Fusion.filter.ok"));
 
     
     $pipeliner->run();
@@ -175,7 +177,7 @@ sub process_cmd {
 
 
 ####
-sub ensure_required_progs_are_installed {
+sub missing_required_program_installed {
     my (@required_progs) = @_;
 
     my $missing = 0;

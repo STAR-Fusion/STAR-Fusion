@@ -2,6 +2,7 @@
 
 use strict;
 use warnings;
+use Carp;
 use FindBin;
 use lib ("$FindBin::Bin/../lib");
 use Fasta_reader;
@@ -169,7 +170,7 @@ sub parse_cdna_seqs_by_gene {
         
         my ($trans_id, $gene_id, $gene_name, @rest) = split(/\s+/, $header);
         unless ($gene_id) {
-            die "Error, need format '>trans_id gene_id [gene_name] ... for the header";
+            confess "Error, need format '>trans_id gene_id [gene_name] ... for the header, found:\n$header\n";
         }
         
         $gene_to_trans{$gene_id}->{$trans_id} = 1;
