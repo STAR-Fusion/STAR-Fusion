@@ -639,8 +639,8 @@ sub map_spanning_reads_to_genes {
         }
 
 
-        $full_read_name =~ m|/([12])$| or die "Error, cannot decipher read name $full_read_name as /1 or /2 ";
-        my $read_dir = $1;
+        my $read_dir = ($full_read_name =~ m|/([12])$|) ? $1 : 0;
+        unless ($read_dir) { next; }
         
         my $chr = $sam_entry->get_scaffold_name();
 
