@@ -233,9 +233,6 @@ main: {
         
     }
     
-    
-    print STDERR "\n\t* process complete.  See output: $fusion_predictions_outfile\n\n";
-    
     close $ofh;
     
 

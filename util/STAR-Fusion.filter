@@ -113,7 +113,7 @@ main: {
             foreach my $altB (@$altB_aref) {
                 my @blast = &examine_seq_similarity($geneB, $altB, \%cdna_seqs, \%gene_to_cdna_id);
                 if (@blast) {
-                    push (@blast, "ALREADY_SELECTED_$geneA--$altB");
+                    push (@blast, "ALREADY_SELECTED:$geneA--$altB");
                     push (@blast_info, @blast);
                 }
             }
@@ -123,7 +123,7 @@ main: {
             foreach my $altA (@$altA_aref) {
                 my @blast = &examine_seq_similarity($altA, $geneA, \%cdna_seqs, \%gene_to_cdna_id);
                 if (@blast) {
-                    push (@blast, "ALREADY_SELECTED_$altA--$geneB");
+                    push (@blast, "ALREADY_SELECTED:$altA--$geneB");
                     push (@blast_info, @blast);
                 }
             }
@@ -136,9 +136,6 @@ main: {
         }
         print $ofh "$line\t" . join("\t", @blast_info) . "\n";
 
-        use Data::Dumper;
-        print STDERR Dumper(\@blast_info);
-        
         unless (@blast_info) {
             print "$line\n";
             push (@{$AtoB{$geneA}}, $geneB);

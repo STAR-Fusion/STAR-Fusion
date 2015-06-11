@@ -46,7 +46,7 @@ my $MIN_NOVEL_JUNCTION_SUPPORT = 10;
 my $MIN_ALT_PCT_JUNCTION = 10.0;
 my $Evalue = 1e-3;
 my $tmpdir = "/tmp";
-
+my $verbose_level = 1;
 
 my $usage = <<__EOUSAGE__;
 
@@ -60,20 +60,22 @@ my $usage = <<__EOUSAGE__;
 #
 #  Optional:
 #
-#    --ref_GTF|G <string>               reference annotation GTF file (ie. gencode.gtf)
+#    --ref_GTF|G <string>                  reference annotation GTF file (ie. gencode.gtf)
 #
-#    --ref_cdna|C <string>              reference cDNA sequences fasta file (generated specially based on gtf -see docs)
+#    --ref_cdna|C <string>                 reference cDNA sequences fasta file (generated specially based on gtf -see docs)
 #
 #    --min_novel_junction_support <int>    default: 10  (minimum of 10 junction reads required if breakpoint
 #                                                        lacks involvement of only reference junctions)
 #
 #    --min_alt_pct_junction <float>        default: 10.0  (10% of the dominant isoform junction support)
 #
-#    --out_prefix|O <string>         output file prefix (default: $out_prefix)
+#    --out_prefix|O <string>               output file prefix (default: $out_prefix)
 #   
-#  -E <float>                     E-value threshold for blast searches (default: 0.001)
+#    -E <float>                            E-value threshold for blast searches (default: 0.001)
 #
-#  --tmpdir <string>              file for temporary files (default: /tmp)
+#    --tmpdir <string>                     file for temporary files (default: /tmp)
+#
+#    --verbose_level <int>                 verbosity (default: $verbose_level, max=2)
 #
 ###################################################################################
 
@@ -96,7 +98,7 @@ __EOUSAGE__
 
               'E=f' => \$Evalue,
               'tmpdir=s' => \$tmpdir,
-              
+              'verbose_level=i' => \$verbose_level,
     );
 
 
@@ -126,7 +128,7 @@ if (&missing_required_program_installed(@required_progs)) {
 
 main: {
      
-    my $pipeliner = new Pipeliner(-verbose => 1);
+    my $pipeliner = new Pipeliner(-verbose => $verbose_level);
     
     ## predict fusions
 
@@ -148,14 +150,16 @@ main: {
         . " --fusion_preds $predicted_fusions_file "
         . " --ref_cdna $ref_cdna "
         . " -E $Evalue "
-        . " --tmpdir $tmpdir ";
+        . " --tmpdir $tmpdir "
+        . " > $out_prefix.fusion_candidates.final ";
     
     $pipeliner->add_commands(new Command($cmd, "STAR-Fusion.filter.ok"));
 
     
     $pipeliner->run();
     
-
+    print STDERR "\n\n\t* Process complete.  See output: $out_prefix.fusion_candidates.final\n\n\n";
+    
     exit(0);
     
 }
@@ -185,6 +189,7 @@ sub missing_required_program_installed {
     foreach my $prog (@required_progs) {
 
         my $path = `which $prog`;
+        chomp $path;
         unless ($path && $path =~ /\w/) {
             $missing++;
             print STDERR "Error, cannot locate required program: $prog\n";
