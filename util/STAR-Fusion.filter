@@ -106,25 +106,31 @@ main: {
     foreach my $fusion (@fusions) {
         
         my ($geneA, $geneB) = ($fusion->{geneA}, $fusion->{geneB});
-        my @blast_info;
+
+        my @blast_info = &examine_seq_similarity($geneA, $geneB, \%cdna_seqs, \%gene_to_cdna_id);
+        if (@blast_info) {
+            push (@blast_info, "SEQ_SIMILAR_PAIR");
+        }
+        else {
         
-        my $altB_aref = $AtoB{$geneA};
-        if ($altB_aref) {
-            foreach my $altB (@$altB_aref) {
-                my @blast = &examine_seq_similarity($geneB, $altB, \%cdna_seqs, \%gene_to_cdna_id);
-                if (@blast) {
-                    push (@blast, "ALREADY_SELECTED:$geneA--$altB");
-                    push (@blast_info, @blast);
+            my $altB_aref = $AtoB{$geneA};
+            if ($altB_aref) {
+                foreach my $altB (@$altB_aref) {
+                    my @blast = &examine_seq_similarity($geneB, $altB, \%cdna_seqs, \%gene_to_cdna_id);
+                    if (@blast) {
+                        push (@blast, "ALREADY_SELECTED:$geneA--$altB");
+                        push (@blast_info, @blast);
+                    }
                 }
             }
-        }
-        my $altA_aref = $BtoA{$geneB};
-        if ($altA_aref) {
-            foreach my $altA (@$altA_aref) {
-                my @blast = &examine_seq_similarity($altA, $geneA, \%cdna_seqs, \%gene_to_cdna_id);
-                if (@blast) {
-                    push (@blast, "ALREADY_SELECTED:$altA--$geneB");
-                    push (@blast_info, @blast);
+            my $altA_aref = $BtoA{$geneB};
+            if ($altA_aref) {
+                foreach my $altA (@$altA_aref) {
+                    my @blast = &examine_seq_similarity($altA, $geneA, \%cdna_seqs, \%gene_to_cdna_id);
+                    if (@blast) {
+                        push (@blast, "ALREADY_SELECTED:$altA--$geneB");
+                        push (@blast_info, @blast);
+                    }
                 }
             }
         }

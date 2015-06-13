@@ -77,12 +77,17 @@ my $usage = <<__EOUSAGE__;
 #
 #    --verbose_level <int>                 verbosity (default: $verbose_level, max=2)
 #
+#    --no_filter                           do not filter predictions.
+#
 ###################################################################################
 
 
 __EOUSAGE__
 
     ;
+
+
+my $no_filter = 0;
 
 
 &GetOptions ( 'h' => \$help_flag,
@@ -99,6 +104,8 @@ __EOUSAGE__
               'E=f' => \$Evalue,
               'tmpdir=s' => \$tmpdir,
               'verbose_level=i' => \$verbose_level,
+    
+              'no_filter' => \$no_filter,
     );
 
 
@@ -144,6 +151,12 @@ main: {
 
     my $predicted_fusions_file = "$out_prefix.fusion_candidates.preliminary";
     
+    if ($no_filter) {
+        print STDERR "\n\n\t--no_filter in effect.  See preliminary predictions at: $predicted_fusions_file\n\n";
+        exit(0);
+    }
+    
+
     ## filter fusions
     
     $cmd = "$UTILDIR/STAR-Fusion.filter "
