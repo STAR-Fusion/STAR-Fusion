@@ -151,27 +151,31 @@ main: {
 
     my $predicted_fusions_file = "$out_prefix.fusion_candidates.preliminary";
     
-    if ($no_filter) {
-        print STDERR "\n\n\t--no_filter in effect.  See preliminary predictions at: $predicted_fusions_file\n\n";
-        exit(0);
+    unless ($no_filter) {
+           
+        ## filter fusions
+        
+        $cmd = "$UTILDIR/STAR-Fusion.filter "
+            . " --fusion_preds $predicted_fusions_file "
+            . " --ref_cdna $ref_cdna "
+            . " -E $Evalue "
+            . " --tmpdir $tmpdir "
+            . " > $out_prefix.fusion_candidates.final ";
+        
+        $pipeliner->add_commands(new Command($cmd, "STAR-Fusion.filter.ok"));
+        
     }
-    
-
-    ## filter fusions
-    
-    $cmd = "$UTILDIR/STAR-Fusion.filter "
-        . " --fusion_preds $predicted_fusions_file "
-        . " --ref_cdna $ref_cdna "
-        . " -E $Evalue "
-        . " --tmpdir $tmpdir "
-        . " > $out_prefix.fusion_candidates.final ";
-    
-    $pipeliner->add_commands(new Command($cmd, "STAR-Fusion.filter.ok"));
-
-    
     $pipeliner->run();
     
-    print STDERR "\n\n\t* Process complete.  See output: $out_prefix.fusion_candidates.final\n\n\n";
+    if ($no_filter) {
+         
+        print STDERR "\n\n *** Note: --no_filtering in effect, so outputs have not been filtered for likely false positives.\n";
+        print STDERR "\n\tSee output: $out_prefix.fusion_candidates.preliminary\n\n";
+    }
+    else {
+        
+        print STDERR "\n\n\t* Process complete.  See output: $out_prefix.fusion_candidates.final\n\n\n";
+    }
     
     exit(0);
     
