@@ -10,8 +10,9 @@ STAR should be run using options that are well suited to fusion read detection. 
         --readFilesIn left.fq right.fq \
         --outSAMstrandField intronMotif \
         --outFilterIntronMotifs RemoveNoncanonicalUnannotated \
-        --outReadsUnmapped None --chimSegmentMin 15 \
-        --chimJunctionOverhangMin 15 \
+        --outReadsUnmapped None --chimSegmentMin 12 \
+        --chimJunctionOverhangMin 12 \
+        --alignSJDBoverhangMin 10 \
         --alignMatesGapMax 200000 \
         --alignIntronMax 200000 \
         --outSAMtype BAM SortedByCoordinate 
