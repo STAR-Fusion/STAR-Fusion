@@ -75,8 +75,11 @@ main: {
     
     my @fusions;
     open (my $fh, $fusion_preds_file) or die "Error, cannot open file $fusion_preds_file";
+    my $header = <$fh>;
     while (<$fh>) {
-        if (/^\#/) { next; }
+        if (/^\#/) { 
+            next; 
+        }
         chomp;
         my $line = $_;
         my @x = split(/\t/);
@@ -96,6 +99,8 @@ main: {
         
     }
     close $fh;
+
+    print $header;
     
     @fusions = reverse sort {$a->{score} <=> $b->{score} } @fusions;
 
