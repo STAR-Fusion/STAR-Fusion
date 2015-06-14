@@ -65,7 +65,7 @@ The output from STAR-Fusion is found as a tab-delimited file named 'star-fusion.
  ...
 ```
 
-Note, these fusion candidates are derived based on mapping the STAR outputs to the reference annotations.  Paralogous genes are notorious for showing up as false-positive fusion candidates. Initial/preliminary predictions are found in file 'star-fusion.fusion_predictions.preliminary'. These are filtered using BLASTN, and those preliminary predictions that are excluded are prefixed with '#' in the file 'star-fusion.fusion_predictions.preliminary.filt', and the blast results are included in additional column fields for such entries.  Those that are not flagged as likely artifacts are reported in the final report file 'star-fusions.fusion_predictions.final'.  To turn off filtering (the BLAST step), simply run STAR-Fusion with the --no_filter parameter. See usage information (--help) for additional options).
+Note, these fusion candidates are derived based on mapping the STAR outputs to the reference annotations.  Paralogous genes are notorious for showing up as false-positive fusion candidates. Initial/preliminary predictions are found in file 'star-fusion.fusion_predictions.preliminary'. These are filtered using BLASTN, and those preliminary predictions that are excluded are prefixed with '#' in the file 'star-fusion.fusion_predictions.preliminary.filt', and the BLAST results are included in additional column fields for such entries.  Those that are not flagged as likely artifacts are reported in the final report file 'star-fusions.fusion_predictions.final'.  To turn off filtering (the BLAST step), simply run STAR-Fusion with the '--no_filter' parameter. See usage information (--help) for additional options).
 
 
 ## Parameterization 
