@@ -90,7 +90,7 @@ __EOUSAGE__
 my $no_filter = 0;
 
 
-&GetOptions ( 'h' => \$help_flag,
+&GetOptions ( 'help|h' => \$help_flag,
               
               'chimeric_out_sam|S=s' => \$chimeric_out_sam,
               'chimeric_junction|J=s' => \$chimeric_junction_file,

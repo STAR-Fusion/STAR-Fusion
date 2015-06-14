@@ -25,6 +25,8 @@ The output from running star will include two primary output files that contain 
 
 ## Installation Requirements 
 
+  In addition to having the STAR aligner installed, you'll need NCBI BLAST+: 
+  http://blast.ncbi.nlm.nih.gov/Blast.cgi?PAGE_TYPE=BlastDocs&DOC_TYPE=Download
 
   STAR-Fusion requires the following Perl module from CPAN : Set/IntervalTree.pm
   found here:
@@ -44,7 +46,7 @@ Run STAR-Fusion like so, using these two files above.  (Note, specify -G ref_ann
       STAR-Fusion -S Chimeric.out.sam -J Chimeric.out.junction
 
 
-The output from STAR-Fusion is found as a tab-delimited file named 'star-fusion.fusion_candidates.txt', and has the following format:
+The output from STAR-Fusion is found as a tab-delimited file named 'star-fusion.fusion_candidates.final', and has the following format:
 
 ```
  #fusion_name    JunctionReads   SpanningFrags   LeftGene        LeftBreakpoint  LeftDistFromRefExonSplice       RightGene       RightBreakpoint RightDistFromRefExonSplice
@@ -62,7 +64,7 @@ The output from STAR-Fusion is found as a tab-delimited file named 'star-fusion.
  ...
 ```
 
-Note, these fusion candidates are derived solely on mapping the STAR outputs to the reference annotations.  Paralogous genes are notorious for showing up as false-positive fusion candidates. Additional filtering tools, although not included now, will be made available soon.  Even without additional filtering, STAR-Fusion provides fusion detection accuracy that is on par with the very best available fusion predictors, and is one of the most efficient.
+Note, these fusion candidates are derived based on mapping the STAR outputs to the reference annotations.  Paralogous genes are notorious for showing up as false-positive fusion candidates. Initial/preliminary predictions are found in file 'star-fusion.fusion_predictions.preliminary'. These are filtered using BLASTN, and those preliminary predictions that are excluded are prefixed with '#' in the file 'star-fusion.fusion_predictions.preliminary.filt', and the blast results are included in additional column fields for such entries.  Those that are not flagged as likely artifacts are reported in the final report file 'star-fusions.fusion_predictions.final'.  To turn off filtering (the BLAST step), simply run STAR-Fusion with the --no_filter parameter. See usage information (--help) for additional options).
 
 
 ## Parameterization 
