@@ -116,11 +116,11 @@ You'll need a reference genome (ie. my_genome.fasta) and reference transcript st
 
 Generate a specially formatted reference cDNA fasta file like so:
 
-   util/gtf_file_to_cDNA_seqs.pl my_annotations.gtf my_genome.fasta > my_cdna.fasta
+    util/gtf_file_to_cDNA_seqs.pl my_annotations.gtf my_genome.fasta > my_cdna.fasta
 
 and then build an index for the my_cdna.fasta file like so:
 
-   util/index_cdna_seqs.pl my_cdna.fasta
+    util/index_cdna_seqs.pl my_cdna.fasta
 
 
 When running STAR-Fusion, specify '--ref_GTF my_annotations.gtf' and '--ref_cdna my_cdna.fasta' to make use of these alternative targets.
