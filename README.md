@@ -26,18 +26,29 @@ The output from running star will include two primary output files that contain 
 
 ## Installation Requirements 
 
+### Software prerequisites:
+
   In addition to having the STAR aligner installed, you'll need NCBI BLAST+: 
   http://blast.ncbi.nlm.nih.gov/Blast.cgi?PAGE_TYPE=BlastDocs&DOC_TYPE=Download
 
-  STAR-Fusion requires the following Perl module from CPAN : Set/IntervalTree.pm
-  found here:
-  http://search.cpan.org/~benbooth/Set-IntervalTree-0.02/lib/Set/IntervalTree.pm
-
+  STAR-Fusion requires the following non-standard Perl modules from CPAN: Set/IntervalTree.pm and DB_File.pm
+  
   A typical perl module installation may involve:
   perl -MCPAN -e shell
-    install Set::IntervalTree 
+    install Set::IntervalTree
+    install DB_File
  	
-  *This CPAN module tends to install trouble-free on Linux.  Note, if you have trouble installing Set::IntervalTree on Mac OS X (as I did), try the following:  download the tarball from the above, run the perl Makefile.pl, then edit the generated 'Makefile' and remove all occurrences of '-arch i386'. Then try 'make', 'make test', and finally 'make install'.
+  *The Set::IntervalTree module tends to install trouble-free on Linux.  Note, if you have trouble installing Set::IntervalTree on Mac OS X (as I did), try the following:  download the tarball from the http://search.cpan.org/~benbooth/Set-IntervalTree-0.02/lib/Set/IntervalTree.pm, run the perl Makefile.pl, then edit the generated 'Makefile' and remove all occurrences of '-arch i386'. Then try 'make', 'make test', and finally 'make install'.
+
+### Building the reference sequence index
+
+Included with STAR-Fusion is the Gencode Hg19 sequence annotations and specially formatted reference transcript sequences. The transcript sequences need to be indexed, which can be done by simply running
+
+   make
+
+in the STAR-Fusion base installation directory.
+
+If you're interested in running STAR-Fusion using other reference genomes and reference annotations, see instructions below in how to integrate alternative genome resources.
 
 
 ## Running STAR-Fusion 
@@ -93,6 +104,26 @@ which simply runs:
     ../STAR-Fusion -S Chimeric.out.sam.gz -J Chimeric.out.junction.gz 
 
 and you'll find the output file 'star-fusion.fusion_candidates.txt' containing the fusion candidates in the format described above.
+
+
+## Integrating alternative genome resources
+
+STAR-Fusion comes with reference annotations and sequences based on the human reference genome Hg19 and gencode annotations.  
+
+If you wish to use a different genome and set of reference annotations, you can install them as follows.
+
+You'll need a reference genome (ie. my_genome.fasta) and reference transcript structure annotations (ie. my_annotations.gtf).  This GTF file should include 'exon' features and contain attributes for 'gene_id', 'transcript_id', and optionally but recommended 'gene_name' to preferentially use gene symbols.
+
+Generate a specially formatted reference cDNA fasta file like so:
+
+   util/gtf_file_to_cDNA_seqs.pl my_annotations.gtf my_genome.fasta > my_cdna.fasta
+
+and then build an index for the my_cdna.fasta file like so:
+
+   util/index_cdna_seqs.pl my_cdna.fasta
+
+
+When running STAR-Fusion, specify '--ref_GTF my_annotations.gtf' and '--ref_cdna my_cdna.fasta' to make use of these alternative targets.
 
 
 
