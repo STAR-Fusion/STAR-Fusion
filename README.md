@@ -10,8 +10,9 @@ STAR should be run using options that are well suited to fusion read detection. 
         --readFilesIn left.fq right.fq \
         --outSAMstrandField intronMotif \
         --outFilterIntronMotifs RemoveNoncanonicalUnannotated \
-        --outReadsUnmapped None --chimSegmentMin 15 \
-        --chimJunctionOverhangMin 15 \
+        --outReadsUnmapped None --chimSegmentMin 12 \
+        --chimJunctionOverhangMin 12 \
+        --alignSJDBoverhangMin 10 \
         --alignMatesGapMax 200000 \
         --alignIntronMax 200000 \
         --outSAMtype BAM SortedByCoordinate 
@@ -25,16 +26,29 @@ The output from running star will include two primary output files that contain 
 
 ## Installation Requirements 
 
+### Software prerequisites:
 
-  STAR-Fusion requires the following Perl module from CPAN : Set/IntervalTree.pm
-  found here:
-  http://search.cpan.org/~benbooth/Set-IntervalTree-0.02/lib/Set/IntervalTree.pm
+  In addition to having the STAR aligner installed, you'll need NCBI BLAST+: 
+  http://blast.ncbi.nlm.nih.gov/Blast.cgi?PAGE_TYPE=BlastDocs&DOC_TYPE=Download
 
+  STAR-Fusion requires the following non-standard Perl modules from CPAN: Set/IntervalTree.pm and DB_File.pm
+  
   A typical perl module installation may involve:
   perl -MCPAN -e shell
-    install Set::IntervalTree 
+    install Set::IntervalTree
+    install DB_File
  	
-  *This CPAN module tends to install trouble-free on Linux.  Note, if you have trouble installing Set::IntervalTree on Mac OS X (as I did), try the following:  download the tarball from the above, run the perl Makefile.pl, then edit the generated 'Makefile' and remove all occurrences of '-arch i386'. Then try 'make', 'make test', and finally 'make install'.
+  *The Set::IntervalTree module tends to install trouble-free on Linux.  Note, if you have trouble installing Set::IntervalTree on Mac OS X (as I did), try the following:  download the tarball from the http://search.cpan.org/~benbooth/Set-IntervalTree-0.02/lib/Set/IntervalTree.pm, run the perl Makefile.pl, then edit the generated 'Makefile' and remove all occurrences of '-arch i386'. Then try 'make', 'make test', and finally 'make install'.
+
+### Building the reference sequence index
+
+Included with STAR-Fusion is the Gencode Hg19 sequence annotations and specially formatted reference transcript sequences. The transcript sequences need to be indexed, which can be done by simply running
+
+   make
+
+in the STAR-Fusion base installation directory.
+
+If you're interested in running STAR-Fusion using other reference genomes and reference annotations, see instructions below in how to integrate alternative genome resources.
 
 
 ## Running STAR-Fusion 
@@ -44,7 +58,7 @@ Run STAR-Fusion like so, using these two files above.  (Note, specify -G ref_ann
       STAR-Fusion -S Chimeric.out.sam -J Chimeric.out.junction
 
 
-The output from STAR-Fusion is found as a tab-delimited file named 'star-fusion.fusion_candidates.txt', and has the following format:
+The output from STAR-Fusion is found as a tab-delimited file named 'star-fusion.fusion_candidates.final', and has the following format:
 
 ```
  #fusion_name    JunctionReads   SpanningFrags   LeftGene        LeftBreakpoint  LeftDistFromRefExonSplice       RightGene       RightBreakpoint RightDistFromRefExonSplice
@@ -62,7 +76,7 @@ The output from STAR-Fusion is found as a tab-delimited file named 'star-fusion.
  ...
 ```
 
-Note, these fusion candidates are derived solely on mapping the STAR outputs to the reference annotations.  Paralogous genes are notorious for showing up as false-positive fusion candidates. Additional filtering tools, although not included now, will be made available soon.  Even without additional filtering, STAR-Fusion provides fusion detection accuracy that is on par with the very best available fusion predictors, and is one of the most efficient.
+Note, these fusion candidates are derived based on mapping the STAR outputs to the reference annotations.  Paralogous genes are notorious for showing up as false-positive fusion candidates. Initial/preliminary predictions are found in file 'star-fusion.fusion_predictions.preliminary'. These are filtered using BLASTN, and those preliminary predictions that are excluded are prefixed with '#' in the file 'star-fusion.fusion_predictions.preliminary.filt', and the BLAST results are included in additional column fields for such entries.  Those that are not flagged as likely artifacts are reported in the final report file 'star-fusions.fusion_predictions.final'.  To turn off filtering (the BLAST step), simply run STAR-Fusion with the '--no_filter' parameter. See usage information (--help) for additional options).
 
 
 ## Parameterization 
@@ -90,6 +104,26 @@ which simply runs:
     ../STAR-Fusion -S Chimeric.out.sam.gz -J Chimeric.out.junction.gz 
 
 and you'll find the output file 'star-fusion.fusion_candidates.txt' containing the fusion candidates in the format described above.
+
+
+## Integrating alternative genome resources
+
+STAR-Fusion comes with reference annotations and sequences based on the human reference genome Hg19 and gencode annotations.  
+
+If you wish to use a different genome and set of reference annotations, you can install them as follows.
+
+You'll need a reference genome (ie. my_genome.fasta) and reference transcript structure annotations (ie. my_annotations.gtf).  This GTF file should include 'exon' features and contain attributes for 'gene_id', 'transcript_id', and optionally but recommended 'gene_name' to preferentially use gene symbols.
+
+Generate a specially formatted reference cDNA fasta file like so:
+
+    util/gtf_file_to_cDNA_seqs.pl my_annotations.gtf my_genome.fasta > my_cdna.fasta
+
+and then build an index for the my_cdna.fasta file like so:
+
+    util/index_cdna_seqs.pl my_cdna.fasta
+
+
+When running STAR-Fusion, specify '--ref_GTF my_annotations.gtf' and '--ref_cdna my_cdna.fasta' to make use of these alternative targets.
 
 
 
