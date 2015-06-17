@@ -12,7 +12,7 @@ use Carp;
 
 my $usage = "\n\nusage: $0 gtf_file genome_db\n\n";
 
-my $gff3_file = $ARGV[0] or die $usage;
+my $gtf_file = $ARGV[0] or die $usage;
 my $fasta_db = $ARGV[1] or die $usage;
 
 
@@ -20,7 +20,7 @@ my $fasta_db = $ARGV[1] or die $usage;
 my $gene_obj_indexer = {};
     
 ## associate gene identifiers with contig id's.
-&GTF_utils::index_GTF_gene_objs($gff3_file, $gene_obj_indexer);
+&GTF_utils::index_GTF_gene_objs($gtf_file, $gene_obj_indexer);
 
 
 ## associate all gene_ids with contigs
@@ -53,7 +53,7 @@ foreach my $asmbl_id (sort keys %contig_to_gene_list) {
     my @gene_ids = @{$contig_to_gene_list{$asmbl_id}};
     
     foreach my $gene_id (@gene_ids) {
-        my $gene_obj_ref = $gene_obj_indexer-{$gene_id};
+        my $gene_obj_ref = $gene_obj_indexer->{$gene_id};
 
         $gene_obj_ref->create_all_sequence_types(\$genome_seq);
         
