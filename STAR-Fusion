@@ -118,7 +118,7 @@ unless ($chimeric_out_sam && $chimeric_junction_file) {
 unless (-s $ref_GTF) {
     die "Error, cannot locate reference annotation file: $ref_GTF";
 }
-unless (-s $ref_cdna) {
+unless ( -s $ref_cdna || $no_filter ) {
     die "Error, cannot locate reference cdna file: $ref_cdna";
 }
 
