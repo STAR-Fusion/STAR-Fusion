@@ -61,8 +61,7 @@ unless ($fusion_preds_file && $cdna_fasta_file) {
 
 my $ref_cdna_idx_file = "$cdna_fasta_file.idx";
 unless (-s $ref_cdna_idx_file) {
-    print STDERR "Error, cannot find indexed fasta file: $cdna_fasta_file.idx; be sure to build an index - see docs.\n";
-    exit(0);
+    die "Error, cannot find indexed fasta file: $cdna_fasta_file.idx; be sure to build an index - see docs.\n";
 }
 
 
