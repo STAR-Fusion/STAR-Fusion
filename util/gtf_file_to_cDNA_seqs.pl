@@ -7,7 +7,7 @@ use lib ("$FindBin::Bin/../lib");
 use Gene_obj;
 use Gene_obj_indexer;
 use GTF_utils;
-use CdbTools;
+use Fasta_retriever;
 use Carp;
 
 my $usage = "\n\nusage: $0 gtf_file genome_db\n\n";
@@ -21,6 +21,9 @@ my $gene_obj_indexer = {};
     
 ## associate gene identifiers with contig id's.
 &GTF_utils::index_GTF_gene_objs($gtf_file, $gene_obj_indexer);
+
+
+my $fasta_retriever = new Fasta_retriever($fasta_db);
 
 
 ## associate all gene_ids with contigs
@@ -48,7 +51,7 @@ foreach my $gene_id (@all_gene_ids) {
 
 foreach my $asmbl_id (sort keys %contig_to_gene_list) {
     
-    my $genome_seq = cdbyank_linear($asmbl_id, $fasta_db);
+    my $genome_seq = $fasta_retriever->get_seq($asmbl_id);
     
     my @gene_ids = @{$contig_to_gene_list{$asmbl_id}};
     
