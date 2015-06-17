@@ -16,8 +16,6 @@ Chimeric.out.junction.gz
 Chimeric.out.sam.gz
 cleanme.pl
 runMe.sh
-star-fusion.junction_read_names
-star-fusion.spanning_read_names
                         );
 
 

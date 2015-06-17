@@ -105,6 +105,7 @@ main: {
     }
     close $fh;
 
+    print $ofh $header;
     print $header;
     
     @fusions = reverse sort {$a->{score} <=> $b->{score} } @fusions;
