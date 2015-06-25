@@ -74,6 +74,17 @@ unless (-s $ref_cdna_idx_file) {
 
 my $CDNA_IDX = new TiedHash({ use => $ref_cdna_idx_file });
 
+my $BLAST_PAIRS_IDX;
+my $blast_pairs_idx_file = "$cdna_fasta_file.blastn_gene_pairs.gz.idx";
+if (-s $blast_pairs_idx_file) {
+    $BLAST_PAIRS_IDX = new TiedHash( { use => $blast_pairs_idx_file } );
+}
+else {
+    die "Error, cannot locate $blast_pairs_idx_file";
+}
+
+my %BLAST_CACHE;
+
 
 main: {
 
@@ -100,7 +111,8 @@ main: {
         my $J = $x[1];
         my $S = $x[2];
 
-        my $score = sqrt($J**2 + $S**2);
+        #my $score = sqrt($J**2 + $S**2);
+        my $score = $J*4 + $S;
         
         push (@fusions, { fusion_name => $fusion_name,
                           geneA => $geneA,
@@ -121,38 +133,48 @@ main: {
     my %AtoB;
     my %BtoA;
     
+    my %already_approved;
+
     foreach my $fusion (@fusions) {
-        
+
         my ($geneA, $geneB) = ($fusion->{geneA}, $fusion->{geneB});
 
-        my @blast_info = &examine_seq_similarity($geneA, $geneB);
-        if (@blast_info) {
-            push (@blast_info, "SEQ_SIMILAR_PAIR");
-        }
-        else {
-        
-            my $altB_aref = $AtoB{$geneA};
-            if ($altB_aref) {
-                foreach my $altB (@$altB_aref) {
-                    my @blast = &examine_seq_similarity($geneB, $altB);
-                    if (@blast) {
-                        push (@blast, "ALREADY_SELECTED:$geneA--$altB");
-                        push (@blast_info, @blast);
+        #print STDERR "Examining fusion: $geneA--$geneB\n";
+        my @blast_info;
+
+        unless ($already_approved{$geneA}->{$geneB}) {
+            
+            
+            @blast_info = &examine_seq_similarity($geneA, $geneB);
+            if (@blast_info) {
+                push (@blast_info, "SEQ_SIMILAR_PAIR");
+            }
+            else {
+                
+                my $altB_href = $AtoB{$geneA};
+                if ($altB_href) {
+                    foreach my $altB (keys %$altB_href) {
+                        my @blast = &examine_seq_similarity($geneB, $altB);
+                        if (@blast) {
+                            push (@blast, "ALREADY_SELECTED:$geneA--$altB");
+                            push (@blast_info, @blast);
+                        }
+                    }
+                }
+                my $altA_href = $BtoA{$geneB};
+                if ($altA_href) {
+                    foreach my $altA (keys %$altA_href) {
+                        my @blast = &examine_seq_similarity($altA, $geneA);
+                        if (@blast) {
+                            push (@blast, "ALREADY_SELECTED:$altA--$geneB");
+                            push (@blast_info, @blast);
+                        }
                     }
                 }
             }
-            my $altA_aref = $BtoA{$geneB};
-            if ($altA_aref) {
-                foreach my $altA (@$altA_aref) {
-                    my @blast = &examine_seq_similarity($altA, $geneA);
-                    if (@blast) {
-                        push (@blast, "ALREADY_SELECTED:$altA--$geneB");
-                        push (@blast_info, @blast);
-                    }
-                }
-            }
         }
         
+            
         my $line = $fusion->{line};
         
         if (@blast_info) {
@@ -162,8 +184,10 @@ main: {
 
         unless (@blast_info) {
             print "$line\n";
-            push (@{$AtoB{$geneA}}, $geneB);
-            push (@{$BtoA{$geneB}}, $geneA);
+            $AtoB{$geneA}->{$geneB} = 1;
+            $BtoA{$geneB}->{$geneA} = 1;
+            
+            $already_approved{$geneA}->{$geneB} = 1;
         }
         
     }
@@ -177,6 +201,32 @@ main: {
 ####
 sub examine_seq_similarity {
     my ($geneA, $geneB) = @_;
+    
+    my @blast_hits;
+    
+
+    if ($BLAST_PAIRS_IDX) {
+        # use pre-computed blast pair data
+        if (my $hit = $BLAST_PAIRS_IDX->get_value("$geneA--$geneB")) {
+            return($hit);
+        }
+        else {
+            return();
+        }
+    }
+    
+    # check for previously stored blast results or attempted search
+    if (my $cache_aref = $BLAST_CACHE{"$geneA--$geneB"}) {
+        my @hits = @$cache_aref;
+        if (@hits) {
+            print STDERR "CACHED HITS FOR: $geneA--$geneB: [@hits]\n";
+            return(@hits);
+        }
+        else {
+            return();
+        }
+    }
+    
 
     print STDERR "-testing $geneA vs. $geneB\n";
     
@@ -199,7 +249,7 @@ sub examine_seq_similarity {
         print $ofh $cdna_seqs;
         close $ofh;
     }
-
+    
     #print STDERR "do it? ... ";
     #my $response = <STDIN>;
     
@@ -210,8 +260,7 @@ sub examine_seq_similarity {
     my $blast_out = "$tmpdir/$$.blastn";
     $cmd = "blastn -db $fileB -query $fileA -evalue $Evalue -outfmt 6 -lcase_masking -max_target_seqs 1 > $blast_out 2>/dev/null";
     &process_cmd($cmd);
-
-    my @blast_hits;
+    
     if (-s $blast_out) {
         open (my $fh, $blast_out) or die "Error, cannot open file $blast_out";
         while (<$fh>) {
@@ -223,6 +272,7 @@ sub examine_seq_similarity {
         }
     }
     
+    $BLAST_CACHE{"$geneA--$geneB"} = [@blast_hits];
 
     return(@blast_hits);
 }
