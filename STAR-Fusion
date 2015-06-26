@@ -123,16 +123,6 @@ unless ( -s $ref_cdna || $no_filter ) {
 }
 
 
-my @required_progs = qw(makeblastdb blastn STAR);
-
-if (&missing_required_program_installed(@required_progs)) {
-    
-    die "Error, required program(s) are missing. Be sure they are installed and available via your PATH setting";
-    
-}
-
-
-
 main: {
      
     my $pipeliner = new Pipeliner(-verbose => $verbose_level);
