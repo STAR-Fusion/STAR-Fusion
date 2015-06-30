@@ -197,7 +197,7 @@ main: {
                         $fusion->{junction_reads}, $fusion->{spanning_frags});
         
 
-        $fusion->{line} = $line;
+        $fusion->{line} = $line;  # note, we'll need to reset this later after merging occurs for some entries.
         
         push (@fusions, $fusion); 
     }
@@ -262,7 +262,12 @@ main: {
         }
         
         
-        my $line = $fusion->{line};
+        # regenerating 'line' here, since merged entries will now have updated stats.        
+        my $line = join("\t", $fusion->{fusion_name}, $fusion->{J}, $fusion->{S}, $fusion->{splice_type},
+                        $fusion->{geneA}, $fusion->{brkptA}, $fusion->{geneB}, $fusion->{brkptB},
+                        $fusion->{junction_reads}, $fusion->{spanning_frags});
+        
+        
         
         if (@blast_info) {
             $line ="#$line"; # comment out the line in the filtered file... an aesthetic.
