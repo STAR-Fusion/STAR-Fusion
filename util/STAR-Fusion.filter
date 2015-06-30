@@ -16,9 +16,13 @@ my $cdna_fasta_file = "$FindBin::Bin/../resources/gencode.v19.annotation.gtf.exo
 my $Evalue = 1e-3;
 my $tmpdir = "/tmp";
 
+my $MIN_NOVEL_JUNCTION_SUPPORT = 3;
+my $MIN_ALT_PCT_JUNCTION = 10;
+my $AGGREGATE_NOVEL_JUNCTION_DIST = 5;
+
 my $usage = <<__EOUSAGE__;
 
-########################################################################
+###################################################################################################
 #
 # Required:
 #
@@ -36,7 +40,14 @@ my $usage = <<__EOUSAGE__;
 #
 #  --tmpdir <string>              file for temporary files (default: $tmpdir)
 #
-########################################################################  
+#  --min_novel_junction_support <int>    default: $MIN_NOVEL_JUNCTION_SUPPORT  (minimum of $MIN_NOVEL_JUNCTION_SUPPORT junction reads required if breakpoint
+#                                                        lacks involvement of only reference junctions)
+#
+#  --min_alt_pct_junction <float>        default: $MIN_ALT_PCT_JUNCTION  ($MIN_ALT_PCT_JUNCTION % of the dominant isoform junction support)
+#
+#  --aggregate_novel_junction_dist <int>  default: $AGGREGATE_NOVEL_JUNCTION_DIST (non-ref junctions within $AGGREGATE_NOVEL_JUNCTION_DIST are merged into single calls)
+#
+####################################################################################################
 
 
 __EOUSAGE__
@@ -55,6 +66,12 @@ my $fusion_preds_file;
               
               'E=f' => \$Evalue,
               'tmpdir=s' => \$tmpdir,
+    
+              'MIN_NOVEL_JUNCTION_SUPPORT=i' => \$MIN_NOVEL_JUNCTION_SUPPORT,
+              'MIN_ALT_PCT_JUNCTION=f' => \$MIN_ALT_PCT_JUNCTION,
+              'AGGREGATE_NOVEL_JUNCTION_DIST=i' => \$AGGREGATE_NOVEL_JUNCTION_DIST,
+              
+              
     );
 
 
@@ -86,6 +103,23 @@ else {
 my %BLAST_CACHE;
 
 
+
+=input_format:
+
+0       ETV6--NTRK3
+1       84
+2       18
+3       ONLY_REF_SPLICE
+4       ETV6^ENSG00000139083.6
+5       chr12:12022903:+
+6       NTRK3^ENSG00000140538.12
+7       chr15:88483984:-
+8       comma-delim list of junction reads
+9       comma-delim list of spanning frags
+
+=cut
+
+
 main: {
 
     unless (-d $tmpdir) {
@@ -107,28 +141,52 @@ main: {
         my $line = $_;
         my @x = split(/\t/);
         my $fusion_name = $x[0];
-        my ($geneA, $geneB) = split(/--/, $fusion_name);
         my $J = $x[1];
         my $S = $x[2];
-
+        my $splice_type = $x[3];
+        my $geneA = $x[4];
+        my $brkptA = $x[5];
+        my $geneB = $x[6];
+        my $brkptB = $x[7];
+        my $junction_reads = $x[8] || '.';
+        my $spanning_frags = $x[9] || '.';
+        
+        
         #my $score = sqrt($J**2 + $S**2);
         my $score = $J*4 + $S;
         
         push (@fusions, { fusion_name => $fusion_name,
+                          
+                          splice_type => $splice_type,
+
+                          J => $J,
+                          S => $S,
+                          
                           geneA => $geneA,
                           geneB => $geneB,
+                          
+                          brkptA => $brkptA,
+                          brkptB => $brkptB,
+                          
+                          junction_reads => $junction_reads,
+                          spanning_frags => $spanning_frags,
+                          
                           score => $score, 
-                          line => $line,
               } );
-        
     }
-    close $fh;
-
+    
     print $ofh $header;
     print $header;
     
     @fusions = reverse sort {$a->{score} <=> $b->{score} } @fusions;
+    
+    @fusions = &merge_neighboring_nonref_splice(@fusions);
 
+    
+    ########################
+    ##  Filter and report ##
+    ########################
+    
 
     my %AtoB;
     my %BtoA;
@@ -175,7 +233,9 @@ main: {
         }
         
             
-        my $line = $fusion->{line};
+        my $line = join("\t", $fusion->{fusion_name}, $fusion->{J}, $fusion->{S}, $fusion->{splice_type},
+                        $fusion->{geneA}, $fusion->{brkptA}, $fusion->{geneB}, $fusion->{brkptB},
+                        $fusion->{junction_reads}, $fusion->{spanning_frags});
         
         if (@blast_info) {
             $line ="#$line"; # comment out the line in the filtered file... an aesthetic.
@@ -294,4 +354,133 @@ sub process_cmd {
     return;
 }
     
+        
+####
+sub merge_neighboring_nonref_splice {
+    my (@fusions) = @_;
+
+    my @ret_fusions;
+
+    my %fusion_name_to_nonref_splice;
+
+    foreach my $fusion (@fusions) {
+        
+        if ($fusion->{splice_type} eq "INCL_NON_REF_SPLICE") {
+            my $fusion_name = $fusion->{fusion_name};
+            push (@{$fusion_name_to_nonref_splice{$fusion_name}}, $fusion);
+        }
+        else {
+            push (@ret_fusions, $fusion);
+        }
+    }
+
+    foreach my $fusion_list_aref (values %fusion_name_to_nonref_splice) {
+        
+        my @nonref_fusions = @$fusion_list_aref;
+        
+        @nonref_fusions = reverse sort {$a->{score}<=>$b->{score}} @nonref_fusions;
+
+        
+        do {
+        
+            my $top_fusion = shift @nonref_fusions;
+    
+            my @remaining_fusions;
+            foreach my $f (@nonref_fusions) {
+                if (&fusions_within_range($top_fusion, $f, $AGGREGATE_NOVEL_JUNCTION_DIST)) {
+                    $top_fusion = &merge_fusions($top_fusion, $f);
+                    
+                }
+                else {
+                    push (@remaining_fusions, $f);
+                }
+            }
+
+            @nonref_fusions = @remaining_fusions;
+            
+            push (@ret_fusions, $top_fusion);
+            
+        } while (@nonref_fusions);
+        
+
+    }
+
+    return(@ret_fusions);
+}
+
+
+####
+sub fusions_within_range {
+    my ($fusionA, $fusionB, $max_dist) = @_;
+
+    my ($chrA_left, $coordA_left, $orientA_left) = split(/:/, $fusionA->{brkptA});
+    my ($chrA_right, $coordA_right, $orientA_right) = split(/:/, $fusionA->{brkptB});
+    
+
+    my ($chrB_left, $coordB_left, $orientB_left) = split(/:/, $fusionB->{brkptA});
+    my ($chrB_right, $coordB_right, $orientB_right) = split(/:/, $fusionB->{brkptB});
+
+    
+    if ( abs($coordA_left - $coordB_left) <= $max_dist
+
+         &&
+
+         abs($coordA_right - $coordB_right) <= $max_dist ) {
+
+        # within range
+        return(1); # yes
+    }
+
+    else {
+
+        return(0); # no
+    }
+
+}
+
+
+####
+sub merge_fusions {
+    my ($fusion_keep, $fusion_subsume) = @_;
+
+    my %junction_reads;
+    foreach my $junction_read_list ($fusion_keep->{junction_reads}, $fusion_subsume->{junction_reads}) {
+
+        my @juncs = split(/,/, $junction_read_list);
+        foreach my $j (@juncs) {
+            unless ($j eq ".") {
+                $junction_reads{$j} = 1;
+            }
+        }
+    }
+
+    my %spanning_frags;
+    foreach my $span_frag_list ($fusion_keep->{spanning_frags}, $fusion_subsume->{spanning_frags}) {
+
+        my @spans = split(/,/, $span_frag_list);
+        
+        foreach my $span (@spans) {
+            if ($span ne '.' && ! exists $junction_reads{$span}) {
+                $spanning_frags{$span} = 1;
+            }
+        }
+    }
+
+    my @new_junc_read_list = keys %junction_reads;
+    my @new_span_frag_list = keys %spanning_frags;
+
+    my $new_count_junc_reads = scalar(@new_junc_read_list);
+    my $new_count_span_frags = scalar(@new_span_frag_list);
+
+    $fusion_keep->{J} = $new_count_junc_reads;
+    $fusion_keep->{S} = $new_count_span_frags;
+
+    $fusion_keep->{junction_reads} = join(",", @new_junc_read_list) || ".";
+    $fusion_keep->{spanning_frags} = join(",", @new_span_frag_list) || ".";
+
+    return($fusion_keep);
+}
+
+
+
         

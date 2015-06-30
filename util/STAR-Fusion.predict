@@ -23,10 +23,9 @@ my $UTILDIR = "$FindBin::Bin/util";
 my $out_prefix = "star-fusion";
 my $chimeric_junction_file;
 my $chimeric_out_sam;
-my $ref_GTF = "$FindBin::Bin/resources/gencode.v19.annotation.gtf.exons.gz";
+my $ref_GTF = "$FindBin::Bin/../resources/gencode.v19.annotation.gtf.exons.gz";
 my $help_flag;
-my $MIN_NOVEL_JUNCTION_SUPPORT = 10;
-my $MIN_ALT_PCT_JUNCTION = 10.0;
+my $MIN_NOVEL_JUNCTION_SUPPORT = 2;
 
 my $usage = <<__EOUSAGE__;
 
@@ -42,10 +41,8 @@ my $usage = <<__EOUSAGE__;
 #
 #    --ref_GTF|G <string>               reference annotation GTF file (ie. gencode.gtf)
 #
-#    --min_novel_junction_support <int>    default: 10  (minimum of 10 junction reads required if breakpoint
-#                                                        lacks involvement of only reference junctions)
-#
-#    --min_alt_pct_junction <float>        default: 10.0  (10% of the dominant isoform junction support)
+#    --min_novel_junction_support <int>    default: $MIN_NOVEL_JUNCTION_SUPPORT  (minimum of $MIN_NOVEL_JUNCTION_SUPPORT junction reads required if breakpoint
+#                                                            lacks involvement of only reference junctions)
 #
 #    --out_prefix|O <string>         output file prefix (default: $out_prefix)
 #
@@ -64,7 +61,6 @@ __EOUSAGE__
               'ref_GTF|G=s' => \$ref_GTF,
 
               'min_novel_junction_support=i' => \$MIN_NOVEL_JUNCTION_SUPPORT,
-              'min_alt_pct_junction=f' => \$MIN_ALT_PCT_JUNCTION,
               'out_prefix|O=s' => \$out_prefix,
     );
 
@@ -111,7 +107,7 @@ main: {
     my $spanning_read_outfile = "$out_prefix.spanning_read_names";
     open (my $ofh_span, ">$spanning_read_outfile") or die "Error, cannot write to $spanning_read_outfile";
 
-    my %breakpoint_to_fusion_candidates;
+    my @fusion_candidates;
     
     foreach my $fusion_complex_name (keys %junctions) {
         
@@ -131,63 +127,62 @@ main: {
         my $breakpoint_info_href = $junctions{$fusion_complex_name};
         
         my @fusion_breakpoints = reverse sort {$breakpoint_info_href->{$a}<=>$breakpoint_info_href->{$b}} keys %$breakpoint_info_href;
-
-        my $top_breakpoint_support = -1;
         
         while (@fusion_breakpoints) {
             my $best_breakpoint = shift @fusion_breakpoints;
             my $breakpoint_count = $breakpoint_info_href->{$best_breakpoint};
             my ($left_gene, $left_coords, $left_delta, $right_gene, $right_coords, $right_delta, $complex_name, $fusion_simple_name) = split(/;/, $best_breakpoint);
-            if ( ($left_delta == 0 && $right_delta == 0) 
-                 || 
-                 ($breakpoint_count >= $MIN_NOVEL_JUNCTION_SUPPORT) 
-                ) {
-                
-                if ($top_breakpoint_support < 0) {
-                    $top_breakpoint_support = $breakpoint_count;
-                }
-                else {
-                    my $pct_top_brkpt_support = $breakpoint_count / $top_breakpoint_support * 100;
-                    if ($pct_top_brkpt_support < $MIN_ALT_PCT_JUNCTION) { 
-                        # not enough evidence compared to a dominant junction call.
-                        next;
-                    }
-                }
-                
-                # prune any junction reads from the span support for this fusion.
-                my %local_spanning_reads = map { + $_ => 1 } @spanning_reads;
-                
-                my $junction_reads_href = $junction_read_names{$best_breakpoint};
-                foreach my $junction_read (keys %$junction_reads_href) {
-                    print $ofh_junc "$fusion_complex_name\t$best_breakpoint\t$junction_read\n";
-                    if (exists $local_spanning_reads{$junction_read}) {
-                        delete $local_spanning_reads{$junction_read};
-                    }
-                }
-                my $span_count = scalar(keys %local_spanning_reads);
-                
-                
-                my $fusion_candidate = { fusion_simple_name => $fusion_simple_name,
-                                         fusion_complex_name => $fusion_complex_name,
-                                         
-                                         junction_count => $breakpoint_count,
-                                         spanning_count => $span_count,
+            my $splice_type = ($left_delta == 0 && $right_delta == 0) ? "ONLY_REF_SPLICE" : "INCL_NON_REF_SPLICE"; 
+            
+            if ($splice_type ne "ONLY_REF_SPLICE" && $breakpoint_count < $MIN_NOVEL_JUNCTION_SUPPORT) { next; } # ignore likely noise
 
-                                         left_gene => $left_gene,
-                                         left_coords => $left_coords,
-                                         left_delta => $left_delta, # dist to ref splice junction
-                                         
-                                         right_gene => $right_gene,
-                                         right_coords => $right_coords,
-                                         right_delta => $right_delta, # dist to ref splice junction
-                                         
-                };
-                
-                my $breakpoint_coords_token = join("$;", $left_coords, $right_coords);
 
-                push (@{$breakpoint_to_fusion_candidates{$breakpoint_coords_token}}, $fusion_candidate);
-                                
+            # prune any junction reads from the span support for this fusion.
+            my %local_spanning_reads = map { + $_ => 1 } @spanning_reads;
+            
+            my $junction_reads_href = $junction_read_names{$best_breakpoint};
+            foreach my $junction_read (keys %$junction_reads_href) {
+                print $ofh_junc "$fusion_complex_name\t$best_breakpoint\t$junction_read\n";
+                if (exists $local_spanning_reads{$junction_read}) {
+                    delete $local_spanning_reads{$junction_read};
+                }
             }
+            
+            my @span_reads = keys %local_spanning_reads;
+            my $span_count = scalar(@span_reads);
+
+            my @junc_reads = keys %$junction_reads_href;
+
+            
+            my $score = $breakpoint_count * 4 + $span_count;
+
+            my $fusion_candidate = { fusion_simple_name => $fusion_simple_name,
+                                     fusion_complex_name => $fusion_complex_name,
+                                     
+                                     junction_count => $breakpoint_count,
+                                     spanning_count => $span_count,
+                                     
+                                     left_gene => $left_gene,
+                                     left_coords => $left_coords,
+                                     left_delta => $left_delta, # dist to ref splice junction
+                                     
+                                     right_gene => $right_gene,
+                                     right_coords => $right_coords,
+                                     right_delta => $right_delta, # dist to ref splice junction
+                                     
+                                     splice_type => $splice_type,
+                                     
+                                     spanning_frag_names => \@span_reads,
+                                     junction_read_names => \@junc_reads,
+                                     
+
+                                     score => $score,
+                                     
+            };
+                        
+            push (@fusion_candidates, $fusion_candidate);
+            
+            
 
         }
     }
@@ -195,42 +190,39 @@ main: {
     close $ofh_junc;
     close $ofh_span;
 
-
-    ####################################################################
-    ## Further filter fusion candidates and generate final predictions.
-    ## Breakpoint-focused
-    ####################################################################
-    
-    
     my $fusion_predictions_outfile = "$out_prefix.fusion_candidates.preliminary";
     open (my $ofh, ">$fusion_predictions_outfile") or die "Error, cannot write to file: $fusion_predictions_outfile";
     
     print STDERR "-outputting fusion candidates to file: $fusion_predictions_outfile\n";
 
     # print header
-    print $ofh join("\t", "#fusion_name", "JunctionReads", "SpanningFrags", 
-                    "LeftGene", "LeftBreakpoint",  "LeftDistFromRefExonSplice",
-                    "RightGene", "RightBreakpoint", "RightDistFromRefExonSplice") . "\n";
+    print $ofh join("\t", "#fusion_name", 
+                    "JunctionReads", "SpanningFrags", 
+                    "Splice_type",
+                    "LeftGene", "LeftBreakpoint",  
+                    "RightGene", "RightBreakpoint", 
+                    "JunctionReads",
+                    "SpanningFrags") . "\n";
     
     
     # examining fusions based on the specific junction breakpoint, regardless of genes assigned to.
     
-    foreach my $fusion_candidates_aref (values %breakpoint_to_fusion_candidates) {
-        
-        ## all have the same junction support,
-        #  so output the one fusion that has the greatest span support.
+    @fusion_candidates = reverse sort {$a->{score}<=>$b->{score}} @fusion_candidates;
 
-        my @candidates_at_breakpoint = reverse sort { $a->{spanning_count} <=> $b->{spanning_count}
-                                                      ||
-                                                          length($b->{fusion_simple_name}) <=> length($a->{fusion_simple_name}) # tie-break on length of name, preferring shorter one (basically penalizing the annotated fusion neighbors)
-        } @$fusion_candidates_aref;
+    foreach my $fusion_candidate (@fusion_candidates) {
         
-        my $fusion_candidate = shift @candidates_at_breakpoint;
+        my $junction_reads = join(",", @{$fusion_candidate->{junction_read_names}}) || ".";
+        my $spanning_frags = join(",", @{$fusion_candidate->{spanning_frag_names}}) || ".";
+        
         
         print $ofh join("\t", $fusion_candidate->{fusion_simple_name}, 
                         $fusion_candidate->{junction_count}, $fusion_candidate->{spanning_count},
-                        $fusion_candidate->{left_gene}, $fusion_candidate->{left_coords}, $fusion_candidate->{left_delta}, 
-                        $fusion_candidate->{right_gene}, $fusion_candidate->{right_coords}, $fusion_candidate->{right_delta}) . "\n";
+                        $fusion_candidate->{splice_type},
+                        $fusion_candidate->{left_gene}, $fusion_candidate->{left_coords}, 
+                        $fusion_candidate->{right_gene}, $fusion_candidate->{right_coords}, 
+                        $junction_reads, 
+                        $spanning_frags,
+            ) . "\n";
         
     }
     
@@ -241,6 +233,7 @@ main: {
 
     
 }
+
 
 ####
 sub make_hidden {
