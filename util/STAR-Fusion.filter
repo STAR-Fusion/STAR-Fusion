@@ -30,6 +30,7 @@ my $usage = <<__EOUSAGE__;
 #                                 Required formatting is:  
 #                                 geneA--geneB (tab) junction_read_count (tab) spanning_read_count (tab) ... rest
 #
+#  --out_prefix <string>          prefix for output filename (will tack on .final and .final.abridged)
 #
 # Optional: 
 #
@@ -57,29 +58,37 @@ __EOUSAGE__
 my $help_flag;
 
 my $fusion_preds_file;
-
+my $out_prefix;
 
 &GetOptions ( 'h' => \$help_flag, 
               
               'fusion_preds=s' => \$fusion_preds_file,
               'ref_cdna=s' => \$cdna_fasta_file,
               
+              'out_prefix=s' => \$out_prefix,
+
               'E=f' => \$Evalue,
               'tmpdir=s' => \$tmpdir,
-    
-              'MIN_NOVEL_JUNCTION_SUPPORT=i' => \$MIN_NOVEL_JUNCTION_SUPPORT,
-              'MIN_ALT_PCT_JUNCTION=f' => \$MIN_ALT_PCT_JUNCTION,
-              'AGGREGATE_NOVEL_JUNCTION_DIST=i' => \$AGGREGATE_NOVEL_JUNCTION_DIST,
+              
+
+
+              'min_novel_junction_support=i' => \$MIN_NOVEL_JUNCTION_SUPPORT,
+              'min_alt_pct_junction=f' => \$MIN_ALT_PCT_JUNCTION,
+              'aggregate_novel_junction_dist=i' => \$AGGREGATE_NOVEL_JUNCTION_DIST,
               
               
     );
+
+if (@ARGV) {
+    die "Error, dont recognize arguments: @ARGV";
+}
 
 
 if ($help_flag) {
     die $usage;
 }
 
-unless ($fusion_preds_file && $cdna_fasta_file) {
+unless ($fusion_preds_file && $cdna_fasta_file && $out_prefix) {
     die $usage;
 }
 
@@ -126,9 +135,13 @@ main: {
         mkdir $tmpdir or die "Error, cannot mkdir $tmpdir";
     }
     
-
+    
+    
+    my $final_preds_file = "$out_prefix.final";
+    open (my $final_ofh, ">$final_preds_file") or die "Error, cannot write to $final_preds_file";
+    
     my $filter_info_file = "$fusion_preds_file.filt_info";
-    open (my $ofh, ">$filter_info_file") or die "Error, cannot write to $filter_info_file";
+    open (my $filter_ofh, ">$filter_info_file") or die "Error, cannot write to $filter_info_file";
     
     my @fusions;
     open (my $fh, $fusion_preds_file) or die "Error, cannot open file $fusion_preds_file";
@@ -138,7 +151,7 @@ main: {
             next; 
         }
         chomp;
-        my $line = $_;
+
         my @x = split(/\t/);
         my $fusion_name = $x[0];
         my $J = $x[1];
@@ -155,33 +168,49 @@ main: {
         #my $score = sqrt($J**2 + $S**2);
         my $score = $J*4 + $S;
         
-        push (@fusions, { fusion_name => $fusion_name,
-                          
-                          splice_type => $splice_type,
+        
+        my $fusion = { fusion_name => $fusion_name,
+                       
+                       splice_type => $splice_type,
+                       
+                       J => $J,
+                       S => $S,
+                       
+                       geneA => $geneA,
+                       geneB => $geneB,
+                       
+                       brkptA => $brkptA,
+                       brkptB => $brkptB,
+                       
+                       junction_reads => $junction_reads,
+                       spanning_frags => $spanning_frags,
+                       
+                       score => $score, 
+                       
+                       
+                       line => "", # set right below
+        };
+    
+    
+        my $line = join("\t", $fusion->{fusion_name}, $fusion->{J}, $fusion->{S}, $fusion->{splice_type},
+                        $fusion->{geneA}, $fusion->{brkptA}, $fusion->{geneB}, $fusion->{brkptB},
+                        $fusion->{junction_reads}, $fusion->{spanning_frags});
+        
 
-                          J => $J,
-                          S => $S,
-                          
-                          geneA => $geneA,
-                          geneB => $geneB,
-                          
-                          brkptA => $brkptA,
-                          brkptB => $brkptB,
-                          
-                          junction_reads => $junction_reads,
-                          spanning_frags => $spanning_frags,
-                          
-                          score => $score, 
-              } );
+        $fusion->{line} = $line;
+        
+        push (@fusions, $fusion); 
     }
     
-    print $ofh $header;
-    print $header;
+    print $filter_ofh $header;
+    print $final_ofh $header;
     
     @fusions = reverse sort {$a->{score} <=> $b->{score} } @fusions;
     
-    @fusions = &merge_neighboring_nonref_splice(@fusions);
+    @fusions = &merge_neighboring_nonref_splice(\@fusions, $filter_ofh);
 
+    @fusions = &remove_minor_nonref_isoforms(\@fusions, $filter_ofh);
+    
     
     ########################
     ##  Filter and report ##
@@ -232,18 +261,16 @@ main: {
             }
         }
         
-            
-        my $line = join("\t", $fusion->{fusion_name}, $fusion->{J}, $fusion->{S}, $fusion->{splice_type},
-                        $fusion->{geneA}, $fusion->{brkptA}, $fusion->{geneB}, $fusion->{brkptB},
-                        $fusion->{junction_reads}, $fusion->{spanning_frags});
+        
+        my $line = $fusion->{line};
         
         if (@blast_info) {
             $line ="#$line"; # comment out the line in the filtered file... an aesthetic.
         }
-        print $ofh "$line\t" . join("\t", @blast_info) . "\n";
-
+        print $filter_ofh "$line\t" . join("\t", @blast_info) . "\n";
+        
         unless (@blast_info) {
-            print "$line\n";
+            print $final_ofh "$line\n";
             $AtoB{$geneA}->{$geneB} = 1;
             $BtoA{$geneB}->{$geneA} = 1;
             
@@ -252,8 +279,15 @@ main: {
         
     }
 
-    close $ofh;
+    close $filter_ofh;
+    close $final_ofh;
     
+    ## generate abrdiged versions, as all those read names take up a lot of space and are annoyoing to look at when you just want to know what fusions are predicted.
+
+    &process_cmd("cut -f1-8,11-13 $filter_info_file > $filter_info_file.abridged");
+    &process_cmd("cut -f1-8,11-13 $final_preds_file > $final_preds_file.abridged");
+    
+
     exit(0);
 }
 
@@ -357,13 +391,13 @@ sub process_cmd {
         
 ####
 sub merge_neighboring_nonref_splice {
-    my (@fusions) = @_;
+    my ($fusions_aref, $ofh) = @_;
 
     my @ret_fusions;
 
     my %fusion_name_to_nonref_splice;
 
-    foreach my $fusion (@fusions) {
+    foreach my $fusion (@$fusions_aref) {
         
         if ($fusion->{splice_type} eq "INCL_NON_REF_SPLICE") {
             my $fusion_name = $fusion->{fusion_name};
@@ -388,7 +422,9 @@ sub merge_neighboring_nonref_splice {
             my @remaining_fusions;
             foreach my $f (@nonref_fusions) {
                 if (&fusions_within_range($top_fusion, $f, $AGGREGATE_NOVEL_JUNCTION_DIST)) {
+                    print $ofh "#" . $f->{line} . "\tmerged into:\t" . $top_fusion->{line} . "\n"; # keep record of filtered and merged entries.
                     $top_fusion = &merge_fusions($top_fusion, $f);
+
                     
                 }
                 else {
@@ -478,9 +514,50 @@ sub merge_fusions {
     $fusion_keep->{junction_reads} = join(",", @new_junc_read_list) || ".";
     $fusion_keep->{spanning_frags} = join(",", @new_span_frag_list) || ".";
 
+    
+    $fusion_keep->{score} = 4 * $new_count_junc_reads + $new_count_span_frags;
+    
+
     return($fusion_keep);
 }
 
 
-
+####
+sub remove_minor_nonref_isoforms {
+    my ($fusions_aref, $ofh) = @_;
+    
+    my @fusions = reverse sort { $a->{score}<=>$b->{score} } @$fusions_aref;
+    
+    my %dominant_isoform_junc_support;
+    my @ret_fusions;
+    
+    foreach my $fusion (@fusions) {
         
+        my $fusion_name = $fusion->{fusion_name};
+        my $junction_support = $fusion->{J};
+
+        my $splice_type = $fusion->{splice_type};
+
+        if ($splice_type ne 'ONLY_REF_SPLICE' && $junction_support < $MIN_NOVEL_JUNCTION_SUPPORT) { next; }
+
+        my $dominant_isoform_support = $dominant_isoform_junc_support{$fusion_name};
+        if (defined $dominant_isoform_support) {
+
+            my $pct_dom_iso_support = $junction_support / $dominant_isoform_support * 100;
+            if ($pct_dom_iso_support < $MIN_ALT_PCT_JUNCTION) {
+                print $ofh "#" . $fusion->{line} . "\tFILTERED DUE TO ONLY $pct_dom_iso_support % of dominant isoform support ($dominant_isoform_support)\n";
+                next; 
+            }
+            
+        }
+        else {
+            $dominant_isoform_junc_support{$fusion_name} = $junction_support;
+        }
+        
+        push (@ret_fusions, $fusion);
+
+    }
+    
+    return(@ret_fusions);
+}
+            

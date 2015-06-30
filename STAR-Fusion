@@ -42,8 +42,9 @@ my $chimeric_out_sam;
 my $ref_GTF = "$FindBin::Bin/resources/gencode.v19.annotation.gtf.exons.gz";
 my $ref_cdna = "$FindBin::Bin/resources/gencode.v19.annotation.gtf.exons.cdna.gz";
 my $help_flag;
-my $MIN_NOVEL_JUNCTION_SUPPORT = 10;
+my $MIN_NOVEL_JUNCTION_SUPPORT = 3;
 my $MIN_ALT_PCT_JUNCTION = 10.0;
+my $AGGREGATE_NOVEL_JUNCTION_DIST = 5;
 my $Evalue = 1e-3;
 my $tmpdir = "/tmp";
 my $verbose_level = 1;
@@ -64,10 +65,12 @@ my $usage = <<__EOUSAGE__;
 #
 #    --ref_cdna|C <string>                 reference cDNA sequences fasta file (generated specially based on gtf -see docs)
 #
-#    --min_novel_junction_support <int>    default: 10  (minimum of 10 junction reads required if breakpoint
+#    --min_novel_junction_support <int>    default: $MIN_NOVEL_JUNCTION_SUPPORT  (minimum of $MIN_NOVEL_JUNCTION_SUPPORT junction reads required if breakpoint
 #                                                        lacks involvement of only reference junctions)
 #
-#    --min_alt_pct_junction <float>        default: 10.0  (10% of the dominant isoform junction support)
+#    --min_alt_pct_junction <float>        default: $MIN_ALT_PCT_JUNCTION  ($MIN_ALT_PCT_JUNCTION % of the dominant isoform junction support)
+#
+#    --aggregate_novel_junction_dist <int>  default: $AGGREGATE_NOVEL_JUNCTION_DIST (non-ref junctions within $AGGREGATE_NOVEL_JUNCTION_DIST are merged into single calls)
 #
 #    --out_prefix|O <string>               output file prefix (default: $out_prefix)
 #   
@@ -99,8 +102,9 @@ my $no_filter = 0;
               
               'min_novel_junction_support=i' => \$MIN_NOVEL_JUNCTION_SUPPORT,
               'min_alt_pct_junction=f' => \$MIN_ALT_PCT_JUNCTION,
+              'aggregate_novel_junction_dist=i' => \$AGGREGATE_NOVEL_JUNCTION_DIST,
               'out_prefix|O=s' => \$out_prefix,
-
+              
               'E=f' => \$Evalue,
               'tmpdir=s' => \$tmpdir,
               'verbose_level=i' => \$verbose_level,
@@ -133,8 +137,6 @@ main: {
         . " -S $chimeric_out_sam "
         . " -J  $chimeric_junction_file "
         . " -G $ref_GTF "
-        . " --min_novel_junction_support $MIN_NOVEL_JUNCTION_SUPPORT "
-        . " --min_alt_pct_junction $MIN_ALT_PCT_JUNCTION "
         . " -O $out_prefix ";
     
     $pipeliner->add_commands(new Command($cmd, "STAR-Fusion.predict.ok"));
@@ -150,7 +152,10 @@ main: {
             . " --ref_cdna $ref_cdna "
             . " -E $Evalue "
             . " --tmpdir $tmpdir "
-            . " > $out_prefix.fusion_candidates.final ";
+            . " --min_novel_junction_support $MIN_NOVEL_JUNCTION_SUPPORT "
+            . " --min_alt_pct_junction $MIN_ALT_PCT_JUNCTION "
+            . " --aggregate_novel_junction_dist $AGGREGATE_NOVEL_JUNCTION_DIST "
+            . " --out_prefix $out_prefix.fusion_candidates ";
         
         $pipeliner->add_commands(new Command($cmd, "STAR-Fusion.filter.ok"));
         
@@ -164,7 +169,7 @@ main: {
     }
     else {
         
-        print STDERR "\n\n\t* Process complete.  See output: $out_prefix.fusion_candidates.final\n\n\n";
+        print STDERR "\n\n\t* Process complete.  See output: $out_prefix.fusion_candidates.final (or .abridged version)\n\n\n";
     }
     
     exit(0);
