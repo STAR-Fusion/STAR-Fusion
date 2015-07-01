@@ -454,13 +454,18 @@ sub merge_neighboring_nonref_splice {
 sub fusions_within_range {
     my ($fusionA, $fusionB, $max_dist) = @_;
 
-    my ($chrA_left, $coordA_left, $orientA_left) = split(/:/, $fusionA->{brkptA});
-    my ($chrA_right, $coordA_right, $orientA_right) = split(/:/, $fusionA->{brkptB});
+    my @pts_A_left = split(/:/, $fusionA->{brkptA});
+    my $coordA_left = $pts_A_left[-2];
     
+    my @pts_A_right = split(/:/, $fusionA->{brkptB});
+    my $coordA_right = $pts_A_right[-2];
 
-    my ($chrB_left, $coordB_left, $orientB_left) = split(/:/, $fusionB->{brkptA});
-    my ($chrB_right, $coordB_right, $orientB_right) = split(/:/, $fusionB->{brkptB});
+    my @pts_B_left = split(/:/, $fusionB->{brkptA});
+    my $coordB_left = $pts_B_left[-2];
 
+    my @pts_B_right = split(/:/, $fusionB->{brkptB});
+    my $coordB_right = $pts_B_right[-2];
+    
     
     if ( abs($coordA_left - $coordB_left) <= $max_dist
 
