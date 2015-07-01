@@ -25,7 +25,7 @@ my $chimeric_junction_file;
 my $chimeric_out_sam;
 my $ref_GTF = "$FindBin::Bin/../resources/gencode.v19.annotation.gtf.exons.gz";
 my $help_flag;
-my $MIN_NOVEL_JUNCTION_SUPPORT = 2;
+my $MIN_NOVEL_JUNCTION_SUPPORT = 5;
 
 my $usage = <<__EOUSAGE__;
 

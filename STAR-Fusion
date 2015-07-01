@@ -42,7 +42,7 @@ my $chimeric_out_sam;
 my $ref_GTF = "$FindBin::Bin/resources/gencode.v19.annotation.gtf.exons.gz";
 my $ref_cdna = "$FindBin::Bin/resources/gencode.v19.annotation.gtf.exons.cdna.gz";
 my $help_flag;
-my $MIN_NOVEL_JUNCTION_SUPPORT = 3;
+my $MIN_NOVEL_JUNCTION_SUPPORT = 5;
 my $MIN_ALT_PCT_JUNCTION = 10.0;
 my $AGGREGATE_NOVEL_JUNCTION_DIST = 5;
 my $Evalue = 1e-3;

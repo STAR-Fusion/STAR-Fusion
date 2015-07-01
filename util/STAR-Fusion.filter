@@ -16,7 +16,7 @@ my $cdna_fasta_file = "$FindBin::Bin/../resources/gencode.v19.annotation.gtf.exo
 my $Evalue = 1e-3;
 my $tmpdir = "/tmp";
 
-my $MIN_NOVEL_JUNCTION_SUPPORT = 3;
+my $MIN_NOVEL_JUNCTION_SUPPORT = 5;
 my $MIN_ALT_PCT_JUNCTION = 10;
 my $AGGREGATE_NOVEL_JUNCTION_DIST = 5;
 
