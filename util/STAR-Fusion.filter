@@ -146,10 +146,10 @@ main: {
     my @fusions;
     open (my $fh, $fusion_preds_file) or die "Error, cannot open file $fusion_preds_file";
     my $header = <$fh>;
+    unless ($header =~ /^\#/) {
+        die "Error, file $fusion_preds_file doesn't begin with a header line";
+    }
     while (<$fh>) {
-        if (/^\#/) { 
-            next; 
-        }
         chomp;
 
         my @x = split(/\t/);
@@ -224,13 +224,20 @@ main: {
 
     foreach my $fusion (@fusions) {
 
-        my ($geneA, $geneB) = ($fusion->{geneA}, $fusion->{geneB});
+        #my ($geneA, $geneB) = ($fusion->{geneA}, $fusion->{geneB});
+        my ($geneA, $geneB) = split(/--/, $fusion->{fusion_name});
 
+
+        #print STDERR "-encountered $geneA--$geneB\n\n";
+        
         #print STDERR "Examining fusion: $geneA--$geneB\n";
         my @blast_info;
 
-        unless ($already_approved{$geneA}->{$geneB}) {
-            
+        if ($already_approved{$geneA}->{$geneB}) {
+           
+            #print STDERR "-already approved $geneA--$geneB\n";
+        }
+        else {
             
             @blast_info = &examine_seq_similarity($geneA, $geneB);
             if (@blast_info) {
@@ -243,7 +250,7 @@ main: {
                     foreach my $altB (keys %$altB_href) {
                         my @blast = &examine_seq_similarity($geneB, $altB);
                         if (@blast) {
-                            push (@blast, "ALREADY_SELECTED:$geneA--$altB");
+                            push (@blast, "ALREADY_EXAMINED:$geneA--$altB");
                             push (@blast_info, @blast);
                         }
                     }
@@ -253,7 +260,7 @@ main: {
                     foreach my $altA (keys %$altA_href) {
                         my @blast = &examine_seq_similarity($altA, $geneA);
                         if (@blast) {
-                            push (@blast, "ALREADY_SELECTED:$altA--$geneB");
+                            push (@blast, "ALREADY_EXAMINED:$altA--$geneB");
                             push (@blast_info, @blast);
                         }
                     }
@@ -276,12 +283,12 @@ main: {
         
         unless (@blast_info) {
             print $final_ofh "$line\n";
-            $AtoB{$geneA}->{$geneB} = 1;
-            $BtoA{$geneB}->{$geneA} = 1;
-            
             $already_approved{$geneA}->{$geneB} = 1;
         }
         
+        $AtoB{$geneA}->{$geneB} = 1;
+        $BtoA{$geneB}->{$geneA} = 1;
+                
     }
 
     close $filter_ofh;
@@ -301,12 +308,17 @@ main: {
 sub examine_seq_similarity {
     my ($geneA, $geneB) = @_;
     
+    #print STDERR "-examining seq similarity between $geneA and $geneB\n";
+
     my @blast_hits;
     
 
     if ($BLAST_PAIRS_IDX) {
         # use pre-computed blast pair data
         if (my $hit = $BLAST_PAIRS_IDX->get_value("$geneA--$geneB")) {
+            return($hit);
+        }
+        elsif ($hit = $BLAST_PAIRS_IDX->get_value("$geneB--$geneA")) {
             return($hit);
         }
         else {
@@ -318,7 +330,7 @@ sub examine_seq_similarity {
     if (my $cache_aref = $BLAST_CACHE{"$geneA--$geneB"}) {
         my @hits = @$cache_aref;
         if (@hits) {
-            print STDERR "CACHED HITS FOR: $geneA--$geneB: [@hits]\n";
+            #print STDERR "CACHED HITS FOR: $geneA--$geneB: [@hits]\n";
             return(@hits);
         }
         else {
@@ -327,7 +339,7 @@ sub examine_seq_similarity {
     }
     
 
-    print STDERR "-testing $geneA vs. $geneB\n";
+    #print STDERR "-testing $geneA vs. $geneB\n";
     
     my $fileA = "$tmpdir/$$.gA.fa";
     my $fileB = "$tmpdir/$$.gB.fa";
