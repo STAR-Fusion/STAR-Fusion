@@ -165,6 +165,11 @@ main: {
         my $spanning_frags = $x[9] || '.';
         
         
+        my $rest = "";
+        if ($#x > 9) {
+            $rest = join("\t", @x[10..$#x]);
+        }
+        
         #my $score = sqrt($J**2 + $S**2);
         my $score = $J*4 + $S;
         
@@ -187,6 +192,7 @@ main: {
                        
                        score => $score, 
                        
+                       rest => $rest,
                        
                        line => "", # set right below
         };
@@ -194,7 +200,7 @@ main: {
     
         my $line = join("\t", $fusion->{fusion_name}, $fusion->{J}, $fusion->{S}, $fusion->{splice_type},
                         $fusion->{geneA}, $fusion->{brkptA}, $fusion->{geneB}, $fusion->{brkptB},
-                        $fusion->{junction_reads}, $fusion->{spanning_frags});
+                        $fusion->{junction_reads}, $fusion->{spanning_frags}, $fusion->{rest});
         
 
         $fusion->{line} = $line;  # note, we'll need to reset this later after merging occurs for some entries.
@@ -272,7 +278,7 @@ main: {
         # regenerating 'line' here, since merged entries will now have updated stats.        
         my $line = join("\t", $fusion->{fusion_name}, $fusion->{J}, $fusion->{S}, $fusion->{splice_type},
                         $fusion->{geneA}, $fusion->{brkptA}, $fusion->{geneB}, $fusion->{brkptB},
-                        $fusion->{junction_reads}, $fusion->{spanning_frags});
+                        $fusion->{junction_reads}, $fusion->{spanning_frags}, $fusion->{rest});
         
         
         
@@ -296,8 +302,8 @@ main: {
     
     ## generate abrdiged versions, as all those read names take up a lot of space and are annoyoing to look at when you just want to know what fusions are predicted.
 
-    &process_cmd("cut -f1-8,11-13 $filter_info_file > $filter_info_file.abridged");
-    &process_cmd("cut -f1-8,11-13 $final_preds_file > $final_preds_file.abridged");
+    &process_cmd("cut -f1-8,11-100 $filter_info_file > $filter_info_file.abridged");
+    &process_cmd("cut -f1-8,11-100 $final_preds_file > $final_preds_file.abridged");
     
 
     exit(0);
