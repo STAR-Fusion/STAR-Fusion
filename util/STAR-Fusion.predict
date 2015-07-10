@@ -527,6 +527,32 @@ sub map_junction_reads_to_genes {
         my $line = $_;
         my @x = split(/\t/);
         
+        # from star doc:
+        #The rst 9 columns give information about the chimeric junction:
+
+        #The format of this le is as follows. Every line contains one chimerically aligned read, e.g.:
+        #chr22 23632601 + chr9 133729450 + 1 0 0 SINATRA-0006:3:3:6387:56650 23632554 47M29S 133729451 47S29M40p76M
+        #The first 9 columns give information about the chimeric junction:
+
+        #column 1: chromosome of the donor
+        #column 2: rst base of the intron of the donor (1-based)
+        #column 3: strand of the donor
+        #column 4: chromosome of the acceptor
+        #column 5: rst base of the intron of the acceptor (1-based)
+        #column 6: strand of the acceptor
+        #column 7: junction type: -1=encompassing junction (between the mates), 1=GT/AG, 2=CT/AC
+        #column 8: repeat length to the left of the junction
+        #column 9: repeat length to the right of the junction
+        #Columns 10-14 describe the alignments of the two chimeric segments, it is SAM like. Alignments are given with respect to the (+) strand
+        #column 10: read name
+        #column 11: rst base of the rst segment (on the + strand)
+        #column 12: CIGAR of the rst segment
+        #column 13: rst base of the second segment
+        #column 14: CIGAR of the second segment
+
+        my $junction_type = $x[6];
+        if ($junction_type == -1) { next; } # getting the spanning frags from the sam file instead
+        
         my $junction_read_name = $x[9];
         
         my ($chrA, $coordA, $orientA) = ($x[0], $x[1], $x[2]);
