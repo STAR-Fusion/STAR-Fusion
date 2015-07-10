@@ -494,7 +494,7 @@ sub get_overlapping_genes {
         return();
     }
     if ($lend == $rend) {
-        print STDERR "Error, need pos width: $chr:$lend-$rend";
+        #print STDERR "Error, need pos width: $chr:$lend-$rend";
         return();
     }
     
