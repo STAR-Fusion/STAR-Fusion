@@ -106,7 +106,7 @@ if (-s $blast_pairs_idx_file) {
     $BLAST_PAIRS_IDX = new TiedHash( { use => $blast_pairs_idx_file } );
 }
 else {
-    die "Error, cannot locate $blast_pairs_idx_file";
+    print STDERR "Warning: cannot locate $blast_pairs_idx_file, running blastn directly.\n";
 }
 
 my %BLAST_CACHE;
