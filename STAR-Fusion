@@ -38,7 +38,6 @@ my $UTILDIR = "$FindBin::Bin/util";
 ## Options
 my $out_prefix = "star-fusion";
 my $chimeric_junction_file;
-my $chimeric_out_sam;
 my $ref_GTF = "$FindBin::Bin/resources/gencode.v19.annotation.gtf.exons.gz";
 my $ref_cdna = "$FindBin::Bin/resources/gencode.v19.annotation.gtf.exons.cdna.gz";
 my $help_flag;
@@ -54,8 +53,6 @@ my $usage = <<__EOUSAGE__;
 ###################################################################################
 #
 #  Required:
-#
-#    --chimeric_out_sam|S <string>      Chimeric.out.sam file
 #
 #    --chimeric_junction|J <string>     Chimeric.out.junction file
 #
@@ -95,7 +92,6 @@ my $no_filter = 0;
 
 &GetOptions ( 'help|h' => \$help_flag,
               
-              'chimeric_out_sam|S=s' => \$chimeric_out_sam,
               'chimeric_junction|J=s' => \$chimeric_junction_file,
               'ref_GTF|G=s' => \$ref_GTF,
               'ref_cdna|C=s' => \$ref_cdna,
@@ -116,7 +112,7 @@ my $no_filter = 0;
 if ($help_flag) {
     die $usage;
 }
-unless ($chimeric_out_sam && $chimeric_junction_file) {
+unless ($chimeric_junction_file) {
     die $usage;
 }
 unless (-s $ref_GTF) {
@@ -134,7 +130,6 @@ main: {
     ## predict fusions
 
     my $cmd = "$UTILDIR/STAR-Fusion.predict "
-        . " -S $chimeric_out_sam "
         . " -J  $chimeric_junction_file "
         . " -G $ref_GTF "
         . " -O $out_prefix ";

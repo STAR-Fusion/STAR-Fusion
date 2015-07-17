@@ -566,8 +566,8 @@ sub remove_minor_nonref_isoforms {
 
         my $splice_type = $fusion->{splice_type};
 
-        if ($splice_type ne 'ONLY_REF_SPLICE' && $junction_support < $MIN_NOVEL_JUNCTION_SUPPORT) { next; }
-
+        if ($splice_type eq 'INCL_NON_REF_SPLICE' && $junction_support < $MIN_NOVEL_JUNCTION_SUPPORT) { next; }
+        
         my $dominant_isoform_support = $dominant_isoform_junc_support{$fusion_name};
         if (defined $dominant_isoform_support) {
 

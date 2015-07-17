@@ -26,14 +26,13 @@ my $chimeric_out_sam;
 my $ref_GTF = "$FindBin::Bin/../resources/gencode.v19.annotation.gtf.exons.gz";
 my $help_flag;
 my $MIN_NOVEL_JUNCTION_SUPPORT = 5;
+my $MIN_SPAN_ONLY_SUPPORT = 5;
 
 my $usage = <<__EOUSAGE__;
 
 ###################################################################################
 #
 #  Required:
-#
-#    --chimeric_out_sam|S <string>      Chimeric.out.sam file
 #
 #    --chimeric_junction|J <string>     Chimeric.out.junction file
 #
@@ -43,6 +42,8 @@ my $usage = <<__EOUSAGE__;
 #
 #    --min_novel_junction_support <int>    default: $MIN_NOVEL_JUNCTION_SUPPORT  (minimum of $MIN_NOVEL_JUNCTION_SUPPORT junction reads required if breakpoint
 #                                                            lacks involvement of only reference junctions)
+#
+#    --min_span_only_support <int>         default: $MIN_SPAN_ONLY_SUPPORT (minimum of $MIN_SPAN_ONLY_SUPPORT) spanning frags required if no junction reads are found
 #
 #    --out_prefix|O <string>         output file prefix (default: $out_prefix)
 #
@@ -56,11 +57,12 @@ __EOUSAGE__
 
 &GetOptions ( 'h' => \$help_flag,
               
-              'chimeric_out_sam|S=s' => \$chimeric_out_sam,
               'chimeric_junction|J=s' => \$chimeric_junction_file,
               'ref_GTF|G=s' => \$ref_GTF,
 
               'min_novel_junction_support=i' => \$MIN_NOVEL_JUNCTION_SUPPORT,
+              'min_span_only_support=i' => \$MIN_SPAN_ONLY_SUPPORT,
+              
               'out_prefix|O=s' => \$out_prefix,
     );
 
@@ -68,12 +70,13 @@ __EOUSAGE__
 if ($help_flag) {
     die $usage;
 }
-unless ($chimeric_out_sam && $chimeric_junction_file) {
+unless ($chimeric_junction_file) {
     die $usage;
 }
 unless (-s $ref_GTF) {
     die "Error, cannot locate reference annotation file: $ref_GTF";
 }
+
 
 main: {
     
@@ -88,11 +91,19 @@ main: {
     ## Get the evidence for fusion genes
     ####################################
     
-    my %junction_read_names;
-    my %junctions = &map_junction_reads_to_genes($chimeric_junction_file, \%chr_to_interval_tree, \%chr_gene_trans_to_exons, 
-                                                 \%junction_read_names);
+
+    my %all_fusion_candidate_complex_names;  # {fusion_complex_name} = info struct
+    my %junction_breakpoint_to_read_names;  # {fusion_complex_name} -> {breakpoint} -> {read_name} = 1 
+    my %spans_to_read_names; # {fusion_complex_name} -> { read_name } = 1
     
-    my %spans = &map_spanning_reads_to_genes($chimeric_out_sam, \%chr_to_interval_tree, \%chr_gene_trans_to_exons); 
+    &map_chimeric_reads_to_genes($chimeric_junction_file, 
+                                 \%chr_to_interval_tree, 
+                                 \%chr_gene_trans_to_exons, 
+
+                                 \%all_fusion_candidate_complex_names,                                 
+                                 \%junction_breakpoint_to_read_names,
+                                 \%spans_to_read_names);
+    
     
     
 
@@ -104,87 +115,138 @@ main: {
     my $junction_read_outfile = "$out_prefix.junction_read_names";
     open (my $ofh_junc, ">$junction_read_outfile") or die "Error, cannot write to $junction_read_outfile";
     
-    my $spanning_read_outfile = "$out_prefix.spanning_read_names";
+    my $spanning_read_outfile = "$out_prefix.spanning_frag_names";
     open (my $ofh_span, ">$spanning_read_outfile") or die "Error, cannot write to $spanning_read_outfile";
-
+    
     my @fusion_candidates;
     
-    foreach my $fusion_complex_name (keys %junctions) {
+    foreach my $fusion_complex_name (keys %all_fusion_candidate_complex_names) {
         
-        my $span_token = join("--", sort split(/--/, $fusion_complex_name)); # spans are lexically ordered pairs in contrast to juncs
-
         ## get the span support
-        my $spanning_reads_href = $spans{$span_token};
+        my $spanning_reads_href = $spans_to_read_names{$fusion_complex_name};
         my @spanning_reads;
-
+        
         if (ref $spanning_reads_href) {
             @spanning_reads = keys %$spanning_reads_href;
             foreach my $span_read (@spanning_reads) {
                 print $ofh_span "$fusion_complex_name\t$span_read\n";
             }
         }
+        else {
+            print STDERR "ERROR, no span reads for $fusion_complex_name\n";
+        }
+       
+        my $fusion_info_struct = $all_fusion_candidate_complex_names{$fusion_complex_name};
+        my ($left_gene_id, $right_gene_id, $fusion_simple_name) = ($fusion_info_struct->{left_gene_id},
+                                                                   $fusion_info_struct->{right_gene_id},
+                                                                   $fusion_info_struct->{fusion_simple_name});
         
-        my $breakpoint_info_href = $junctions{$fusion_complex_name};
+        my $breakpoint_info_href = $junction_breakpoint_to_read_names{$fusion_complex_name};
         
-        my @fusion_breakpoints = reverse sort {$breakpoint_info_href->{$a}<=>$breakpoint_info_href->{$b}} keys %$breakpoint_info_href;
+        if ($breakpoint_info_href) {
+            my @fusion_breakpoints = reverse sort {$breakpoint_info_href->{$a}<=>$breakpoint_info_href->{$b}} keys %$breakpoint_info_href;
         
-        while (@fusion_breakpoints) {
-            my $best_breakpoint = shift @fusion_breakpoints;
-            my $breakpoint_count = $breakpoint_info_href->{$best_breakpoint};
-            my ($left_gene, $left_coords, $left_delta, $right_gene, $right_coords, $right_delta, $complex_name, $fusion_simple_name) = split(/;/, $best_breakpoint);
-            my $splice_type = ($left_delta == 0 && $right_delta == 0) ? "ONLY_REF_SPLICE" : "INCL_NON_REF_SPLICE"; 
-            
-            if ($splice_type ne "ONLY_REF_SPLICE" && $breakpoint_count < $MIN_NOVEL_JUNCTION_SUPPORT) { next; } # ignore likely noise
+            while (@fusion_breakpoints) {
+                my $best_breakpoint = shift @fusion_breakpoints;
+                
+                my ($left_coords, $left_delta, $right_coords, $right_delta) = split(/;/, $best_breakpoint);
+                my $splice_type = ($left_delta == 0 && $right_delta == 0) ? "ONLY_REF_SPLICE" : "INCL_NON_REF_SPLICE"; 
+                
+                my $junction_reads_href = $breakpoint_info_href->{$best_breakpoint};
+                my @junc_reads = keys %$junction_reads_href;
+                                
+                my $breakpoint_count = scalar(@junc_reads);
 
-
-            # prune any junction reads from the span support for this fusion.
-            my %local_spanning_reads = map { + $_ => 1 } @spanning_reads;
-            
-            my $junction_reads_href = $junction_read_names{$best_breakpoint};
-            foreach my $junction_read (keys %$junction_reads_href) {
-                print $ofh_junc "$fusion_complex_name\t$best_breakpoint\t$junction_read\n";
-                if (exists $local_spanning_reads{$junction_read}) {
-                    delete $local_spanning_reads{$junction_read};
+                if ($splice_type ne "ONLY_REF_SPLICE" && $breakpoint_count < $MIN_NOVEL_JUNCTION_SUPPORT) { next; } # ignore likely noise
+                
+                
+                # prune any junction reads from the span support for this fusion.
+                my %local_spanning_reads = map { + $_ => 1 } @spanning_reads;
+                
+                
+                foreach my $junction_read (@junc_reads) {
+                    print $ofh_junc "$fusion_complex_name\t$best_breakpoint\t$junction_read\n";
+                    if (exists $local_spanning_reads{$junction_read}) {
+                        delete $local_spanning_reads{$junction_read};
+                    }
                 }
-            }
+                
+                my @span_reads = keys %local_spanning_reads;
+                my $span_count = scalar(@span_reads);
+                
+                
+                my $score = 4 * $breakpoint_count +  $span_count;
+                
+                
+                my $fusion_candidate = { fusion_simple_name => $fusion_simple_name,
+                                         fusion_complex_name => $fusion_complex_name,
+                                         
+                                         junction_count => $breakpoint_count,
+                                         spanning_count => $span_count,
+                                         
+                                         left_gene => $left_gene_id,
+                                         left_coords => $left_coords,
+                                         left_delta => $left_delta, # dist to ref splice junction
+                                         
+                                         right_gene => $right_gene_id,
+                                         right_coords => $right_coords,
+                                         right_delta => $right_delta, # dist to ref splice junction
+                                         
+                                         splice_type => $splice_type,
+                                         
+                                         spanning_frag_names => \@span_reads,
+                                         junction_read_names => \@junc_reads,
+                                                                                  
+                                         score => $score,
+                                         
+                };                
+                
+                
+                push (@fusion_candidates, $fusion_candidate);
             
-            my @span_reads = keys %local_spanning_reads;
-            my $span_count = scalar(@span_reads);
+            } # end for each breakpoint
+        } # end if breakpont
+        else {
+            # just spanning evidence.
 
-            my @junc_reads = keys %$junction_reads_href;
+            my $span_count = scalar(@spanning_reads);
 
+
+            if ($span_count < $MIN_SPAN_ONLY_SUPPORT) { next; } # ignore likely noise
             
-            my $score = $breakpoint_count * 4 + $span_count;
 
+            my $score = $span_count;
+            
             my $fusion_candidate = { fusion_simple_name => $fusion_simple_name,
                                      fusion_complex_name => $fusion_complex_name,
                                      
-                                     junction_count => $breakpoint_count,
+                                     junction_count => 0,
                                      spanning_count => $span_count,
                                      
-                                     left_gene => $left_gene,
-                                     left_coords => $left_coords,
-                                     left_delta => $left_delta, # dist to ref splice junction
+                                     left_gene => $left_gene_id,
+                                     left_coords => '.',
+                                     left_delta => '.', # dist to ref splice junction
                                      
-                                     right_gene => $right_gene,
-                                     right_coords => $right_coords,
-                                     right_delta => $right_delta, # dist to ref splice junction
+                                     right_gene => $right_gene_id,
+                                     right_coords => '.',
+                                     right_delta => '.',
                                      
-                                     splice_type => $splice_type,
+                                     splice_type => "NO_JUNCTION_READS_IDENTIFIED",
                                      
-                                     spanning_frag_names => \@span_reads,
-                                     junction_read_names => \@junc_reads,
+                                     spanning_frag_names => \@spanning_reads,
+                                     junction_read_names => [],
                                      
-
+                                     
                                      score => $score,
                                      
             };
-                        
+            
+            
+            
             push (@fusion_candidates, $fusion_candidate);
-            
-            
-
         }
+        
+        
     }
     
     close $ofh_junc;
@@ -209,6 +271,7 @@ main: {
     
     @fusion_candidates = reverse sort {$a->{score}<=>$b->{score}} @fusion_candidates;
 
+
     foreach my $fusion_candidate (@fusion_candidates) {
         
         my $junction_reads = join(",", @{$fusion_candidate->{junction_read_names}}) || ".";
@@ -227,6 +290,7 @@ main: {
     }
     
     close $ofh;
+    
     
 
     exit(0);
@@ -505,12 +569,12 @@ sub get_overlapping_genes {
 
 
 ####
-sub map_junction_reads_to_genes {
+sub map_chimeric_reads_to_genes {
     my ($junctions_file, $chr_to_interval_tree_href, $chr_gene_trans_to_exons_href, 
-        $junction_read_names_href, $gene_id_to_name_href) = @_;
+        $all_fusion_candidate_complex_names_href, $junction_breakpoint_to_read_names_href, $spans_to_read_names_href) = @_;
     
-    print STDERR "-mapping junction reads to genes\n";
-
+    print STDERR "-mapping reads to genes\n";
+    
     my $junctions_w_gene_info_file = "$out_prefix.junction_breakpts_to_genes.txt";
     open (my $ofh, ">$junctions_w_gene_info_file") or die "Error, cannot write to file $junctions_w_gene_info_file";
     
@@ -519,8 +583,7 @@ sub map_junction_reads_to_genes {
         $junctions_file = "gunzip -c $junctions_file | ";
     }
     
-    my %junction_info;
-    
+        
     open (my $fh, $junctions_file) or die "Error, cannot open file $junctions_file";
     while (<$fh>) {
         chomp;
@@ -551,9 +614,8 @@ sub map_junction_reads_to_genes {
         #column 14: CIGAR of the second segment
 
         my $junction_type = $x[6];
-        if ($junction_type == -1) { next; } # getting the spanning frags from the sam file instead
-        
-        my $junction_read_name = $x[9];
+                
+        my $read_name = $x[9];
         
         my ($chrA, $coordA, $orientA) = ($x[0], $x[1], $x[2]);
         $coordA = ($orientA eq '+') ? --$coordA : ++$coordA;
@@ -568,22 +630,25 @@ sub map_junction_reads_to_genes {
         #print STDERR "A: " . Dumper(\@A_hits);
         #print STDERR "B: " . Dumper(\@B_hits);
 
+        
+        if (&found_selfie(\@A_hits, \@B_hits) ) {
+            # skip it. likely FP
+            next;
+        }
+
         foreach my $left_possibility (@A_hits) {
 
             foreach my $right_possibility (@B_hits) {
                         
                 my ($left_entry, $right_entry) = ($left_possibility, $right_possibility);
-                    
+                
+                
                 # ensure consistent orientation
                 unless ($left_entry->{sense_or_antisense} eq $right_entry->{sense_or_antisense}) {
                     next;
                 }
 
-                if ($left_entry->{gene_id} eq $right_entry->{gene_id}) {
-                    # no selfies
-                    next;
-                }
-
+                
                 if ($left_entry->{sense_or_antisense} eq 'antisense') {
                     # swap em
                     ($left_entry, $right_entry) = ($right_entry, $left_entry);
@@ -597,165 +662,65 @@ sub map_junction_reads_to_genes {
                 
                 my $fusion_simple_name = join("--", $left_gene_name, $right_gene_name);
                 my $fusion_complex_name = join("--", $left_gene_id, $right_gene_id);
-                
-                my @at_exon_junctions = ($left_gene_id, 
-                                         $left_entry->{chr} . ":" . $left_entry->{pt_align} . ":" . $left_entry->{exon}->{orient},
-                                         $left_entry->{delta}, 
 
-                                         $right_gene_id, 
-                                         $right_entry->{chr} . ":" . $right_entry->{pt_align} . ":" . $right_entry->{exon}->{orient},
-                                         $right_entry->{delta}, 
-                                         $fusion_complex_name,
-                                         $fusion_simple_name);
+                $all_fusion_candidate_complex_names_href->{$fusion_complex_name} = { left_gene_id => $left_gene_id,
+                                                                                     right_gene_id => $right_gene_id,
+                                                                                     fusion_complex_name => $fusion_complex_name,
+                                                                                     fusion_simple_name => $fusion_simple_name,
+                };
                 
-                
-                my $junction_text = join(";", @at_exon_junctions);
-                push (@x, $junction_text);
-                
-                # both at exon junctions
-                $junction_info{$fusion_complex_name}->{$junction_text}++;
-                
-                $junction_read_names_href->{$junction_text}->{$junction_read_name}++; # track junction read name to fusion name
-                $junction_read_names_href->{$junction_read_name}++; # ignore in spanning read set, working double-duty w/ data structure. 
-            
+                if ($junction_type == -1) { 
+                    # Not a split read, but rather a split pair
+                    
+                    $spans_to_read_names_href->{$fusion_complex_name}->{$read_name} = 1;
+                    push (@x, $fusion_complex_name);
+                }
+                else {
+                    
+                    my @at_exon_junctions = ($left_entry->{chr} . ":" . $left_entry->{pt_align} . ":" . $left_entry->{exon}->{orient},
+                                             $left_entry->{delta}, 
+                                             $right_entry->{chr} . ":" . $right_entry->{pt_align} . ":" . $right_entry->{exon}->{orient},
+                                             $right_entry->{delta}, 
+                        );
+                    
+                    
+                    my $junction_text = join(";", @at_exon_junctions);
+                    push (@x, $junction_text, $fusion_complex_name);
+                    
+                    # both at exon junctions
+                    
+                    
+                    $junction_breakpoint_to_read_names_href->{$fusion_complex_name}->{$junction_text}->{$read_name}++; # track junction read name to fusion name
+                                        
+                }
             }
         }
-     
+        
         print $ofh join("\t", @x) . "\n";
     }
     
     close $ofh;
     
-    
-    return (%junction_info);
-    
+    return;    
 }
 
 
 ####
-sub map_spanning_reads_to_genes {
-    my ($chimeric_out_sam, $chr_to_interval_tree_href, $chr_gene_trans_to_exons_href) = @_;
-    
-    
-    my $read_to_spans_file = "$out_prefix.discordant_spans_to_genes.txt";
-    open (my $ofh, ">$read_to_spans_file") or die "Error, cannot open file $read_to_spans_file";
-    
-    my %span_pair_counter;
-    
+sub found_selfie {
+    my ($A_hits_aref, $B_hits_aref) = @_;
 
-    my $sam_reader = new SAM_reader($chimeric_out_sam);
-    
-    my @read_info;
-    my $prev_core_read_name = "";
-    
-    my $DEBUG_SPAN_FLAG = 0;
-    my $test_ofh;
-    
-    if ($DEBUG_SPAN_FLAG) {
-        open ($test_ofh, ">test.out") or die $!;
-    }
-    
-    while (my $sam_entry = $sam_reader->get_next()) {
-        
-        my $core_read_name = $sam_entry->get_core_read_name();
-        my $full_read_name = $sam_entry->reconstruct_full_read_name();
-        
-        print $test_ofh "// read: $full_read_name\n" if $DEBUG_SPAN_FLAG;
+    foreach my $left_entry (@$A_hits_aref) {
 
-        if ($core_read_name ne $prev_core_read_name && @read_info) {
-            &describe_read_pair_info($prev_core_read_name, \@read_info, $ofh, \%span_pair_counter);
-            @read_info = ();
-        }
-
-
-        my $read_dir = ($full_read_name =~ m|/([12])$|) ? $1 : 0;
-        unless ($read_dir) { next; }
-        
-        my $chr = $sam_entry->get_scaffold_name();
-
-        unless (exists $chr_to_interval_tree_href->{$chr}) { 
+        foreach my $right_entry (@$B_hits_aref) {
             
-             # no annotations to search overlaps of.
-            print $test_ofh "-warning: no interval tree features on chr: $chr\n" if $DEBUG_SPAN_FLAG;
-            next; 
-        }
-        
-        my ($genome_coords_aref, $read_coords_aref) = $sam_entry->get_alignment_coords();
-
-        my $found_overlap = 0;
-        foreach my $exon_segment (@$genome_coords_aref) {
-            my ($lend, $rend) = @$exon_segment;
-            if ($lend == $rend) { next; } # no single base interval searches
-            my $overlaps_aref = $chr_to_interval_tree_href->{$chr}->fetch($lend, $rend);
-            if (@$overlaps_aref) {
-                print $test_ofh "$full_read_name coords $lend-$rend overlap: " . join(",", @$overlaps_aref) . "\n" if $DEBUG_SPAN_FLAG;
-                &add_overlapping_genes(\@read_info, $overlaps_aref, $read_dir);                
-                $found_overlap = 1;
+            if ($left_entry->{gene_id} eq $right_entry->{gene_id}) {
+                # found selfie
+                return(1);
             }
         }
-        unless ($found_overlap) {
-            print $test_ofh "$full_read_name has no feature overlap.\n" if $DEBUG_SPAN_FLAG;
-        }
-        
-        $prev_core_read_name = $core_read_name;
     }
 
-    # get last one
-    &describe_read_pair_info($prev_core_read_name, \@read_info, $ofh, \%span_pair_counter);
-
-    #use Data::Dumper; print STDERR Dumper(\%span_pair_counter);
-    
-    return(%span_pair_counter);
-    
+    return(0);
 }
 
-
-####
-sub describe_read_pair_info {
-    my ($read_name, $read_info_aref, $ofh, $span_pair_counter_href) = @_;
     
-    my @read_1_genes;
-    my @read_2_genes;
-
-    my $read_1_genes_href = $read_info_aref->[1];
-    if ($read_1_genes_href) {
-        @read_1_genes = sort keys (%$read_1_genes_href);
-    }
-
-    my $read_2_genes_href = $read_info_aref->[2];
-    if ($read_2_genes_href) {
-        @read_2_genes = sort keys (%$read_2_genes_href);
-    }
-    
-    if (@read_1_genes && @read_2_genes) {
-            
-        my %seen;
-        foreach my $read_1_gene (@read_1_genes) {
-            foreach my $read_2_gene (@read_2_genes) {
-                my $fusion_token = join("--", sort ($read_1_gene, $read_2_gene));
-                if ($seen{$fusion_token}) { next; } # just in case, don't overcount
-                $seen{$fusion_token} = 1;
-                
-                print $ofh "$read_name\t$fusion_token\n";
-            
-                $span_pair_counter_href->{$fusion_token}->{$read_name}++;
-            }
-        }
-        
-        
-    }
-    
-    return;
-}    
-        
-
-####
-sub add_overlapping_genes {
-    my ($read_info_aref, $overlaps_aref, $read_dir) = @_;
-    
-    foreach my $gene (@$overlaps_aref) {
-        $read_info_aref->[$read_dir]->{$gene} = 1;
-    }
-
-    return;
-}

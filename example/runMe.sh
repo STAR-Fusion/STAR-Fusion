@@ -1,4 +1,4 @@
 #!/bin/bash
 
 
-../STAR-Fusion -S Chimeric.out.sam.gz -J Chimeric.out.junction.gz
+../STAR-Fusion -J Chimeric.out.junction.gz --verbose_level 2
