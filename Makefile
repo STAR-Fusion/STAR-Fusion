@@ -30,4 +30,4 @@ clean:
 
 
 test:
-	cd example/ && runMe.pl
+	cd example/ && runMe.sh
