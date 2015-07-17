@@ -132,10 +132,7 @@ main: {
                 print $ofh_span "$fusion_complex_name\t$span_read\n";
             }
         }
-        else {
-            print STDERR "ERROR, no span reads for $fusion_complex_name\n";
-        }
-       
+               
         my $fusion_info_struct = $all_fusion_candidate_complex_names{$fusion_complex_name};
         my ($left_gene_id, $right_gene_id, $fusion_simple_name) = ($fusion_info_struct->{left_gene_id},
                                                                    $fusion_info_struct->{right_gene_id},
