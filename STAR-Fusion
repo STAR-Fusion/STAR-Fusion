@@ -139,7 +139,7 @@ main: {
         . " -G $ref_GTF "
         . " -O $out_prefix ";
     
-    $pipeliner->add_commands(new Command($cmd, "STAR-Fusion.predict.ok"));
+    $pipeliner->add_commands(new Command($cmd, "$out_prefix.STAR-Fusion.predict.ok"));
 
     my $predicted_fusions_file = "$out_prefix.fusion_candidates.preliminary";
     
@@ -157,7 +157,7 @@ main: {
             . " --aggregate_novel_junction_dist $AGGREGATE_NOVEL_JUNCTION_DIST "
             . " --out_prefix $out_prefix.fusion_candidates ";
         
-        $pipeliner->add_commands(new Command($cmd, "STAR-Fusion.filter.ok"));
+        $pipeliner->add_commands(new Command($cmd, "$out_prefix.STAR-Fusion.filter.ok"));
         
     }
     $pipeliner->run();
