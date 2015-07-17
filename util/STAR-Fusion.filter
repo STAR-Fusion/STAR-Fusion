@@ -559,6 +559,8 @@ sub remove_minor_nonref_isoforms {
     my %dominant_isoform_junc_support;
     my @ret_fusions;
     
+    my %seen;
+    
     foreach my $fusion (@fusions) {
         
         my $fusion_name = $fusion->{fusion_name};
@@ -568,21 +570,34 @@ sub remove_minor_nonref_isoforms {
 
         if ($splice_type eq 'INCL_NON_REF_SPLICE' && $junction_support < $MIN_NOVEL_JUNCTION_SUPPORT) { next; }
         
-        my $dominant_isoform_support = $dominant_isoform_junc_support{$fusion_name};
-        if (defined $dominant_isoform_support) {
-
-            my $pct_dom_iso_support = $junction_support / $dominant_isoform_support * 100;
-            if ($pct_dom_iso_support < $MIN_ALT_PCT_JUNCTION) {
-                print $ofh "#" . $fusion->{line} . "\tFILTERED DUE TO ONLY $pct_dom_iso_support % of dominant isoform support ($dominant_isoform_support)\n";
+        if ($splice_type eq 'NO_JUNCTION_READS_IDENTIFIED') {
+            if ($seen{$fusion_name}) {
+                print $ofh "#" . $fusion->{line} . "\tFILTERED as redundant, already reported $fusion_name\n";
                 next; 
             }
-            
+            else {
+                $seen{$fusion_name} = 1;
+            }
         }
         else {
-            $dominant_isoform_junc_support{$fusion_name} = $junction_support;
+            
+            my $dominant_isoform_support = $dominant_isoform_junc_support{$fusion_name};
+            if (defined $dominant_isoform_support) {
+                
+                my $pct_dom_iso_support = $junction_support / $dominant_isoform_support * 100;
+                if ($pct_dom_iso_support < $MIN_ALT_PCT_JUNCTION) {
+                    print $ofh "#" . $fusion->{line} . "\tFILTERED DUE TO ONLY $pct_dom_iso_support % of dominant isoform support ($dominant_isoform_support)\n";
+                    next; 
+                }
+                
+            }
+        
+            else {
+                $dominant_isoform_junc_support{$fusion_name} = $junction_support;
+            }
         }
         
-        push (@ret_fusions, $fusion);
+        push (@ret_fusions, $fusion); # it's a keeper.
 
     }
     
