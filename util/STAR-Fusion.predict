@@ -221,11 +221,11 @@ main: {
                                      spanning_count => $span_count,
                                      
                                      left_gene => $left_gene_id,
-                                     left_coords => '.',
+                                     left_coords => $fusion_info_struct->{left_coord},
                                      left_delta => '.', # dist to ref splice junction
                                      
                                      right_gene => $right_gene_id,
-                                     right_coords => '.',
+                                     right_coords => $fusion_info_struct->{right_coord},
                                      right_delta => '.',
                                      
                                      splice_type => "NO_JUNCTION_READS_IDENTIFIED",
@@ -664,6 +664,9 @@ sub map_chimeric_reads_to_genes {
                                                                                      right_gene_id => $right_gene_id,
                                                                                      fusion_complex_name => $fusion_complex_name,
                                                                                      fusion_simple_name => $fusion_simple_name,
+                                                                                     left_coord => join(":", $left_entry->{chr}, $left_entry->{pt_align}),
+                                                                                     right_coord => join(":", $right_entry->{chr}, $right_entry->{pt_align})
+                                                                                         
                 };
                 
                 if ($junction_type == -1) { 
