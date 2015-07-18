@@ -9,8 +9,6 @@ use Fasta_reader;
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);                                                 
 use TiedHash;
 
-
-
 my $cdna_fasta_file = "$FindBin::Bin/../resources/gencode.v19.annotation.gtf.exons.cdna.gz";
 
 my $Evalue = 1e-3;
@@ -19,6 +17,8 @@ my $tmpdir = "/tmp";
 my $MIN_NOVEL_JUNCTION_SUPPORT = 5;
 my $MIN_ALT_PCT_JUNCTION = 10;
 my $AGGREGATE_NOVEL_JUNCTION_DIST = 5;
+my $MIN_SPAN_ONLY_SUPPORT = 5;
+
 
 my $usage = <<__EOUSAGE__;
 
@@ -46,6 +46,8 @@ my $usage = <<__EOUSAGE__;
 #
 #  --min_alt_pct_junction <float>        default: $MIN_ALT_PCT_JUNCTION  ($MIN_ALT_PCT_JUNCTION % of the dominant isoform junction support)
 #
+#  --min_span_only_support <int>         default: $MIN_SPAN_ONLY_SUPPORT (minimum of $MIN_SPAN_ONLY_SUPPORT) spanning frags required if no junction reads are found
+#
 #  --aggregate_novel_junction_dist <int>  default: $AGGREGATE_NOVEL_JUNCTION_DIST (non-ref junctions within $AGGREGATE_NOVEL_JUNCTION_DIST are merged into single calls)
 #
 ####################################################################################################
@@ -70,11 +72,11 @@ my $out_prefix;
               'E=f' => \$Evalue,
               'tmpdir=s' => \$tmpdir,
               
-
-
               'min_novel_junction_support=i' => \$MIN_NOVEL_JUNCTION_SUPPORT,
               'min_alt_pct_junction=f' => \$MIN_ALT_PCT_JUNCTION,
               'aggregate_novel_junction_dist=i' => \$AGGREGATE_NOVEL_JUNCTION_DIST,
+
+              'min_span_only_support=i' => \$MIN_SPAN_ONLY_SUPPORT,
               
               
     );
@@ -565,10 +567,30 @@ sub remove_minor_nonref_isoforms {
         
         my $fusion_name = $fusion->{fusion_name};
         my $junction_support = $fusion->{J};
+        my $span_support = $fusion->{S};
 
         my $splice_type = $fusion->{splice_type};
 
-        if ($splice_type eq 'INCL_NON_REF_SPLICE' && $junction_support < $MIN_NOVEL_JUNCTION_SUPPORT) { next; }
+
+        if ($splice_type eq 'NO_JUNCTION_READS_IDENTIFIED') {
+            if ($span_support < $MIN_SPAN_ONLY_SUPPORT) {
+                print $ofh "#" . $fusion->{line} . "\tFILTERED DUE TO span-only support $span_support < $MIN_SPAN_ONLY_SUPPORT\n";
+                next;
+            }
+        }
+        
+        if ($splice_type eq 'INCL_NON_REF_SPLICE' && $junction_support < $MIN_NOVEL_JUNCTION_SUPPORT) { 
+            
+            if ($span_support + $junction_support >= $MIN_SPAN_ONLY_SUPPORT) {
+                ## treat as NO_JUNCTION_READS_IDENTIFIED
+                $splice_type = "NO_JUNCTION_READS_IDENTIFIED";
+            }
+            else {
+                # skip it
+                print $ofh "#" . $fusion->{line} . "\tFILTERED DUE TO junction support $junction_support < $MIN_NOVEL_JUNCTION_SUPPORT\n";
+                next; 
+            }
+        }
         
         if ($splice_type eq 'NO_JUNCTION_READS_IDENTIFIED') {
             if ($seen{$fusion_name}) {

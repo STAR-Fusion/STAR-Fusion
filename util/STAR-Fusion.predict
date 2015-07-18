@@ -16,7 +16,6 @@ use SAM_entry;
 
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
-
 my $UTILDIR = "$FindBin::Bin/util";
 
 ## Options
