@@ -556,7 +556,9 @@ sub merge_fusions {
 sub remove_minor_nonref_isoforms {
     my ($fusions_aref, $ofh) = @_;
     
-    my @fusions = reverse sort { $a->{score}<=>$b->{score} } @$fusions_aref;
+    my @fusions = reverse sort { $a->{J}<=>$b->{J} 
+                                 ||
+                                     $a->{S} <=> $b->{S} } @$fusions_aref;
     
     my %dominant_isoform_junc_support;
     my @ret_fusions;
@@ -579,26 +581,20 @@ sub remove_minor_nonref_isoforms {
             }
         }
         
-        if ($splice_type eq 'INCL_NON_REF_SPLICE' && $junction_support < $MIN_NOVEL_JUNCTION_SUPPORT) { 
+        if ($splice_type eq 'INCL_NON_REF_SPLICE' 
+            && $junction_support < $MIN_NOVEL_JUNCTION_SUPPORT 
+            && $span_support + $junction_support < $MIN_SPAN_ONLY_SUPPORT) {
             
-            if ($span_support + $junction_support >= $MIN_SPAN_ONLY_SUPPORT) {
-                ## treat as NO_JUNCTION_READS_IDENTIFIED
-                $splice_type = "NO_JUNCTION_READS_IDENTIFIED";
-            }
-            else {
-                # skip it
-                print $ofh "#" . $fusion->{line} . "\tFILTERED DUE TO junction support $junction_support < $MIN_NOVEL_JUNCTION_SUPPORT\n";
-                next; 
-            }
+            # skip it
+            print $ofh "#" . $fusion->{line} . "\tFILTERED DUE TO junction support $junction_support < $MIN_NOVEL_JUNCTION_SUPPORT\n";
+            next; 
+            
         }
         
         if ($splice_type eq 'NO_JUNCTION_READS_IDENTIFIED') {
             if ($seen{$fusion_name}) {
                 print $ofh "#" . $fusion->{line} . "\tFILTERED as redundant, already reported $fusion_name\n";
                 next; 
-            }
-            else {
-                $seen{$fusion_name} = 1;
             }
         }
         else {
@@ -621,6 +617,8 @@ sub remove_minor_nonref_isoforms {
         
         push (@ret_fusions, $fusion); # it's a keeper.
 
+        $seen{$fusion_name} = 1;
+        
     }
     
     return(@ret_fusions);
