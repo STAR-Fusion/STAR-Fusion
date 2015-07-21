@@ -573,6 +573,11 @@ sub remove_minor_nonref_isoforms {
 
         my $splice_type = $fusion->{splice_type};
 
+        if ($junction_support == 0) {
+            # resetting it (though the fusion-reporting script should have done this!... compensate for it here)
+            $splice_type = "NO_JUNCTION_READS_IDENTIFIED";
+        }
+        
 
         if ($splice_type eq 'NO_JUNCTION_READS_IDENTIFIED') {
             if ($span_support < $MIN_SPAN_ONLY_SUPPORT) {
