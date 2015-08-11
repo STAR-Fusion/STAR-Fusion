@@ -14,10 +14,14 @@ my $cdna_fasta_file = "$FindBin::Bin/../resources/gencode.v19.annotation.gtf.exo
 my $Evalue = 1e-3;
 my $tmpdir = "/tmp";
 
-my $MIN_NOVEL_JUNCTION_SUPPORT = 5;
+my $MIN_NOVEL_JUNCTION_SUPPORT = 3;
 my $MIN_ALT_PCT_JUNCTION = 10;
 my $AGGREGATE_NOVEL_JUNCTION_DIST = 5;
 my $MIN_SPAN_ONLY_SUPPORT = 5;
+
+my $MIN_JUNCTION_READS = 1;
+my $MIN_SUM_FRAGS = 3;
+my $MAX_PROMISCUITY = 3;  # perhaps a poor choice of words, but still a best fit IMHO.
 
 
 my $usage = <<__EOUSAGE__;
@@ -40,6 +44,13 @@ my $usage = <<__EOUSAGE__;
 #  -E <float>                     E-value threshold for blast searches (default: $Evalue)
 #
 #  --tmpdir <string>              file for temporary files (default: $tmpdir)
+#
+#    --min_junction_reads <int>            minimum number of junction-spanning reads required. Default: $MIN_JUNCTION_READS
+#
+#    --max_promiscuity <int>               maximum number of partners allowed for a given fusion. Default: $MAX_PROMISCUITY
+#
+#    --min_sum_frags <int>                 minimum fusion support = ( # junction_reads + # spanning_frags ) Default: $MIN_SUM_FRAGS
+#
 #
 #  --min_novel_junction_support <int>    default: $MIN_NOVEL_JUNCTION_SUPPORT  (minimum of $MIN_NOVEL_JUNCTION_SUPPORT junction reads required if breakpoint
 #                                                        lacks involvement of only reference junctions)
@@ -76,7 +87,10 @@ my $out_prefix;
               'min_alt_pct_junction=f' => \$MIN_ALT_PCT_JUNCTION,
               'aggregate_novel_junction_dist=i' => \$AGGREGATE_NOVEL_JUNCTION_DIST,
 
-              'min_span_only_support=i' => \$MIN_SPAN_ONLY_SUPPORT,
+              'min_junction_reads=i' => \$MIN_JUNCTION_READS,
+              'min_sum_frags=i' => \$MIN_SUM_FRAGS,
+              'max_promiscuity=i' => \$MAX_PROMISCUITY,
+        
               
               
     );
@@ -136,7 +150,6 @@ main: {
     unless (-d $tmpdir) {
         mkdir $tmpdir or die "Error, cannot mkdir $tmpdir";
     }
-    
     
     
     my $final_preds_file = "$out_prefix.final";
@@ -217,8 +230,14 @@ main: {
     
     @fusions = &merge_neighboring_nonref_splice(\@fusions, $filter_ofh);
 
-    @fusions = &remove_minor_nonref_isoforms(\@fusions, $filter_ofh);
+
+    @fusions = &remove_fusions_with_insufficient_support(\@fusions, $filter_ofh, $MIN_JUNCTION_READS, $MIN_SUM_FRAGS);
     
+    @fusions = &remove_promiscuous_fusions(\@fusions, $filter_ofh, $MAX_PROMISCUITY);
+        
+    @fusions = &remove_minor_nonref_isoforms(\@fusions, $filter_ofh);
+
+
     
     ########################
     ##  Filter and report ##
@@ -570,62 +589,116 @@ sub remove_minor_nonref_isoforms {
         my $fusion_name = $fusion->{fusion_name};
         my $junction_support = $fusion->{J};
         my $span_support = $fusion->{S};
-
-        my $splice_type = $fusion->{splice_type};
-
-        if ($junction_support == 0) {
-            # resetting it (though the fusion-reporting script should have done this!... compensate for it here)
-            $splice_type = "NO_JUNCTION_READS_IDENTIFIED";
-        }
         
-
-        if ($splice_type eq 'NO_JUNCTION_READS_IDENTIFIED') {
-            if ($span_support < $MIN_SPAN_ONLY_SUPPORT) {
-                print $ofh "#" . $fusion->{line} . "\tFILTERED DUE TO span-only support $span_support < $MIN_SPAN_ONLY_SUPPORT\n";
-                next;
-            }
-        }
-        
-        if ($splice_type eq 'INCL_NON_REF_SPLICE' 
-            && $junction_support < $MIN_NOVEL_JUNCTION_SUPPORT 
-            && $span_support + $junction_support < $MIN_SPAN_ONLY_SUPPORT) {
+        my $dominant_isoform_support = $dominant_isoform_junc_support{$fusion_name};
+        if (defined $dominant_isoform_support && $dominant_isoform_support > 0) {
             
-            # skip it
-            print $ofh "#" . $fusion->{line} . "\tFILTERED DUE TO junction support $junction_support < $MIN_NOVEL_JUNCTION_SUPPORT\n";
-            next; 
-            
-        }
-        
-        if ($splice_type eq 'NO_JUNCTION_READS_IDENTIFIED') {
-            if ($seen{$fusion_name}) {
-                print $ofh "#" . $fusion->{line} . "\tFILTERED as redundant, already reported $fusion_name\n";
+            my $pct_dom_iso_support = $junction_support / $dominant_isoform_support * 100;
+            if ($pct_dom_iso_support < $MIN_ALT_PCT_JUNCTION) {
+                print $ofh "#" . $fusion->{line} . "\tFILTERED DUE TO ONLY $pct_dom_iso_support % of dominant isoform support ($dominant_isoform_support)\n";
                 next; 
             }
-        }
-        else {
             
-            my $dominant_isoform_support = $dominant_isoform_junc_support{$fusion_name};
-            if (defined $dominant_isoform_support) {
-                
-                my $pct_dom_iso_support = $junction_support / $dominant_isoform_support * 100;
-                if ($pct_dom_iso_support < $MIN_ALT_PCT_JUNCTION) {
-                    print $ofh "#" . $fusion->{line} . "\tFILTERED DUE TO ONLY $pct_dom_iso_support % of dominant isoform support ($dominant_isoform_support)\n";
-                    next; 
-                }
-                
-            }
-        
-            else {
-                $dominant_isoform_junc_support{$fusion_name} = $junction_support;
-            }
         }
         
+        else {
+            $dominant_isoform_junc_support{$fusion_name} = $junction_support;
+        }
+        
+    
         push (@ret_fusions, $fusion); # it's a keeper.
-
+        
         $seen{$fusion_name} = 1;
         
     }
     
+    
     return(@ret_fusions);
 }
             
+####
+sub remove_fusions_with_insufficient_support {
+    my ($fusions_aref, $filter_ofh, $min_J, $min_sum) = @_;
+
+    my @ret_fusions;
+
+    foreach my $fusion (@$fusions_aref) {
+        
+
+        my $splice_type = $fusion->{splice_type};
+
+        my $sum = $fusion->{J} + $fusion->{S};
+        
+        if ($sum < $min_sum) {
+            print $filter_ofh "#" . $fusion->{line} . "\tFILTERED DUE TO sum_support($sum) < min_support_required:$min_sum\n";
+            next;
+        }
+
+
+        if ($splice_type eq 'INCL_NON_REF_SPLICE' && $fusion->{J} < $MIN_NOVEL_JUNCTION_SUPPORT) { 
+            
+            
+            # skip it
+            print $filter_ofh "#" . $fusion->{line} . "\tFILTERED DUE TO *novel* junction support $fusion->{J} < $MIN_NOVEL_JUNCTION_SUPPORT\n";
+            next; 
+        }
+
+        
+        if ($fusion->{J} < $min_J) {
+            
+            # skip it
+            print $filter_ofh "#" . $fusion->{line} . "\tFILTERED DUE TO junction read support ($fusion->{J}) < $min_J\n";
+            next;
+        }
+        
+
+        # passed requirements.
+
+        push (@ret_fusions, $fusion);
+
+    }
+
+    return(@ret_fusions);
+}
+
+####
+sub remove_promiscuous_fusions {
+    my ($fusions_aref, $filter_ofh, $max_promiscuity) = @_;
+
+    
+    my %partners;
+
+    foreach my $fusion (@$fusions_aref) {
+
+        my $geneA = $fusion->{geneA};
+        my $geneB = $fusion->{geneB};
+
+        $partners{$geneA}->{$geneB}++;
+        $partners{$geneB}->{$geneA}++;
+
+    }
+
+    my @ret_fusions;
+    
+    foreach my $fusion (@$fusions_aref) {
+
+        my $geneA = $fusion->{geneA};
+        my $geneB = $fusion->{geneB};
+
+        my $num_geneA_partners = scalar(keys %{$partners{$geneA}});
+        my $num_geneB_partners = scalar(keys %{$partners{$geneB}});
+
+        if ($num_geneA_partners > $max_promiscuity || $num_geneB_partners > $max_promiscuity) {
+
+            print $filter_ofh "#" . $fusion->{line} . "\tFILTERED DUE TO reached max promiscuity ($max_promiscuity), num_partners($geneA)=$num_geneA_partners and num_partners($geneB)=$num_geneB_partners\n";
+        }
+        else {
+            push (@ret_fusions, $fusion);
+        }
+    }
+
+
+    return(@ret_fusions);
+}
+
+

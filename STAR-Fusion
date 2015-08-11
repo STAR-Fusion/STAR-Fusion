@@ -41,12 +41,15 @@ my $chimeric_junction_file;
 my $ref_GTF = "$FindBin::Bin/resources/gencode.v19.annotation.gtf.exons.gz";
 my $ref_cdna = "$FindBin::Bin/resources/gencode.v19.annotation.gtf.exons.cdna.gz";
 my $help_flag;
-my $MIN_NOVEL_JUNCTION_SUPPORT = 5;
+my $MIN_NOVEL_JUNCTION_SUPPORT = 3;
 my $MIN_ALT_PCT_JUNCTION = 10.0;
 my $AGGREGATE_NOVEL_JUNCTION_DIST = 5;
 my $Evalue = 1e-3;
 my $tmpdir = "/tmp";
 my $verbose_level = 1;
+my $MIN_JUNCTION_READS = 1;
+my $MIN_SUM_FRAGS = 3;
+my $MAX_PROMISCUITY = 3;  # perhaps a poor choice of words, but still a best fit IMHO.
 
 my $usage = <<__EOUSAGE__;
 
@@ -61,6 +64,13 @@ my $usage = <<__EOUSAGE__;
 #    --ref_GTF|G <string>                  reference annotation GTF file (ie. gencode.gtf)
 #
 #    --ref_cdna|C <string>                 reference cDNA sequences fasta file (generated specially based on gtf -see docs)
+#
+#    --min_junction_reads <int>            minimum number of junction-spanning reads required. Default: $MIN_JUNCTION_READS
+#
+#    --max_promiscuity <int>               maximum number of partners allowed for a given fusion. Default: $MAX_PROMISCUITY
+#
+#    --min_sum_frags <int>                 minimum fusion support = ( # junction_reads + # spanning_frags ) Default: $MIN_SUM_FRAGS
+#
 #
 #    --min_novel_junction_support <int>    default: $MIN_NOVEL_JUNCTION_SUPPORT  (minimum of $MIN_NOVEL_JUNCTION_SUPPORT junction reads required if breakpoint
 #                                                        lacks involvement of only reference junctions)
@@ -96,11 +106,15 @@ my $no_filter = 0;
               'ref_GTF|G=s' => \$ref_GTF,
               'ref_cdna|C=s' => \$ref_cdna,
               
+              'min_junction_reads=i' => \$MIN_JUNCTION_READS,
+              'min_sum_frags=i' => \$MIN_SUM_FRAGS,
+              'max_promiscuity=i' => \$MAX_PROMISCUITY,
+              
               'min_novel_junction_support=i' => \$MIN_NOVEL_JUNCTION_SUPPORT,
               'min_alt_pct_junction=f' => \$MIN_ALT_PCT_JUNCTION,
               'aggregate_novel_junction_dist=i' => \$AGGREGATE_NOVEL_JUNCTION_DIST,
               'out_prefix|O=s' => \$out_prefix,
-              
+
               'E=f' => \$Evalue,
               'tmpdir=s' => \$tmpdir,
               'verbose_level=i' => \$verbose_level,
@@ -147,6 +161,9 @@ main: {
             . " --ref_cdna $ref_cdna "
             . " -E $Evalue "
             . " --tmpdir $tmpdir "
+            . " --min_junction_reads $MIN_JUNCTION_READS "
+            . " --min_sum_frags $MIN_SUM_FRAGS "
+            . " --max_promiscuity $MAX_PROMISCUITY "
             . " --min_novel_junction_support $MIN_NOVEL_JUNCTION_SUPPORT "
             . " --min_alt_pct_junction $MIN_ALT_PCT_JUNCTION "
             . " --aggregate_novel_junction_dist $AGGREGATE_NOVEL_JUNCTION_DIST "
