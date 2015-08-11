@@ -48,7 +48,7 @@ my $Evalue = 1e-3;
 my $tmpdir = "/tmp";
 my $verbose_level = 1;
 my $MIN_JUNCTION_READS = 1;
-my $MIN_SUM_FRAGS = 3;
+my $MIN_SUM_FRAGS = 2;
 my $MAX_PROMISCUITY = 3;  # perhaps a poor choice of words, but still a best fit IMHO.
 
 my $usage = <<__EOUSAGE__;
