@@ -623,14 +623,30 @@ sub map_chimeric_reads_to_genes {
 
         my @B_hits = &find_exon_junction_matches($chrB, $coordB, $orientB, 'right', $chr_to_interval_tree_href, $chr_gene_trans_to_exons_href);
 
-        #print STDERR "A: " . Dumper(\@A_hits);
-        #print STDERR "B: " . Dumper(\@B_hits);
+        print STDERR "A: " . Dumper(\@A_hits);
+        print STDERR "B: " . Dumper(\@B_hits);
 
         
         if (&found_selfie(\@A_hits, \@B_hits) ) {
             # skip it. likely FP
             next;
         }
+
+        if (@A_hits) {
+            my @left_genes;
+            foreach my $A_hit (@A_hits) {
+                push (@left_genes, $A_hit->{gene_id});
+            }
+            push (@x, "Left:" . join(",", @left_genes) );
+        }
+        if (@B_hits) {
+            my @right_genes;
+            foreach my $B_hit (@B_hits) {
+                push (@right_genes, $B_hit->{gene_id});
+            }
+            push (@x, "Right:" . join(",", @right_genes));
+        }
+        
 
         foreach my $left_possibility (@A_hits) {
 
