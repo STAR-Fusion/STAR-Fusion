@@ -389,10 +389,10 @@ sub parse_GTF_features {
 
 ####
 sub find_exon_junction_matches {
-    my ($chr, $coord, $orient, $left_or_right, $chr_to_interval_tree_href, $chr_gene_trans_to_exons_href) = @_;
+    my ($chr, $coord, $orient, $left_or_right, $chr_to_interval_tree_href, $chr_gene_trans_to_exons_href, $rst, $cigar) = @_;
     
         
-    # two options, depending on sense or antisense alignment (antisense orientation just an artifiact of DS trans assembly)
+    # two options, depending on sense or antisense alignment (antisense orientation just a consequence of DS trans assembly)
     
     #          L                               R
     #        ------> gt...................ag -------->              
@@ -411,46 +411,63 @@ sub find_exon_junction_matches {
     #      can be donor matching antisesnse of geneA
     #
     
+
+    
+    # require alignment segment to overlap an exon of an annotated gene, but breakpoint coordianate need not exist within the confines of an annotated exon.
+
+    my ($genome_coords_aref, $read_coords_aref) = &get_genome_coords_via_cigar($rst, $cigar);
+    
+
     my @exon_hits;
 
-    foreach my $gene_id (&get_overlapping_genes($chr_to_interval_tree_href, $chr, $coord - 1, $coord + 1)) {
+    my %seen_gene;
+
+    foreach my $coordset (@$genome_coords_aref) {
+        my ($segment_lend, $segment_rend) = @$coordset;
         
-        foreach my $transcript_id (keys %{$chr_gene_trans_to_exons_href->{$chr}->{$gene_id}}) {
+        foreach my $gene_id (&get_overlapping_genes($chr_to_interval_tree_href, $chr, $segment_lend, $segment_rend)) {
             
-            my @exons = @{$chr_gene_trans_to_exons_href->{$chr}->{$gene_id}->{$transcript_id}};
-            
-            @exons = sort {$a->{lend}<=>$b->{lend}} @exons;
+            if ($seen_gene{$gene_id}) { next; } # already analyzed it earlier.
+            $seen_gene{$gene_id} = 1; 
 
-            my $trans_lend = $exons[0]->{lend};
-            my $trans_rend = $exons[$#exons]->{rend};
-            
-            unless ($trans_lend <= $coord && $trans_rend >= $coord) { 
-                # no overlap
-                next;
-            }
-            
-            ## exclude first and last exons, only looking at internal boundaries
-            $exons[0]->{terminal} = 1;
-            $exons[$#exons]->{terminal} = 1;
-
-            my $num_exons = scalar(@exons);
-            my $counter= 0;
-            foreach my $exon (@exons) {
-                $counter++;
-                $exon->{exon_num} = "$counter/$num_exons";
-            }
-            
-                        
-            foreach my $exon (@exons) {
+            foreach my $transcript_id (keys %{$chr_gene_trans_to_exons_href->{$chr}->{$gene_id}}) {
                 
-                my $exon_lend = $exon->{lend};
-                my $exon_rend = $exon->{rend};
-                my $exon_orient = $exon->{orient};
+                my @exons = @{$chr_gene_trans_to_exons_href->{$chr}->{$gene_id}->{$transcript_id}};
                 
-                my ($exon_end5, $exon_end3) = ($exon_orient eq '+') ? ($exon_lend, $exon_rend) : ($exon_rend, $exon_lend);
+                @exons = sort {$a->{lend}<=>$b->{lend}} @exons;
                 
-
-                if ($exon_lend <= $coord && $exon_rend >= $coord ) {
+                my $trans_lend = $exons[0]->{lend};
+                my $trans_rend = $exons[$#exons]->{rend};
+                
+                unless ($trans_lend <= $coord && $trans_rend >= $coord) { 
+                    # no overlap for this isoform of the gene.
+                    next; 
+                }
+                
+                ## exclude first and last exons, only looking at internal boundaries
+                $exons[0]->{terminal} = 1;
+                $exons[$#exons]->{terminal} = 1;
+                
+                my $num_exons = scalar(@exons);
+                my $counter= 0;
+                foreach my $exon (@exons) {
+                    $counter++;
+                    $exon->{exon_num} = "$counter/$num_exons";
+                }
+                
+                
+                foreach my $exon (@exons) {
+                    
+                    my $exon_lend = $exon->{lend};
+                    my $exon_rend = $exon->{rend};
+                    my $exon_orient = $exon->{orient};
+                    
+                    my ($exon_end5, $exon_end3) = ($exon_orient eq '+') ? ($exon_lend, $exon_rend) : ($exon_rend, $exon_lend);
+                    
+                    
+                    unless ($exon_lend <= $segment_rend && $exon_rend >= $segment_lend ) {
+                        next;
+                    }
                     # annotated exon overlaps transcript
                     
                     my $sense_or_antisense;
@@ -471,7 +488,7 @@ sub find_exon_junction_matches {
                             $exon_coord = $exon_end5;
                         }
                     }
-
+                    
                     else {
                         # antisense orientation to gene
                         
@@ -491,7 +508,7 @@ sub find_exon_junction_matches {
                     
                     push (@exon_hits, { delta => $delta,
                                         exon => $exon,
-                                                                                
+                                        
                                         gene_id => $exon->{gene},
                                         
                                         # below for debugging
@@ -503,9 +520,10 @@ sub find_exon_junction_matches {
                                         
                           });
                     
+                    
                 }
+                
             }
-            
         }
     }
     
@@ -616,13 +634,18 @@ sub map_chimeric_reads_to_genes {
         my ($chrA, $coordA, $orientA) = ($x[0], $x[1], $x[2]);
         $coordA = ($orientA eq '+') ? --$coordA : ++$coordA;
         
+        my ($rst_A, $cigar_A) = ($x[10], $x[11]);
+        
+
         my ($chrB, $coordB, $orientB) = ($x[3], $x[4], $x[5]);
         $coordB = ($orientB eq '+') ? ++$coordB : --$coordB;
         
-        my @A_hits = &find_exon_junction_matches($chrA, $coordA, $orientA, 'left', $chr_to_interval_tree_href, $chr_gene_trans_to_exons_href);
+        my ($rst_B, $cigar_B) = ($x[12], $x[13]);
 
-        my @B_hits = &find_exon_junction_matches($chrB, $coordB, $orientB, 'right', $chr_to_interval_tree_href, $chr_gene_trans_to_exons_href);
+        my @A_hits = &find_exon_junction_matches($chrA, $coordA, $orientA, 'left', $chr_to_interval_tree_href, $chr_gene_trans_to_exons_href, $rst_A, $cigar_A);
 
+        my @B_hits = &find_exon_junction_matches($chrB, $coordB, $orientB, 'right', $chr_to_interval_tree_href, $chr_gene_trans_to_exons_href, $rst_B, $cigar_B);
+        
         print STDERR "A: " . Dumper(\@A_hits);
         print STDERR "B: " . Dumper(\@B_hits);
 
@@ -739,3 +762,63 @@ sub found_selfie {
 }
 
     
+####
+sub get_genome_coords_via_cigar {
+    my ($rst, $cigar) = @_;
+
+    ## borrowing this code from my SAM_entry.pm
+
+    
+    my $genome_lend = $rst;
+
+    my $alignment = $cigar;
+
+    my $query_lend = 0;
+
+    my @genome_coords;
+    my @query_coords;
+
+
+    $genome_lend--; # move pointer just before first position.
+    
+    while ($alignment =~ /(\d+)([A-Z])/g) {
+        my $len = $1;
+        my $code = $2;
+        
+        unless ($code =~ /^[MSDNIH]$/) {
+            confess "Error, cannot parse cigar code [$code] ";
+        }
+        
+        # print "parsed $len,$code\n";
+        
+        if ($code eq 'M') { # aligned bases match or mismatch
+            
+            my $genome_rend = $genome_lend + $len;
+            my $query_rend = $query_lend + $len;
+            
+            push (@genome_coords, [$genome_lend+1, $genome_rend]);
+            push (@query_coords, [$query_lend+1, $query_rend]);
+            
+            # reset coord pointers
+            $genome_lend = $genome_rend;
+            $query_lend = $query_rend;
+            
+        }
+        elsif ($code eq 'D' || $code eq 'N') { # insertion in the genome or gap in query (intron, perhaps)
+            $genome_lend += $len;
+            
+        }
+        
+        elsif ($code eq 'I'  # gap in genome or insertion in query 
+               ||
+               $code eq 'S' || $code eq 'H')  # masked region of query
+        { 
+            $query_lend += $len;
+            
+        }
+    }
+    
+    return(\@genome_coords, \@query_coords);
+}
+
+
