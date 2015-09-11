@@ -38,7 +38,7 @@ my $UTILDIR = "$FindBin::Bin/util";
 ## Options
 my $out_prefix = "star-fusion";
 my $chimeric_junction_file;
-my $ref_GTF = "$FindBin::Bin/resources/gencode.v19.annotation.gtf.exons.gz";
+my $ref_GTF = "$FindBin::Bin/resources/gencode.v19.annotation.gtf.exons.protein_coding.gz";
 my $ref_cdna = "$FindBin::Bin/resources/gencode.v19.annotation.gtf.exons.cdna.gz";
 my $help_flag;
 my $MIN_NOVEL_JUNCTION_SUPPORT = 3;
