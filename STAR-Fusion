@@ -10,6 +10,7 @@ use FindBin;
 use lib ("$FindBin::Bin/lib");
 use Pipeliner;
 use Set::IntervalTree;
+use File::Basename;
 
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
@@ -138,6 +139,15 @@ unless ( -s $ref_cdna || $no_filter ) {
 
 
 main: {
+
+    my $out_prefix_basename = basename($out_prefix);
+    my $out_prefix_dirname = dirname($out_prefix);
+    
+    my $intermediates_dir = "$out_prefix_dirname/$out_prefix_basename.interm_dir";
+    unless (-d $intermediates_dir) {
+        mkdir ($intermediates_dir) or die "Error, cannot mkdir $intermediates_dir";
+    }
+    
      
     my $pipeliner = new Pipeliner(-verbose => $verbose_level);
     
@@ -148,7 +158,7 @@ main: {
         . " -G $ref_GTF "
         . " -O $out_prefix ";
     
-    $pipeliner->add_commands(new Command($cmd, "$out_prefix.STAR-Fusion.predict.ok"));
+    $pipeliner->add_commands(new Command($cmd, "$intermediates_dir/$out_prefix_basename.STAR-Fusion.predict.ok"));
 
     my $predicted_fusions_file = "$out_prefix.fusion_candidates.preliminary";
     
@@ -167,11 +177,18 @@ main: {
             . " --min_novel_junction_support $MIN_NOVEL_JUNCTION_SUPPORT "
             . " --min_alt_pct_junction $MIN_ALT_PCT_JUNCTION "
             . " --aggregate_novel_junction_dist $AGGREGATE_NOVEL_JUNCTION_DIST "
-            . " --out_prefix $out_prefix.fusion_candidates ";
+            . " --out_prefix $intermediates_dir/$out_prefix.fusion_candidates ";
         
-        $pipeliner->add_commands(new Command($cmd, "$out_prefix.STAR-Fusion.filter.ok"));
+        $pipeliner->add_commands(new Command($cmd, "$intermediates_dir/$out_prefix_basename.STAR-Fusion.filter.ok"));
+        
+        $pipeliner->add_commands(new Command("mv $intermediates_dir/$out_prefix_basename.fusion_candidates.final .", 
+                                             "$intermediates_dir/$out_prefix_basename.mv_final.ok"));
+
+        $pipeliner->add_commands(new Command("mv $intermediates_dir/$out_prefix_basename.fusion_candidates.final.abridged .", 
+                                             "$intermediates_dir/$out_prefix_basename.mv_final_abridged.ok"));
         
     }
+                                 
     $pipeliner->run();
     
     if ($no_filter) {
