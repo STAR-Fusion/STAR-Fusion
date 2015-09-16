@@ -31,5 +31,7 @@ foreach my $file (<*>) {
 	}
 }
 
+`rm -rf ./star-fusion.interm_dir`;
+
 
 exit(0);
