@@ -250,11 +250,7 @@ main: {
     close $filter_ofh;
     close $final_ofh;
     
-    ## generate abrdiged versions, as all those read names take up a lot of space and are annoyoing to look at when you just want to know what fusions are predicted.
-
-    &process_cmd("cut -f1-8,11-100 $filter_info_file > $filter_info_file.abridged");
-    &process_cmd("cut -f1-8,11-100 $final_preds_file > $final_preds_file.abridged");
-    
+        
 
     exit(0);
 }
