@@ -238,7 +238,10 @@ main: {
             print $filter_ofh "#" . "$line\t" . join("\t", @blast_info) . "\n";
         }
         else {
+            
             print $final_ofh "$line\n";
+            print $filter_ofh "$line\n";
+            
             $already_approved{$geneA}->{$geneB} = 1;
         }
         
