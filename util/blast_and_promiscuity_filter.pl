@@ -325,7 +325,7 @@ sub examine_seq_similarity {
     &process_cmd($cmd);
     
     my $blast_out = "$tmpdir/$$.blastn";
-    $cmd = "blastn -db $fileB -query $fileA -evalue $Evalue -outfmt 6 -lcase_masking -max_target_seqs 1 > $blast_out 2>/dev/null";
+    $cmd = "blastn -db $fileB -query $fileA -evalue $Evalue -outfmt 6 -lcase_masking -max_target_seqs 1 -word_size 11 > $blast_out 2>/dev/null";
     &process_cmd($cmd);
     
     if (-s $blast_out) {
