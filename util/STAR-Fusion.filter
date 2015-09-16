@@ -17,7 +17,6 @@ my $tmpdir = "/tmp";
 my $MIN_NOVEL_JUNCTION_SUPPORT = 3;
 my $MIN_ALT_PCT_JUNCTION = 10;
 my $AGGREGATE_NOVEL_JUNCTION_DIST = 5;
-my $MIN_SPAN_ONLY_SUPPORT = 5;
 
 my $MIN_JUNCTION_READS = 1;
 my $MIN_SUM_FRAGS = 2;
@@ -56,8 +55,6 @@ my $usage = <<__EOUSAGE__;
 #                                                        lacks involvement of only reference junctions)
 #
 #  --min_alt_pct_junction <float>        default: $MIN_ALT_PCT_JUNCTION  ($MIN_ALT_PCT_JUNCTION % of the dominant isoform junction support)
-#
-#  --min_span_only_support <int>         default: $MIN_SPAN_ONLY_SUPPORT (minimum of $MIN_SPAN_ONLY_SUPPORT) spanning frags required if no junction reads are found
 #
 #  --aggregate_novel_junction_dist <int>  default: $AGGREGATE_NOVEL_JUNCTION_DIST (non-ref junctions within $AGGREGATE_NOVEL_JUNCTION_DIST are merged into single calls)
 #
@@ -114,20 +111,6 @@ unless (-s $ref_cdna_idx_file) {
 }
 
 
-my $CDNA_IDX = new TiedHash({ use => $ref_cdna_idx_file });
-
-my $BLAST_PAIRS_IDX;
-my $blast_pairs_idx_file = "$cdna_fasta_file.blastn_gene_pairs.gz.idx";
-if (-s $blast_pairs_idx_file) {
-    $BLAST_PAIRS_IDX = new TiedHash( { use => $blast_pairs_idx_file } );
-}
-else {
-    print STDERR "Warning: cannot locate $blast_pairs_idx_file, running blastn directly.\n";
-}
-
-my %BLAST_CACHE;
-
-
 
 =input_format:
 
@@ -147,15 +130,10 @@ my %BLAST_CACHE;
 
 main: {
 
-    unless (-d $tmpdir) {
-        mkdir $tmpdir or die "Error, cannot mkdir $tmpdir";
-    }
+    my $stage1_preds_file = "$out_prefix.pre_blast_filter";
+    open (my $stage1_ofh, ">$stage1_preds_file") or die "Error, cannot write to $stage1_preds_file";
     
-    
-    my $final_preds_file = "$out_prefix.final";
-    open (my $final_ofh, ">$final_preds_file") or die "Error, cannot write to $final_preds_file";
-    
-    my $filter_info_file = "$fusion_preds_file.filt_info";
+    my $filter_info_file = "$stage1_preds_file.filt_info";
     open (my $filter_ofh, ">$filter_info_file") or die "Error, cannot write to $filter_info_file";
     
     my @fusions;
@@ -224,7 +202,7 @@ main: {
     }
     
     print $filter_ofh $header;
-    print $final_ofh $header;
+    print $stage1_ofh $header;
     
     @fusions = reverse sort {$a->{score} <=> $b->{score} } @fusions;
     
@@ -233,188 +211,42 @@ main: {
 
     @fusions = &remove_fusions_with_insufficient_support(\@fusions, $filter_ofh, $MIN_JUNCTION_READS, $MIN_SUM_FRAGS);
     
-    @fusions = &remove_promiscuous_fusions(\@fusions, $filter_ofh, $MAX_PROMISCUITY);
-        
     @fusions = &remove_minor_nonref_isoforms(\@fusions, $filter_ofh);
 
 
     
-    ########################
-    ##  Filter and report ##
-    ########################
-    
-
-    my %AtoB;
-    my %BtoA;
-    
-    my %already_approved;
-
     foreach my $fusion (@fusions) {
-
-        #my ($geneA, $geneB) = ($fusion->{geneA}, $fusion->{geneB});
-        my ($geneA, $geneB) = split(/--/, $fusion->{fusion_name});
-
-
-        #print STDERR "-encountered $geneA--$geneB\n\n";
-        
-        #print STDERR "Examining fusion: $geneA--$geneB\n";
-        my @blast_info;
-
-        if ($already_approved{$geneA}->{$geneB}) {
-           
-            #print STDERR "-already approved $geneA--$geneB\n";
-        }
-        else {
-            
-            @blast_info = &examine_seq_similarity($geneA, $geneB);
-            if (@blast_info) {
-                push (@blast_info, "SEQ_SIMILAR_PAIR");
-            }
-            else {
-                
-                my $altB_href = $AtoB{$geneA};
-                if ($altB_href) {
-                    foreach my $altB (keys %$altB_href) {
-                        my @blast = &examine_seq_similarity($geneB, $altB);
-                        if (@blast) {
-                            push (@blast, "ALREADY_EXAMINED:$geneA--$altB");
-                            push (@blast_info, @blast);
-                        }
-                    }
-                }
-                my $altA_href = $BtoA{$geneB};
-                if ($altA_href) {
-                    foreach my $altA (keys %$altA_href) {
-                        my @blast = &examine_seq_similarity($altA, $geneA);
-                        if (@blast) {
-                            push (@blast, "ALREADY_EXAMINED:$altA--$geneB");
-                            push (@blast_info, @blast);
-                        }
-                    }
-                }
-            }
-        }
-        
-        
         # regenerating 'line' here, since merged entries will now have updated stats.        
         my $line = join("\t", $fusion->{fusion_name}, $fusion->{J}, $fusion->{S}, $fusion->{splice_type},
                         $fusion->{geneA}, $fusion->{brkptA}, $fusion->{geneB}, $fusion->{brkptB},
                         $fusion->{junction_reads}, $fusion->{spanning_frags}, $fusion->{rest});
         
         
-        
-        if (@blast_info) {
-            $line ="#$line"; # comment out the line in the filtered file... an aesthetic.
-        }
-        print $filter_ofh "$line\t" . join("\t", @blast_info) . "\n";
-        
-        unless (@blast_info) {
-            print $final_ofh "$line\n";
-            $already_approved{$geneA}->{$geneB} = 1;
-        }
-        
-        $AtoB{$geneA}->{$geneB} = 1;
-        $BtoA{$geneB}->{$geneA} = 1;
-                
+        print $filter_ofh "$line\n";
+        print $stage1_ofh "$line\n";
     }
 
     close $filter_ofh;
-    close $final_ofh;
+    close $stage1_ofh;
     
-    ## generate abrdiged versions, as all those read names take up a lot of space and are annoyoing to look at when you just want to know what fusions are predicted.
 
+    ## Run the blast and promiscuity filter
+    my $cmd = "$FindBin::Bin/blast_and_promiscuity_filter.pl --out_prefix $out_prefix --ref_cdna $cdna_fasta_file -E $Evalue --max_promiscuity $MAX_PROMISCUITY --fusion_preds $stage1_preds_file";
+    &process_cmd($cmd);  # generates $out_prefix.final and $out_prefix.filt
+
+
+    ## generate abridged versions, as all those read names take up a lot of space and are annoyoing to look at when you just want to know what fusions are predicted.
+    
+
+    &process_cmd("cut -f1-8,11-100 $stage1_preds_file > $stage1_preds_file.abridged");
     &process_cmd("cut -f1-8,11-100 $filter_info_file > $filter_info_file.abridged");
-    &process_cmd("cut -f1-8,11-100 $final_preds_file > $final_preds_file.abridged");
+    
+    &process_cmd("cut -f1-8,11-100 $out_prefix.final > $out_prefix.final.abridged");
+    &process_cmd("cut -f1-8,11-100 $stage1_preds_file.post_blast_n_promisc_filter > $stage1_preds_file.post_blast_n_promisc_filter.abridged");
     
 
     exit(0);
 }
-
-
-####
-sub examine_seq_similarity {
-    my ($geneA, $geneB) = @_;
-    
-    #print STDERR "-examining seq similarity between $geneA and $geneB\n";
-
-    my @blast_hits;
-    
-
-    if ($BLAST_PAIRS_IDX) {
-        # use pre-computed blast pair data
-        if (my $hit = $BLAST_PAIRS_IDX->get_value("$geneA--$geneB")) {
-            return($hit);
-        }
-        elsif ($hit = $BLAST_PAIRS_IDX->get_value("$geneB--$geneA")) {
-            return($hit);
-        }
-        else {
-            return();
-        }
-    }
-    
-    # check for previously stored blast results or attempted search
-    if (my $cache_aref = $BLAST_CACHE{"$geneA--$geneB"}) {
-        my @hits = @$cache_aref;
-        if (@hits) {
-            #print STDERR "CACHED HITS FOR: $geneA--$geneB: [@hits]\n";
-            return(@hits);
-        }
-        else {
-            return();
-        }
-    }
-    
-
-    #print STDERR "-testing $geneA vs. $geneB\n";
-    
-    my $fileA = "$tmpdir/$$.gA.fa";
-    my $fileB = "$tmpdir/$$.gB.fa";
-        
-    {
-        # write file A
-        open (my $ofh, ">$fileA") or die "Error, cannot write to $fileA";
-        my $cdna_seqs = $CDNA_IDX->get_value($geneA) or confess "Error, no sequences found for gene: $geneA";
-        print $ofh $cdna_seqs;
-        close $ofh;
-    }
-        
-    
-    {
-        # write file B
-        open (my $ofh, ">$fileB") or die "Error, cannot write to file $fileB";
-        my $cdna_seqs = $CDNA_IDX->get_value($geneB) or confess "Error, no sequences found for gene: $geneB";
-        print $ofh $cdna_seqs;
-        close $ofh;
-    }
-    
-    #print STDERR "do it? ... ";
-    #my $response = <STDIN>;
-    
-    ## blast them:
-    my $cmd = "makeblastdb -in $fileB -dbtype nucl 2>/dev/null 1>&2";
-    &process_cmd($cmd);
-    
-    my $blast_out = "$tmpdir/$$.blastn";
-    $cmd = "blastn -db $fileB -query $fileA -evalue $Evalue -outfmt 6 -lcase_masking -max_target_seqs 1 > $blast_out 2>/dev/null";
-    &process_cmd($cmd);
-    
-    if (-s $blast_out) {
-        open (my $fh, $blast_out) or die "Error, cannot open file $blast_out";
-        while (<$fh>) {
-            chomp;
-            my @x = split(/\t/);
-            my $blast_line = join("^", @x);
-            $blast_line =~ s/\s+//g;
-            push (@blast_hits, $blast_line);
-        }
-    }
-    
-    $BLAST_CACHE{"$geneA--$geneB"} = [@blast_hits];
-
-    return(@blast_hits);
-}
-
 
 
 ####
@@ -660,45 +492,4 @@ sub remove_fusions_with_insufficient_support {
 
     return(@ret_fusions);
 }
-
-####
-sub remove_promiscuous_fusions {
-    my ($fusions_aref, $filter_ofh, $max_promiscuity) = @_;
-
-    
-    my %partners;
-
-    foreach my $fusion (@$fusions_aref) {
-
-        my $geneA = $fusion->{geneA};
-        my $geneB = $fusion->{geneB};
-
-        $partners{$geneA}->{$geneB}++;
-        $partners{$geneB}->{$geneA}++;
-
-    }
-
-    my @ret_fusions;
-    
-    foreach my $fusion (@$fusions_aref) {
-
-        my $geneA = $fusion->{geneA};
-        my $geneB = $fusion->{geneB};
-
-        my $num_geneA_partners = scalar(keys %{$partners{$geneA}});
-        my $num_geneB_partners = scalar(keys %{$partners{$geneB}});
-
-        if ($num_geneA_partners > $max_promiscuity || $num_geneB_partners > $max_promiscuity) {
-
-            print $filter_ofh "#" . $fusion->{line} . "\tFILTERED DUE TO reached max promiscuity ($max_promiscuity), num_partners($geneA)=$num_geneA_partners and num_partners($geneB)=$num_geneB_partners\n";
-        }
-        else {
-            push (@ret_fusions, $fusion);
-        }
-    }
-
-
-    return(@ret_fusions);
-}
-
 
