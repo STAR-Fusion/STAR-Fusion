@@ -111,10 +111,20 @@ sub GTF_to_gene_objs {
             $gene_id_to_name{$gene_id} = $name;
         }
 
+
+        ## If there's more than one gene_name assignment per gene_id, only using the first one.
+        
         my $gene_name = "";
         if ($annot =~ /gene_name \"([^\"]+)\"/) {
             $gene_name = $1;
-            $gene_id_to_gene_name{$gene_id} = $gene_name;
+            if (exists $gene_id_to_gene_name{$gene_id}) {
+                if ($gene_id_to_gene_name{$gene_id} ne $gene_name) {
+                    print STDERR "WARNING: gene name [ $gene_id_to_gene_name{$gene_id} ] already assigned to $gene_id.  Ignoring $gene_name assignment.\n";
+                }
+            }
+            else {
+                $gene_id_to_gene_name{$gene_id} = $gene_name;
+            }
         }
         
         

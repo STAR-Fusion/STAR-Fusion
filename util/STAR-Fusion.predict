@@ -13,6 +13,8 @@ use Data::Dumper;
 use lib ("$FindBin::Bin/../lib");
 use SAM_reader;
 use SAM_entry;
+use Gene_obj_indexer;
+use GTF_utils;
 
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
@@ -312,59 +314,54 @@ sub make_hidden {
 sub parse_GTF_features {
     my ($annot_gtf_file, $chr_to_interval_tree_href, $chr_gene_trans_to_exons_href) = @_;
     
-    if ($annot_gtf_file =~ /\.gz$/) {
-        $annot_gtf_file = "gunzip -c $annot_gtf_file | ";
-    }
+    my $gene_obj_indexer = {};
+    &GTF_utils::index_GTF_gene_objs($annot_gtf_file, $gene_obj_indexer);
 
 
     my %chr_to_gene_coords;
-    print STDERR "-parsing $annot_gtf_file\n";
-    open (my $fh, $annot_gtf_file) or die "Error, cannot open file $annot_gtf_file";
-    while (<$fh>) {
-        chomp;
-        unless (/\w/) { next; }
-        if (/^\#/) { next; }
-        s/^>//;
-        my @x = split(/\t/);
+
+    ## associate all gene_ids with contigs
+    my @all_gene_ids = keys %$gene_obj_indexer;
+
+    my %contig_to_gene_list;
+    foreach my $gene_id (@all_gene_ids) {
+        my $gene_obj = $gene_obj_indexer->{$gene_id};
+
+        my $gene_id = $gene_obj->{TU_feat_name};
         
-        unless ($x[2] eq "exon") { next; }
+        my $gene_name = $gene_obj->{gene_name} || $gene_id;
+
+        $gene_id = join("^", $gene_name, $gene_id); # for use internally here.
+
+        my $chr = $gene_obj->{asmbl_id};
+        my $orient = $gene_obj->get_orientation();
         
-        my $info = $x[8];
-        $info =~ /gene_id \"([^\"]+)/ or die "Error, cannot extract gene_id from $_ [specifically from: $info]";
-        my $gene_id = $1 or die "Error, no gene_id from $_";
-        
-        
-        if ($info =~ /gene_name \"([^\"]+)/) {
-            # use gene name instead
-            my $gene_name = $1;
-            $gene_id = join("^", $gene_name, $gene_id);
-        }
-        
-        $info =~ /transcript_id \"([^\"]+)/ or die "Error, cannot extract transcript_id from $_";
-        my $transcript_id = $1 or die "Error, no trans id from $_";
-        
-        my ($lend, $rend) = ($x[3], $x[4]);
-        my $chr = $x[0];
-        my $orient = $x[6];
-        
-        
-        my $exon_struct = { 
+        foreach my $isoform ($gene_obj, $gene_obj->get_additional_isoforms()) {
             
-            gene => $gene_id,
-            transcript => $transcript_id,
-            chr => $chr,
-            lend => $lend,
-            rend => $rend,
-            orient => $orient,
-        
-        };
-        
-        push (@{$chr_gene_trans_to_exons_href->{$chr}->{$gene_id}->{$transcript_id}}, $exon_struct);
-        
-        push (@{$chr_to_gene_coords{$chr}->{$gene_id}}, $lend, $rend);
-        
+            my $transcript_id = $isoform->{Model_feat_name};
+            
+            foreach my $exon ($isoform->get_exons()) {
+                my ($lend, $rend) = sort {$a<=>$b} $exon->get_coords();
+                
+                
+                
+                my $exon_struct = { 
+                    
+                    gene => $gene_id,
+                    transcript => $transcript_id,
+                    chr => $chr,
+                    lend => $lend,
+                    rend => $rend,
+                    orient => $orient,
+                    
+                };
+                
+                push (@{$chr_gene_trans_to_exons_href->{$chr}->{$gene_id}->{$transcript_id}}, $exon_struct);
+                
+                push (@{$chr_to_gene_coords{$chr}->{$gene_id}}, $lend, $rend);
+            }
+        }
     }
-    close $fh;
     
     
     print STDERR "-building interval tree for fast searching of gene overlaps\n";
