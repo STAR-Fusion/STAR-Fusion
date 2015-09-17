@@ -80,8 +80,13 @@ sub GTF_to_gene_objs {
 
     my %coding_genes;
     
-    
-    open (my $fh, $gtf_filename) or die "Error, cannot open $gtf_filename";
+    my $fh;
+    if ($gtf_filename =~ /\.gz$/) {
+        open ($fh, "gunzip -c $gtf_filename | ") or die "Error, cannot open  gunzip -c $gtf_filename | ";
+    }
+    else {
+        open ($fh, $gtf_filename) or die "Error, cannot open $gtf_filename";
+    }
     while (<$fh>) {
         unless (/\w/) { next; }
         if (/^\#/) { next; } # comment line.
