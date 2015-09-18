@@ -15,6 +15,7 @@ use SAM_reader;
 use SAM_entry;
 use Gene_obj_indexer;
 use GTF_utils;
+use Process_cmd;
 
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
@@ -28,6 +29,8 @@ my $ref_GTF = "$FindBin::Bin/../resources/gencode.v19.annotation.gtf.exons.gz";
 my $help_flag;
 my $MIN_NOVEL_JUNCTION_SUPPORT = 3;
 my $MIN_SPAN_ONLY_SUPPORT = 5;
+
+
 
 my $usage = <<__EOUSAGE__;
 
@@ -47,7 +50,7 @@ my $usage = <<__EOUSAGE__;
 #    --min_span_only_support <int>         default: $MIN_SPAN_ONLY_SUPPORT (minimum of $MIN_SPAN_ONLY_SUPPORT) spanning frags required if no junction reads are found
 #
 #    --out_prefix|O <string>         output file prefix (default: $out_prefix)
-#
+#    
 ###################################################################################
 
 
@@ -65,6 +68,7 @@ __EOUSAGE__
               'min_span_only_support=i' => \$MIN_SPAN_ONLY_SUPPORT,
               
               'out_prefix|O=s' => \$out_prefix,
+              
     );
 
 
@@ -81,10 +85,17 @@ unless (-s $ref_GTF) {
 
 main: {
     
+    my $out_prefix_basename = basename($out_prefix);
+
+    my $intermediates_dir = "$out_prefix.predict.intermediates_dir";
+    if (! -d $intermediates_dir) {
+        &process_cmd("mkdir -p $intermediates_dir");
+    }
+    my $intermediates_out_prefix = "$intermediates_dir/$out_prefix_basename";
 
     my %chr_to_interval_tree;
     my %chr_gene_trans_to_exons;
-
+    print STDERR "-parsing GTF file: $ref_GTF\n";
     &parse_GTF_features($ref_GTF, \%chr_to_interval_tree, \%chr_gene_trans_to_exons);
 
 
@@ -96,27 +107,28 @@ main: {
     my %all_fusion_candidate_complex_names;  # {fusion_complex_name} = info struct
     my %junction_breakpoint_to_read_names;  # {fusion_complex_name} -> {breakpoint} -> {read_name} = 1 
     my %spans_to_read_names; # {fusion_complex_name} -> { read_name } = 1
-    
+    print STDERR "-parsing fusion evidence: $chimeric_junction_file\n";
     &map_chimeric_reads_to_genes($chimeric_junction_file, 
                                  \%chr_to_interval_tree, 
                                  \%chr_gene_trans_to_exons, 
 
                                  \%all_fusion_candidate_complex_names,                                 
                                  \%junction_breakpoint_to_read_names,
-                                 \%spans_to_read_names);
+                                 \%spans_to_read_names,
+                                 
+                                 $intermediates_out_prefix,
+        );
     
-    
-    
-
+        
     ########################################################################
     ## Examine each fusion gene pair, filter out fusion candidates based on 
     ## reference gene mappings and use of reference splice junctions.
     ########################################################################
                       
-    my $junction_read_outfile = "$out_prefix.junction_read_names";
+    my $junction_read_outfile = "$intermediates_out_prefix.junction_read_names";
     open (my $ofh_junc, ">$junction_read_outfile") or die "Error, cannot write to $junction_read_outfile";
     
-    my $spanning_read_outfile = "$out_prefix.spanning_frag_names";
+    my $spanning_read_outfile = "$intermediates_out_prefix.spanning_frag_names";
     open (my $ofh_span, ">$spanning_read_outfile") or die "Error, cannot write to $spanning_read_outfile";
     
     my @fusion_candidates;
@@ -582,11 +594,12 @@ sub get_overlapping_genes {
 ####
 sub map_chimeric_reads_to_genes {
     my ($junctions_file, $chr_to_interval_tree_href, $chr_gene_trans_to_exons_href, 
-        $all_fusion_candidate_complex_names_href, $junction_breakpoint_to_read_names_href, $spans_to_read_names_href) = @_;
+        $all_fusion_candidate_complex_names_href, $junction_breakpoint_to_read_names_href, $spans_to_read_names_href,
+        $intermediates_out_prefix) = @_;
     
     print STDERR "-mapping reads to genes\n";
     
-    my $junctions_w_gene_info_file = "$out_prefix.junction_breakpts_to_genes.txt";
+    my $junctions_w_gene_info_file = "$intermediates_out_prefix.junction_breakpts_to_genes.txt";
     open (my $ofh, ">$junctions_w_gene_info_file") or die "Error, cannot write to file $junctions_w_gene_info_file";
     
     

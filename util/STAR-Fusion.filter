@@ -8,6 +8,9 @@ use lib ("$FindBin::Bin/../lib");
 use Fasta_reader;
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);                                                 
 use TiedHash;
+use Process_cmd;
+use File::Basename;
+use Pipeliner;
 
 my $cdna_fasta_file = "$FindBin::Bin/../resources/gencode.v19.annotation.gtf.exons.cdna.gz";
 
@@ -105,6 +108,11 @@ unless ($fusion_preds_file && $cdna_fasta_file && $out_prefix) {
     die $usage;
 }
 
+$fusion_preds_file = &ensure_full_path($fusion_preds_file);
+$cdna_fasta_file = &ensure_full_path($cdna_fasta_file);
+$out_prefix = &ensure_full_path($out_prefix);
+
+
 my $ref_cdna_idx_file = "$cdna_fasta_file.idx";
 unless (-s $ref_cdna_idx_file) {
     die "Error, cannot find indexed fasta file: $cdna_fasta_file.idx; be sure to build an index - see docs.\n";
@@ -130,7 +138,14 @@ unless (-s $ref_cdna_idx_file) {
 
 main: {
 
-    my $stage1_preds_file = "$out_prefix.pre_blast_filter";
+    my $out_prefix_basename = basename($out_prefix);
+    my $intermediates_dir = "$out_prefix.filter.intermediates_dir";
+    unless (-d $intermediates_dir) {
+        &process_cmd("mkdir -p $intermediates_dir");
+    }
+    my $intermediates_out_prefix = "$intermediates_dir/$out_prefix_basename";
+
+    my $stage1_preds_file = "$intermediates_out_prefix.pre_blast_filter";
     open (my $stage1_ofh, ">$stage1_preds_file") or die "Error, cannot write to $stage1_preds_file";
     
     my $filter_info_file = "$stage1_preds_file.filt_info";
@@ -231,39 +246,25 @@ main: {
     
 
     ## Run the blast and promiscuity filter
-    my $cmd = "$FindBin::Bin/blast_and_promiscuity_filter.pl --out_prefix $out_prefix --ref_cdna $cdna_fasta_file -E $Evalue --max_promiscuity $MAX_PROMISCUITY --fusion_preds $stage1_preds_file";
+    my $cmd = "$FindBin::Bin/blast_and_promiscuity_filter.pl --out_prefix $intermediates_out_prefix --ref_cdna $cdna_fasta_file -E $Evalue --max_promiscuity $MAX_PROMISCUITY --fusion_preds $stage1_preds_file";
     &process_cmd($cmd);  # generates $out_prefix.final and $out_prefix.filt
 
-
+    # rename final output file:
+    rename("$intermediates_out_prefix.final", "$out_prefix.fusion_candidates.final");
+    
     ## generate abridged versions, as all those read names take up a lot of space and are annoyoing to look at when you just want to know what fusions are predicted.
     
 
     &process_cmd("cut -f1-8,11-100 $stage1_preds_file > $stage1_preds_file.abridged");
     &process_cmd("cut -f1-8,11-100 $filter_info_file > $filter_info_file.abridged");
     
-    &process_cmd("cut -f1-8,11-100 $out_prefix.final > $out_prefix.final.abridged");
+    &process_cmd("cut -f1-8,11-100 $out_prefix.fusion_candidates.final > $out_prefix.fusion_candidates.final.abridged");
     &process_cmd("cut -f1-8,11-100 $stage1_preds_file.post_blast_n_promisc_filter > $stage1_preds_file.post_blast_n_promisc_filter.abridged");
     
 
     exit(0);
 }
 
-
-####
-sub process_cmd {
-    my ($cmd) = @_;
-
-    print STDERR "CMD: $cmd\n";
-        
-    my $ret = system($cmd);
-    if ($ret) {
-
-        die "Error, cmd $cmd died with ret $ret";
-    }
-    
-    return;
-}
-    
         
 ####
 sub merge_neighboring_nonref_splice {
