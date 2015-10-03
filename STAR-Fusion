@@ -107,8 +107,8 @@ my $right_fq_filename = "";
 
 &GetOptions ( 'help|h' => \$help_flag,
               
-              'left_fq' => \$left_fq_filename,
-              'right_fq' => \$right_fq_filename,
+              'left_fq=s' => \$left_fq_filename,
+              'right_fq=s' => \$right_fq_filename,
               
               'min_junction_reads=i' => \$MIN_JUNCTION_READS,
               'min_sum_frags=i' => \$MIN_SUM_FRAGS,
