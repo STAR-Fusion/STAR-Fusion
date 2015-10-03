@@ -1,1 +1,0 @@
-RepeatMasker -pa 6 -s -species human -xsmall gencode.v19.annotation.gtf.exons.cdna
