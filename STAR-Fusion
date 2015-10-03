@@ -40,8 +40,6 @@ my $UTILDIR = "$FindBin::Bin/util";
 ## Options
 my $out_prefix = "star-fusion";
 my $chimeric_junction_file;
-my $ref_GTF = "$FindBin::Bin/resources/gencode.v19.annotation.gtf.exons.protein_coding.gz";
-my $ref_cdna = "$FindBin::Bin/resources/gencode.v19.annotation.gtf.exons.cdna.gz";
 my $help_flag;
 my $MIN_NOVEL_JUNCTION_SUPPORT = 3;
 my $MIN_ALT_PCT_JUNCTION = 10.0;
@@ -55,17 +53,16 @@ my $MAX_PROMISCUITY = 3;  # perhaps a poor choice of words, but still a best fit
 
 my $usage = <<__EOUSAGE__;
 
+
 ###################################################################################
 #
 #  Required:
 #
-#    --chimeric_junction|J <string>     Chimeric.out.junction file
+#    --chimeric_junction|J <string>        Chimeric.out.junction file
+#
+#    --genome_lib_dir <string>             directory containing genome lib (see http://FusionFilter.github.io for details)
 #
 #  Optional:
-#
-#    --ref_GTF|G <string>                  reference annotation GTF file (ie. gencode.gtf)
-#
-#    --ref_cdna|C <string>                 reference cDNA sequences fasta file (generated specially based on gtf -see docs)
 #
 #    --min_junction_reads <int>            minimum number of junction-spanning reads required. Default: $MIN_JUNCTION_READS
 #
@@ -101,12 +98,11 @@ __EOUSAGE__
 
 my $no_filter = 0;
 
+my $genome_lib_dir;
 
 &GetOptions ( 'help|h' => \$help_flag,
               
               'chimeric_junction|J=s' => \$chimeric_junction_file,
-              'ref_GTF|G=s' => \$ref_GTF,
-              'ref_cdna|C=s' => \$ref_cdna,
               
               'min_junction_reads=i' => \$MIN_JUNCTION_READS,
               'min_sum_frags=i' => \$MIN_SUM_FRAGS,
@@ -122,28 +118,31 @@ my $no_filter = 0;
               'verbose_level=i' => \$verbose_level,
     
               'no_filter' => \$no_filter,
+    
+              'genome_lib_dir=s' => \$genome_lib_dir,
+              
     );
 
 
 if ($help_flag) {
     die $usage;
 }
-unless ($chimeric_junction_file) {
+unless ($chimeric_junction_file && $genome_lib_dir) {
     die $usage;
 }
-unless (-s $ref_GTF) {
-    die "Error, cannot locate reference annotation file: $ref_GTF";
-}
-unless ( -s $ref_cdna || $no_filter ) {
-    die "Error, cannot locate reference cdna file: $ref_cdna";
+
+unless (-s $chimeric_junction_file) {
+    die "Error, cannot locate file $chimeric_junction_file";
 }
 
+unless (-d $genome_lib_dir) {
+    die "Error, cannot locate genome_lib_dir: $genome_lib_dir";
+}
 
 main: {
     
     $chimeric_junction_file = &ensure_full_path($chimeric_junction_file);
-    $ref_GTF = &ensure_full_path($ref_GTF);
-    $ref_cdna = &ensure_full_path($ref_cdna);
+    $genome_lib_dir = &ensure_full_path($genome_lib_dir);
     
     if ($out_prefix =~ m|/$|) {
         # not allowing to end as a directory, must be a filename
@@ -159,7 +158,7 @@ main: {
 
     my $cmd = "$UTILDIR/STAR-Fusion.predict "
         . " -J  $chimeric_junction_file "
-        . " -G $ref_GTF "
+        . " --genome_lib_dir $genome_lib_dir "
         . " -O $out_prefix ";
     
     $pipeliner->add_commands(new Command($cmd, "$out_prefix.STAR-Fusion.predict.ok"));
@@ -172,7 +171,6 @@ main: {
         
         $cmd = "$UTILDIR/STAR-Fusion.filter "
             . " --fusion_preds $predicted_fusions_file "
-            . " --ref_cdna $ref_cdna "
             . " -E $Evalue "
             . " --tmpdir $tmpdir "
             . " --min_junction_reads $MIN_JUNCTION_READS "
@@ -181,6 +179,7 @@ main: {
             . " --min_novel_junction_support $MIN_NOVEL_JUNCTION_SUPPORT "
             . " --min_alt_pct_junction $MIN_ALT_PCT_JUNCTION "
             . " --aggregate_novel_junction_dist $AGGREGATE_NOVEL_JUNCTION_DIST "
+            . " --genome_lib_dir $genome_lib_dir "
             . " --out_prefix $out_prefix";
         
         $pipeliner->add_commands(new Command($cmd, "$out_prefix.STAR-Fusion.filter.ok"));

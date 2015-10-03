@@ -12,8 +12,6 @@ use Process_cmd;
 use File::Basename;
 use Pipeliner;
 
-my $cdna_fasta_file = "$FindBin::Bin/../resources/gencode.v19.annotation.gtf.exons.cdna.gz";
-
 my $Evalue = 1e-3;
 my $tmpdir = "/tmp";
 
@@ -38,10 +36,9 @@ my $usage = <<__EOUSAGE__;
 #
 #  --out_prefix <string>          prefix for output filename (will tack on .final and .final.abridged)
 #
-# Optional: 
+#  --genome_lib_dir <string>      genome lib directory for FusionFilter
 #
-#  --ref_cdna <string>            reference cDNA sequences fasta file (generated specially based on gtf -see docs) 
-#                                 (default: $cdna_fasta_file)
+# Optional: 
 #
 #  -E <float>                     E-value threshold for blast searches (default: $Evalue)
 #
@@ -72,12 +69,12 @@ my $help_flag;
 
 my $fusion_preds_file;
 my $out_prefix;
+my $genome_lib_dir;
 
 &GetOptions ( 'h' => \$help_flag, 
               
               'fusion_preds=s' => \$fusion_preds_file,
-              'ref_cdna=s' => \$cdna_fasta_file,
-              
+                            
               'out_prefix=s' => \$out_prefix,
 
               'E=f' => \$Evalue,
@@ -91,6 +88,8 @@ my $out_prefix;
               'min_sum_frags=i' => \$MIN_SUM_FRAGS,
               'max_promiscuity=i' => \$MAX_PROMISCUITY,
         
+              'genome_lib_dir=s' => \$genome_lib_dir,
+              
               
               
     );
@@ -104,12 +103,12 @@ if ($help_flag) {
     die $usage;
 }
 
-unless ($fusion_preds_file && $cdna_fasta_file && $out_prefix) {
+unless ($fusion_preds_file && $genome_lib_dir && $out_prefix) {
     die $usage;
 }
 
 $fusion_preds_file = &ensure_full_path($fusion_preds_file);
-$cdna_fasta_file = &ensure_full_path($cdna_fasta_file);
+my $cdna_fasta_file = &ensure_full_path("$genome_lib_dir/ref_cdna.fasta.gz");
 $out_prefix = &ensure_full_path($out_prefix);
 
 
@@ -244,9 +243,9 @@ main: {
     close $filter_ofh;
     close $stage1_ofh;
     
-
+    
     ## Run the blast and promiscuity filter
-    my $cmd = "$FindBin::Bin/blast_and_promiscuity_filter.pl --out_prefix $intermediates_out_prefix --ref_cdna $cdna_fasta_file -E $Evalue --max_promiscuity $MAX_PROMISCUITY --fusion_preds $stage1_preds_file";
+    my $cmd = "$FindBin::Bin/../FusionFilter/util/blast_and_promiscuity_filter.pl --out_prefix $intermediates_out_prefix -E $Evalue --max_promiscuity $MAX_PROMISCUITY --fusion_preds $stage1_preds_file --genome_lib_dir $genome_lib_dir ";
     &process_cmd($cmd);  # generates $out_prefix.final and $out_prefix.filt
 
     # rename final output file:

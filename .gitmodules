@@ -1,0 +1,3 @@
+[submodule "FusionFilter"]
+	path = FusionFilter
+	url = https://github.com/FusionFilter/FusionFilter.git

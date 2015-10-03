@@ -25,11 +25,10 @@ my $UTILDIR = "$FindBin::Bin/util";
 my $out_prefix = "star-fusion";
 my $chimeric_junction_file;
 my $chimeric_out_sam;
-my $ref_GTF = "$FindBin::Bin/../resources/gencode.v19.annotation.gtf.exons.gz";
 my $help_flag;
 my $MIN_NOVEL_JUNCTION_SUPPORT = 3;
 my $MIN_SPAN_ONLY_SUPPORT = 5;
-
+my $genome_lib_dir;
 
 
 my $usage = <<__EOUSAGE__;
@@ -40,9 +39,9 @@ my $usage = <<__EOUSAGE__;
 #
 #    --chimeric_junction|J <string>     Chimeric.out.junction file
 #
-#  Optional:
+#    --genome_lib_dir <string>          path to genome lib dir 
 #
-#    --ref_GTF|G <string>               reference annotation GTF file (ie. gencode.gtf)
+#  Optional:
 #
 #    --min_novel_junction_support <int>    default: $MIN_NOVEL_JUNCTION_SUPPORT  (minimum of $MIN_NOVEL_JUNCTION_SUPPORT junction reads required if breakpoint
 #                                                            lacks involvement of only reference junctions)
@@ -62,8 +61,8 @@ __EOUSAGE__
 &GetOptions ( 'h' => \$help_flag,
               
               'chimeric_junction|J=s' => \$chimeric_junction_file,
-              'ref_GTF|G=s' => \$ref_GTF,
-
+              'genome_lib_dir=s' => \$genome_lib_dir,
+              
               'min_novel_junction_support=i' => \$MIN_NOVEL_JUNCTION_SUPPORT,
               'min_span_only_support=i' => \$MIN_SPAN_ONLY_SUPPORT,
               
@@ -75,9 +74,11 @@ __EOUSAGE__
 if ($help_flag) {
     die $usage;
 }
-unless ($chimeric_junction_file) {
+unless ($chimeric_junction_file && $genome_lib_dir) {
     die $usage;
 }
+
+my $ref_GTF = "$genome_lib_dir/ref_annot.gtf.gz";
 unless (-s $ref_GTF) {
     die "Error, cannot locate reference annotation file: $ref_GTF";
 }
