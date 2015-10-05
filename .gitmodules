@@ -1,3 +1,6 @@
 [submodule "FusionFilter"]
 	path = FusionFilter
 	url = https://github.com/FusionFilter/FusionFilter.git
+[submodule "STAR-Fusion.github.io"]
+	path = STAR-Fusion.github.io
+	url = https://github.com/STAR-Fusion/STAR-Fusion.github.io.git
