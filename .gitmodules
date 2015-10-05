@@ -4,3 +4,6 @@
 [submodule "STAR-Fusion.github.io"]
 	path = STAR-Fusion.github.io
 	url = https://github.com/STAR-Fusion/STAR-Fusion.github.io.git
+[submodule "STAR-Fusion.wiki"]
+	path = STAR-Fusion.wiki
+	url = https://github.com/STAR-Fusion/STAR-Fusion.wiki.git
