@@ -78,7 +78,7 @@ unless ($chimeric_junction_file && $genome_lib_dir) {
     die $usage;
 }
 
-my $ref_GTF = "$genome_lib_dir/ref_annot.gtf.gz";
+my $ref_GTF = "$genome_lib_dir/ref_annot.gtf";
 unless (-s $ref_GTF) {
     die "Error, cannot locate reference annotation file: $ref_GTF";
 }

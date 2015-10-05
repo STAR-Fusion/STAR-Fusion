@@ -108,15 +108,8 @@ unless ($fusion_preds_file && $genome_lib_dir && $out_prefix) {
 }
 
 $fusion_preds_file = &ensure_full_path($fusion_preds_file);
-my $cdna_fasta_file = &ensure_full_path("$genome_lib_dir/ref_cdna.fasta.gz");
+
 $out_prefix = &ensure_full_path($out_prefix);
-
-
-my $ref_cdna_idx_file = "$cdna_fasta_file.idx";
-unless (-s $ref_cdna_idx_file) {
-    die "Error, cannot find indexed fasta file: $cdna_fasta_file.idx; be sure to build an index - see docs.\n";
-}
-
 
 
 =input_format:
@@ -245,7 +238,7 @@ main: {
     
     
     ## Run the blast and promiscuity filter
-    my $cmd = "$FindBin::Bin/../FusionFilter/util/blast_and_promiscuity_filter.pl --out_prefix $intermediates_out_prefix -E $Evalue --max_promiscuity $MAX_PROMISCUITY --fusion_preds $stage1_preds_file --genome_lib_dir $genome_lib_dir ";
+    my $cmd = "$FindBin::Bin/../FusionFilter/blast_and_promiscuity_filter.pl --out_prefix $intermediates_out_prefix -E $Evalue --max_promiscuity $MAX_PROMISCUITY --fusion_preds $stage1_preds_file --genome_lib_dir $genome_lib_dir ";
     &process_cmd($cmd);  # generates $out_prefix.final and $out_prefix.filt
 
     # rename final output file:
