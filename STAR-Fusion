@@ -51,8 +51,7 @@ my $verbose_level = 2;
 my $MIN_JUNCTION_READS = 1;
 my $MIN_SUM_FRAGS = 2;
 my $MAX_PROMISCUITY = 3;  # perhaps a poor choice of words, but still a best fit IMHO.
-
-my $genome_lib_dir = "$FindBin::Bin/resources";
+my $genome_lib_dir;
 
 my $usage = <<__EOUSAGE__;
 
@@ -64,6 +63,8 @@ my $usage = <<__EOUSAGE__;
 #    --left_fq <string>                    left.fq file
 #
 #    --right_fq <string>                   right.fq file  (actually optional, but highly recommended)
+#
+#    --genome_lib_dir <string>             directory containing genome lib (see http://STAR-Fusion.github.io)
 #
 #    --output_dir|O <string>               output directory   
 #
@@ -91,8 +92,6 @@ my $usage = <<__EOUSAGE__;
 #
 #    --no_filter                           do not filter predictions.
 #
-#    --genome_lib_dir <string>             directory containing genome lib (see http://FusionFilter.github.io for details)
-#                                          default: $genome_lib_dir
 #
 ###################################################################################
 
