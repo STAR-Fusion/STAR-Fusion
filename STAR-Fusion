@@ -15,6 +15,12 @@ use Process_cmd;
 
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
+
+
+my $VERSION_TAG = "__VERSION_TAG__"; # set for release.
+
+
+
 my $UTILDIR = "$FindBin::Bin/util";
 
 
@@ -52,6 +58,7 @@ my $MIN_JUNCTION_READS = 1;
 my $MIN_SUM_FRAGS = 2;
 my $MAX_PROMISCUITY = 3;  # perhaps a poor choice of words, but still a best fit IMHO.
 my $genome_lib_dir;
+
 
 my $usage = <<__EOUSAGE__;
 
@@ -92,6 +99,7 @@ my $usage = <<__EOUSAGE__;
 #
 #    --no_filter                           do not filter predictions.
 #
+#   --version                              report software version: $VERSION_TAG
 #
 ###################################################################################
 
