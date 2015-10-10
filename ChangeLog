@@ -1,0 +1,3 @@
+Version 0.5.1 (Oct, 10, 2015)
+     added back capability to run STAR-Fusion from an existing Chimeric.out.junctions file from an earlier STAR run.
+     Use parameter:  --chimeric_junction|J or (--left_fq, --right_fq)
