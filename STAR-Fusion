@@ -23,26 +23,6 @@ my $VERSION_TAG = "__VERSION_TAG__"; # set for release.
 
 my $UTILDIR = "$FindBin::Bin/util";
 
-
-=recommended_STAR_settings
-
-  # From Stransky et al. 2014   PMID: 25204415
-
-   STAR --genomeDir Hg19.fa_star_index \
-        --readFilesIn left.fq right.fq \
-        --outSAMstrandField intronMotif \
-        --outFilterIntronMotifs RemoveNoncanonicalUnannotated \
-        --outReadsUnmapped None --chimSegmentMin 15 \
-        --chimJunctionOverhangMin 15 \
-        --alignMatesGapMax 200000 \
-        --alignIntronMax 200000 \
-        --runThreadN 4 \
-        --outSAMtype BAM SortedByCoordinate 
-
-=cut
-
-
-
 ## Options
 my $output_dir = "";
 my $out_prefix = "star-fusion";
@@ -67,13 +47,22 @@ my $usage = <<__EOUSAGE__;
 #
 #  Required:
 #
-#    --left_fq <string>                    left.fq file
+#  To include running STAR:
 #
-#    --right_fq <string>                   right.fq file  (actually optional, but highly recommended)
+#      --left_fq <string>                    left.fq file
+#
+#      --right_fq <string>                   right.fq file  (actually optional, but highly recommended)
+#
+#  Or use output from earlier STAR run:
+#
+#      --chimeric_junction|J <string>        Chimeric.out.junction file
+#
 #
 #    --genome_lib_dir <string>             directory containing genome lib (see http://STAR-Fusion.github.io)
 #
 #    --output_dir|O <string>               output directory   
+#
+#
 #
 #  Optional:
 #
@@ -114,12 +103,15 @@ my $no_filter = 0;
 
 my $left_fq_filename = "";
 my $right_fq_filename = "";
+my $chimeric_out_junctions_file = "";
 
 &GetOptions ( 'help|h' => \$help_flag,
               
               'left_fq=s' => \$left_fq_filename,
               'right_fq=s' => \$right_fq_filename,
               
+              'chimeric_junction|J=s' => \$chimeric_out_junctions_file,
+
               'min_junction_reads=i' => \$MIN_JUNCTION_READS,
               'min_sum_frags=i' => \$MIN_SUM_FRAGS,
               'max_promiscuity=i' => \$MAX_PROMISCUITY,
@@ -143,7 +135,7 @@ my $right_fq_filename = "";
 if ($help_flag) {
     die $usage;
 }
-unless ($left_fq_filename && $genome_lib_dir) {
+unless ( ($left_fq_filename || $chimeric_out_junctions_file) && $genome_lib_dir) {
     die $usage;
 }
 
@@ -155,15 +147,16 @@ main: {
     
     $output_dir = &ensure_full_path($output_dir);
     $genome_lib_dir = &ensure_full_path($genome_lib_dir);
-    $left_fq_filename = &ensure_full_path($left_fq_filename);
-    $right_fq_filename = &ensure_full_path($right_fq_filename);
-    
+    $left_fq_filename = &ensure_full_path($left_fq_filename) if $left_fq_filename;
+    $right_fq_filename = &ensure_full_path($right_fq_filename) if $right_fq_filename;
+    $chimeric_out_junctions_file = &ensure_full_path($chimeric_out_junctions_file) if $chimeric_out_junctions_file;
+
     unless (-d $output_dir) {
         &process_cmd("mkdir -p $output_dir");
     }
     
     chdir $output_dir or die "Error, cannot cd to $output_dir";
-        
+    
     
     if ($out_prefix =~ m|/$|) {
         # not allowing to end as a directory, must be a filename
@@ -172,41 +165,45 @@ main: {
     
     $out_prefix = &ensure_full_path($out_prefix);
     my $out_prefix_basename = basename($out_prefix);
-
+    
     my $pipeliner = new Pipeliner(-verbose => $verbose_level);
     
-    my $star_index_dir = "$genome_lib_dir/ref_genome.fa.star.idx";
-    unless (-d $star_index_dir) {
-        die "Error, cannot locate star index at $star_index_dir";
+    if ($left_fq_filename) {
+        my $star_index_dir = "$genome_lib_dir/ref_genome.fa.star.idx";
+        unless (-d $star_index_dir) {
+            die "Error, cannot locate star index at $star_index_dir";
+        }
+        
+        ## run STAR to align reads:
+        my $cmd = "STAR --genomeDir $star_index_dir "
+            . " --readFilesIn $left_fq_filename $right_fq_filename "
+            . " --twopassMode Basic "
+            . " --outReadsUnmapped None "
+            . " --chimSegmentMin 12 "
+            . " --chimJunctionOverhangMin 12 "
+            . " --alignSJDBoverhangMin 10 "   
+            . " --alignMatesGapMax 200000 "
+            . " --alignIntronMax 200000 "
+            . " --chimSegmentReadGapMax parameter 3 "
+            . " --alignSJstitchMismatchNmax 5 -1 5 5 "  #which allows for up to 5 mismatches for non-canonical GC/AG, and AT/AC junctions, and any number of mismatches for canonical junctions (the default values 0 -1 0 0 replicate the old behavior (from AlexD)
+            . " --runThreadN 4"
+            . " --limitBAMsortRAM 31532137230 "
+            . " --outSAMtype BAM SortedByCoordinate ";
+        
+        if ($left_fq_filename =~ /\.gz$/) {
+            $cmd .= " --readFilesCommand zcat ";
+        }
+        
+        $pipeliner->add_commands(Command->new($cmd, "star.ok"));
     }
-    
-    ## run STAR to align reads:
-    my $cmd = "STAR --genomeDir $star_index_dir "
-        . " --readFilesIn $left_fq_filename $right_fq_filename "
-        . " --twopassMode Basic "
-        . " --outReadsUnmapped None "
-        . " --chimSegmentMin 12 "
-        . " --chimJunctionOverhangMin 12 "
-        . " --alignSJDBoverhangMin 10 "   
-        . " --alignMatesGapMax 200000 "
-        . " --alignIntronMax 200000 "
-        . " --chimSegmentReadGapMax parameter 3 "
-        . " --alignSJstitchMismatchNmax 5 -1 5 5 "  #which allows for up to 5 mismatches for non-canonical GC/AG, and AT/AC junctions, and any number of mismatches for canonical junctions (the default values 0 -1 0 0 replicate the old behavior (from AlexD)
-        . " --runThreadN 4"
-        . " --limitBAMsortRAM 31532137230 "
-        . " --outSAMtype BAM SortedByCoordinate ";
-    
-    if ($left_fq_filename =~ /\.gz$/) {
-        $cmd .= " --readFilesCommand zcat ";
-    }
-    
-    $pipeliner->add_commands(Command->new($cmd, "star.ok"));
-    
     
     ## predict fusions
-
-    $cmd = "$UTILDIR/STAR-Fusion.predict "
-        . " -J Chimeric.out.junction "
+    unless ($chimeric_out_junctions_file) {
+        $chimeric_out_junctions_file = "Chimeric.out.junction";
+    }
+    
+    my $cmd = "$UTILDIR/STAR-Fusion.predict "
+        . " -J $chimeric_out_junctions_file "
         . " --genome_lib_dir $genome_lib_dir "
         . " -O $out_prefix ";
     
