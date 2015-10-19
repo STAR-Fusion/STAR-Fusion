@@ -427,19 +427,15 @@ sub find_exon_junction_matches {
 
     my ($genome_coords_aref, $read_coords_aref) = &get_genome_coords_via_cigar($rst, $cigar);
     
-
+    print "Genome coords for aln: " . Dumper(\$genome_coords_aref);
+    
     my @exon_hits;
-
-    my %seen_gene;
 
     foreach my $coordset (@$genome_coords_aref) {
         my ($segment_lend, $segment_rend) = @$coordset;
         
         foreach my $gene_id (&get_overlapping_genes($chr_to_interval_tree_href, $chr, $segment_lend, $segment_rend)) {
             
-            if ($seen_gene{$gene_id}) { next; } # already analyzed it earlier.
-            $seen_gene{$gene_id} = 1; 
-
             foreach my $transcript_id (keys %{$chr_gene_trans_to_exons_href->{$chr}->{$gene_id}}) {
                 
                 my @exons = @{$chr_gene_trans_to_exons_href->{$chr}->{$gene_id}->{$transcript_id}};
@@ -541,12 +537,11 @@ sub find_exon_junction_matches {
     
     if (@exon_hits) {
 
-        #use Data::Dumper;  print Dumper(\@hits); print Dumper($align_struct);
-        
+                
         @exon_hits = sort {$a->{delta}<=>$b->{delta}} @exon_hits;
+
+        use Data::Dumper;  print Dumper(\@exon_hits);
         
-        #use Data::Dumper;
-        #print STDERR Dumper(\@hits);
         
         # only best per gene
         my %seen;
@@ -792,11 +787,11 @@ sub get_genome_coords_via_cigar {
 
     $genome_lend--; # move pointer just before first position.
     
-    while ($alignment =~ /(\d+)([A-Z])/g) {
+    while ($alignment =~ /(\d+)([A-Zp])/g) {
         my $len = $1;
         my $code = $2;
         
-        unless ($code =~ /^[MSDNIH]$/) {
+        unless ($code =~ /^[MSDNIHp]$/) {
             confess "Error, cannot parse cigar code [$code] ";
         }
         
@@ -815,7 +810,7 @@ sub get_genome_coords_via_cigar {
             $query_lend = $query_rend;
             
         }
-        elsif ($code eq 'D' || $code eq 'N') { # insertion in the genome or gap in query (intron, perhaps)
+        elsif ($code eq 'D' || $code eq 'N' || $code eq 'p') { # insertion in the genome or gap in query (intron, perhaps)
             $genome_lend += $len;
             
         }
