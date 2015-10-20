@@ -427,7 +427,7 @@ sub find_exon_junction_matches {
 
     my ($genome_coords_aref, $read_coords_aref) = &get_genome_coords_via_cigar($rst, $cigar);
     
-    print "Genome coords for aln: " . Dumper(\$genome_coords_aref);
+    #print "Genome coords for aln: " . Dumper(\$genome_coords_aref);
     
     my @exon_hits;
 
@@ -540,7 +540,7 @@ sub find_exon_junction_matches {
                 
         @exon_hits = sort {$a->{delta}<=>$b->{delta}} @exon_hits;
 
-        use Data::Dumper;  print Dumper(\@exon_hits);
+        #print Dumper(\@exon_hits);
         
         
         # only best per gene
