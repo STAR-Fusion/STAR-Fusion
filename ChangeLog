@@ -1,3 +1,9 @@
-Version 0.5.1 (Oct, 10, 2015)
+Version 0.5.3 (Nov, 6, 2015)
+	removed duplicate PE alignments supporting fusions, decreases FP rate dramatically on samples w/ high PCR dups, w/ little effect on other 'good' samples w/ low DUP rate.
+
+Version 0.5.2 (Oct 26, 2016)
+	Bugfix for paired cigar-string alignment parsing leading to proper grouping of junction counts.
+	
+Version 0.5.1 (Oct 10, 2015)
      added back capability to run STAR-Fusion from an existing Chimeric.out.junctions file from an earlier STAR run.
      Use parameter:  --chimeric_junction|J or (--left_fq, --right_fq)

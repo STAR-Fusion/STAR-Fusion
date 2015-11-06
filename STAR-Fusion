@@ -17,7 +17,7 @@ use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
 
 
-my $VERSION_TAG = "STAR-Fusion_v0.5.1"; # set for release.
+my $VERSION_TAG = "STAR-Fusion_v0.5.3"; # set for release.
 
 
 
