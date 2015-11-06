@@ -603,7 +603,9 @@ sub map_chimeric_reads_to_genes {
         $junctions_file = "gunzip -c $junctions_file | ";
     }
     
-        
+
+    my %seen; # avoid PE duplicates
+    
     open (my $fh, $junctions_file) or die "Error, cannot open file $junctions_file";
     while (<$fh>) {
         chomp;
@@ -648,13 +650,25 @@ sub map_chimeric_reads_to_genes {
         
         my ($rst_B, $cigar_B) = ($x[12], $x[13]);
 
+        my $PE_read_map_token = join("$;", $chrA, $rst_A, $cigar_A ,$chrB, $rst_B, $cigar_B);
+        
+        
+        if ($seen{$PE_read_map_token}) { 
+            # rmdups
+            next; 
+        }
+        else {
+            $seen{$PE_read_map_token} = 1;
+        }
+        
+        
         my @A_hits = &find_exon_junction_matches($chrA, $coordA, $orientA, 'left', $chr_to_interval_tree_href, $chr_gene_trans_to_exons_href, $rst_A, $cigar_A);
 
         my @B_hits = &find_exon_junction_matches($chrB, $coordB, $orientB, 'right', $chr_to_interval_tree_href, $chr_gene_trans_to_exons_href, $rst_B, $cigar_B);
         
         #print STDERR "A: " . Dumper(\@A_hits);
         #print STDERR "B: " . Dumper(\@B_hits);
-
+        
         
         if (&found_selfie(\@A_hits, \@B_hits) ) {
             # skip it. likely FP
