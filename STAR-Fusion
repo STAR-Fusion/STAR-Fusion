@@ -230,11 +230,10 @@ main: {
         
         $pipeliner->add_commands(new Command($cmd, "$out_prefix.STAR-Fusion.filter.ok"));
         
-        #$pipeliner->add_commands(new Command("mv $intermediates_dir/$out_prefix_basename.fusion_candidates.final .", 
-        #                                     "$intermediates_dir/$out_prefix_basename.mv_final.ok"));
-
-        #$pipeliner->add_commands(new Command("mv $intermediates_dir/$out_prefix_basename.fusion_candidates.final.abridged .", 
-        #                                     "$intermediates_dir/$out_prefix_basename.mv_final_abridged.ok"));
+        
+        ## convert vals to FFPM
+        $cmd = "$UTILDIR/convert_to_FFPM.pl $left_fq_filename $out_prefix.fusion_candidates.final.abridged > $out_prefix.fusion_candidates.final.abridged.FFPM";
+        $pipeliner->add_commands(new Command($cmd, "$out_prefix.fusion_candidates.final.abridged.FFPM.ok") );
         
     }
                                  
