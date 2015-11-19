@@ -1,3 +1,6 @@
+Version 0.5.4 (Nov, 10, 2015)
+	update to FusionFilter, no 2-pass in genome-generate function
+
 Version 0.5.3 (Nov, 6, 2015)
 	removed duplicate PE alignments supporting fusions, decreases FP rate dramatically on samples w/ high PCR dups, w/ little effect on other 'good' samples w/ low DUP rate.
 
