@@ -231,10 +231,11 @@ main: {
         $pipeliner->add_commands(new Command($cmd, "$out_prefix.STAR-Fusion.filter.ok"));
         
         
-        ## convert vals to FFPM
-        $cmd = "$UTILDIR/convert_to_FFPM.pl $left_fq_filename $out_prefix.fusion_candidates.final.abridged > $out_prefix.fusion_candidates.final.abridged.FFPM";
-        $pipeliner->add_commands(new Command($cmd, "$out_prefix.fusion_candidates.final.abridged.FFPM.ok") );
-        
+        if ($left_fq_filename) {
+            ## convert vals to FFPM
+            $cmd = "$UTILDIR/convert_to_FFPM.pl $left_fq_filename $out_prefix.fusion_candidates.final.abridged > $out_prefix.fusion_candidates.final.abridged.FFPM";
+            $pipeliner->add_commands(new Command($cmd, "$out_prefix.fusion_candidates.final.abridged.FFPM.ok") );
+        }
     }
                                  
     $pipeliner->run();
