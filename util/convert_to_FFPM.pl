@@ -16,6 +16,8 @@ main: {
 
     open (my $fh, $fusions_file) or die "$!";
     my $header = <$fh>;
+    my @header_pts = split(/\t/, $header);
+    $header = join("\t", @header_pts[0..2], "J_FFPM", "S_FFPM", @header_pts[3..$#header_pts]);
     print $header;
 
     while (<$fh>) {
@@ -23,13 +25,13 @@ main: {
         my $J = $x[1];
         my $S = $x[2];
 
-        $x[1] = sprintf("%.4f", $J/$num_frags * 1e6);
-        $x[2] = sprintf("%.4f", $S/$num_frags * 1e6);
+        my $J_FFPM = sprintf("%.4f", $J/$num_frags * 1e6);
+        my $S_FFPM = sprintf("%.4f", $S/$num_frags * 1e6);
 
-        print join("\t", @x);
+        print join("\t", @x[0..2], $J_FFPM, $S_FFPM, @x[3..$#x]);
     }
     close $fh;
-
+    
     exit(0);
 }
 

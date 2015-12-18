@@ -1,3 +1,6 @@
+Version 0.6.0 (Dec 16, 2015)
+	including FFPM calculations in output summary.
+
 Version 0.5.4 (Nov, 10, 2015)
 	update to FusionFilter, no 2-pass in genome-generate function
 
@@ -6,7 +9,7 @@ Version 0.5.3 (Nov, 6, 2015)
 
 Version 0.5.2 (Oct 26, 2016)
 	Bugfix for paired cigar-string alignment parsing leading to proper grouping of junction counts.
-	
+
 Version 0.5.1 (Oct 10, 2015)
      added back capability to run STAR-Fusion from an existing Chimeric.out.junctions file from an earlier STAR run.
      Use parameter:  --chimeric_junction|J or (--left_fq, --right_fq)
