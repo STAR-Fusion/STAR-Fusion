@@ -162,7 +162,7 @@ main: {
         if ($breakpoint_info_href) {
             
             # sort by number of reads supporting the breakpoints
-            my @fusion_breakpoints = reverse sort { scalar(%{$breakpoint_info_href->{$a}}) <=> scalar(%{$breakpoint_info_href->{$b}}) } keys %$breakpoint_info_href;
+            my @fusion_breakpoints = reverse sort { scalar(keys %{$breakpoint_info_href->{$a}}) <=> scalar(keys %{$breakpoint_info_href->{$b}}) } keys %$breakpoint_info_href;
             
             while (@fusion_breakpoints) {
                 my $best_breakpoint = shift @fusion_breakpoints;
@@ -193,16 +193,15 @@ main: {
                 
                 my $score = 4 * $breakpoint_count +  $span_count;
 
-                my $long_double_anchor_support = "NO_DOUBLE_LONG_ANCHOR";
+                my $long_double_anchor_support = "NO_LDAS";
                 if ($junction_breakpoint_to_long_anchors{$fusion_complex_name}->{$best_breakpoint}->{'left'}
                     &&
                     $junction_breakpoint_to_long_anchors{$fusion_complex_name}->{$best_breakpoint}->{'right'} ) {
 
-                    $long_double_anchor_support = "YES_DOUBLE_LONG_ANCHOR";
+                    $long_double_anchor_support = "YES_LDAS";
                     
                 }
-
-                
+                                
                 
                 my $fusion_candidate = { fusion_simple_name => $fusion_simple_name,
                                          fusion_complex_name => $fusion_complex_name,
@@ -267,7 +266,7 @@ main: {
                                      
                                      score => $score,
 
-                                     long_double_anchor_support => "NO_LONG_DOUBLE_ANCHOR_SUPPORT",
+                                     long_double_anchor_support => "NO_LDAS",
                                      
                                      
             };
@@ -295,7 +294,7 @@ main: {
                     "LeftGene", "LeftBreakpoint",  
                     "RightGene", "RightBreakpoint", 
                     "JunctionReads",
-                    "SpanningFrags") . "\n";
+                    "SpanningFrags", "Long_double_anchor_support") . "\n";
     
     
     # examining fusions based on the specific junction breakpoint, regardless of genes assigned to.

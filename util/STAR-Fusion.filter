@@ -161,13 +161,14 @@ main: {
         my $brkptA = $x[5];
         my $geneB = $x[6];
         my $brkptB = $x[7];
-        my $junction_reads = $x[8] || '.';
-        my $spanning_frags = $x[9] || '.';
+        my $junction_reads = $x[8];
+        my $spanning_frags = $x[9];
+        my $long_double_anchor_support = $x[10];
         
         
         my $rest = "";
-        if ($#x > 9) {
-            $rest = join("\t", @x[10..$#x]);
+        if ($#x > 10) {
+            $rest = join("\t", @x[11..$#x]);
         }
         
         #my $score = sqrt($J**2 + $S**2);
@@ -190,6 +191,8 @@ main: {
                        junction_reads => $junction_reads,
                        spanning_frags => $spanning_frags,
                        
+                       ldas => $long_double_anchor_support,
+
                        score => $score, 
                        
                        rest => $rest,
@@ -200,7 +203,7 @@ main: {
     
         my $line = join("\t", $fusion->{fusion_name}, $fusion->{J}, $fusion->{S}, $fusion->{splice_type},
                         $fusion->{geneA}, $fusion->{brkptA}, $fusion->{geneB}, $fusion->{brkptB},
-                        $fusion->{junction_reads}, $fusion->{spanning_frags}, $fusion->{rest});
+                        $fusion->{junction_reads}, $fusion->{spanning_frags}, $fusion->{ldas}, $fusion->{rest});
         
 
         $fusion->{line} = $line;  # note, we'll need to reset this later after merging occurs for some entries.
@@ -376,6 +379,10 @@ sub merge_fusions {
         }
     }
 
+    unless ($fusion_keep->{ldas} =~ /YES/i) {
+        $fusion_keep->{ldas} = $fusion_subsume->{ldas};
+    }
+    
     my @new_junc_read_list = keys %junction_reads;
     my @new_span_frag_list = keys %spanning_frags;
 
@@ -473,6 +480,12 @@ sub remove_fusions_with_insufficient_support {
             
             # skip it
             print $filter_ofh "#" . $fusion->{line} . "\tFILTERED DUE TO junction read support ($fusion->{J}) < $min_J\n";
+            next;
+        }
+
+
+        if ($fusion->{S} == 0 && $fusion->{ldas} !~ /YES/i) {
+            print $filter_ofh "#" . $fusion->{line} . "\tFILTERED DUE TO no spanning reads and no long double anchor support at breakpoint\n";
             next;
         }
         
