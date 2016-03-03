@@ -254,7 +254,7 @@ main: {
     &process_cmd("cut -f1-8,11-100 $filter_info_file > $filter_info_file.abridged");
     
     &process_cmd("cut -f1-8,11-100 $out_prefix.fusion_candidates.final > $out_prefix.fusion_candidates.final.abridged");
-    &process_cmd("cut -f1-8,11-100 $stage1_preds_file.post_blast_n_promisc_filter > $stage1_preds_file.post_blast_n_promisc_filter.abridged");
+    &process_cmd("cut -f1-8,11-100 $stage1_preds_file.post_blast_filter.post_promisc_filter > $stage1_preds_file.post_blast_filter.post_promisc_filter.abridged");
     
 
     exit(0);
