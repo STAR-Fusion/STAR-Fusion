@@ -30,6 +30,7 @@ my $MIN_NOVEL_JUNCTION_SUPPORT = 3;
 my $MIN_SPAN_ONLY_SUPPORT = 5;
 my $genome_lib_dir;
 
+my $LONG_ANCHOR_SIZE = 25;
 
 my $usage = <<__EOUSAGE__;
 
@@ -103,11 +104,13 @@ main: {
     ####################################
     ## Get the evidence for fusion genes
     ####################################
-    
-
-    my %all_fusion_candidate_complex_names;  # {fusion_complex_name} = info struct
-    my %junction_breakpoint_to_read_names;  # {fusion_complex_name} -> {breakpoint} -> {read_name} = 1 
+        
+    my %all_fusion_candidate_complex_names;  # {fusion_complex_name} = info struct.  complex_name = gene_symbolA^gene_idA--gene_symbolB^gene_idB
+    my %junction_breakpoint_to_read_names;  #  {fusion_complex_name} -> {breakpoint} -> {read_name} = 1 
+    my %junction_breakpoint_to_long_anchors; # {fusion_complex_name} -> {breakpoint} -> {left|right} = 1 
     my %spans_to_read_names; # {fusion_complex_name} -> { read_name } = 1
+    
+    
     print STDERR "-parsing fusion evidence: $chimeric_junction_file\n";
     &map_chimeric_reads_to_genes($chimeric_junction_file, 
                                  \%chr_to_interval_tree, 
@@ -118,6 +121,8 @@ main: {
                                  \%spans_to_read_names,
                                  
                                  $intermediates_out_prefix,
+
+                                 \%junction_breakpoint_to_long_anchors,
         );
     
         
@@ -155,8 +160,10 @@ main: {
         my $breakpoint_info_href = $junction_breakpoint_to_read_names{$fusion_complex_name};
         
         if ($breakpoint_info_href) {
-            my @fusion_breakpoints = reverse sort {$breakpoint_info_href->{$a}<=>$breakpoint_info_href->{$b}} keys %$breakpoint_info_href;
-        
+            
+            # sort by number of reads supporting the breakpoints
+            my @fusion_breakpoints = reverse sort { scalar(%{$breakpoint_info_href->{$a}}) <=> scalar(%{$breakpoint_info_href->{$b}}) } keys %$breakpoint_info_href;
+            
             while (@fusion_breakpoints) {
                 my $best_breakpoint = shift @fusion_breakpoints;
                 
@@ -170,10 +177,8 @@ main: {
 
                 if ($splice_type ne "ONLY_REF_SPLICE" && $breakpoint_count < $MIN_NOVEL_JUNCTION_SUPPORT) { next; } # ignore likely noise
                 
-                
                 # prune any junction reads from the span support for this fusion.
-                my %local_spanning_reads = map { + $_ => 1 } @spanning_reads;
-                
+                my %local_spanning_reads = map { + $_ => 1 } @spanning_reads;                
                 
                 foreach my $junction_read (@junc_reads) {
                     print $ofh_junc "$fusion_complex_name\t$best_breakpoint\t$junction_read\n";
@@ -187,6 +192,16 @@ main: {
                 
                 
                 my $score = 4 * $breakpoint_count +  $span_count;
+
+                my $long_double_anchor_support = "NO_DOUBLE_LONG_ANCHOR";
+                if ($junction_breakpoint_to_long_anchors{$fusion_complex_name}->{$best_breakpoint}->{'left'}
+                    &&
+                    $junction_breakpoint_to_long_anchors{$fusion_complex_name}->{$best_breakpoint}->{'right'} ) {
+
+                    $long_double_anchor_support = "YES_DOUBLE_LONG_ANCHOR";
+                    
+                }
+
                 
                 
                 my $fusion_candidate = { fusion_simple_name => $fusion_simple_name,
@@ -209,6 +224,8 @@ main: {
                                          junction_read_names => \@junc_reads,
                                                                                   
                                          score => $score,
+
+                                         long_double_anchor_support => $long_double_anchor_support,
                                          
                 };                
                 
@@ -249,6 +266,9 @@ main: {
                                      
                                      
                                      score => $score,
+
+                                     long_double_anchor_support => "NO_LONG_DOUBLE_ANCHOR_SUPPORT",
+                                     
                                      
             };
             
@@ -296,6 +316,7 @@ main: {
                         $fusion_candidate->{right_gene}, $fusion_candidate->{right_coords}, 
                         $junction_reads, 
                         $spanning_frags,
+                        $fusion_candidate->{long_double_anchor_support},
             ) . "\n";
         
     }
@@ -428,6 +449,10 @@ sub find_exon_junction_matches {
     my ($genome_coords_aref, $read_coords_aref) = &get_genome_coords_via_cigar($rst, $cigar);
     
     #print "Genome coords for aln: " . Dumper(\$genome_coords_aref);
+
+
+    my $anchor_length = &compute_anchor_length($read_coords_aref, $left_or_right, $orient);
+    
     
     my @exon_hits;
 
@@ -524,6 +549,8 @@ sub find_exon_junction_matches {
                                         
                                         chr => $chr,
                                         
+                                        anchor_length => $anchor_length,
+                                        
                           });
                     
                     
@@ -561,6 +588,7 @@ sub find_exon_junction_matches {
 }
 
 
+
 ####
 sub get_overlapping_genes {
     my ($chr_to_interval_tree_href, $chr, $lend, $rend) = @_;
@@ -591,7 +619,7 @@ sub get_overlapping_genes {
 sub map_chimeric_reads_to_genes {
     my ($junctions_file, $chr_to_interval_tree_href, $chr_gene_trans_to_exons_href, 
         $all_fusion_candidate_complex_names_href, $junction_breakpoint_to_read_names_href, $spans_to_read_names_href,
-        $intermediates_out_prefix) = @_;
+        $intermediates_out_prefix, $junction_breakpoint_to_long_anchors_href) = @_;
     
     print STDERR "-mapping reads to genes\n";
     
@@ -697,7 +725,6 @@ sub map_chimeric_reads_to_genes {
                         
                 my ($left_entry, $right_entry) = ($left_possibility, $right_possibility);
                 
-                
                 # ensure consistent orientation
                 unless ($left_entry->{sense_or_antisense} eq $right_entry->{sense_or_antisense}) {
                     next;
@@ -722,8 +749,8 @@ sub map_chimeric_reads_to_genes {
                                                                                      right_gene_id => $right_gene_id,
                                                                                      fusion_complex_name => $fusion_complex_name,
                                                                                      fusion_simple_name => $fusion_simple_name,
-                                                                                     left_coord => join(":", $left_entry->{chr}, $left_entry->{pt_align}),
-                                                                                     right_coord => join(":", $right_entry->{chr}, $right_entry->{pt_align})
+                                                                                     left_coord => join(":", $left_entry->{chr}, $left_entry->{pt_align}), # left breakpoint
+                                                                                     right_coord => join(":", $right_entry->{chr}, $right_entry->{pt_align}) # right breakpoint
                                                                                          
                 };
                 
@@ -734,6 +761,8 @@ sub map_chimeric_reads_to_genes {
                     push (@x, $fusion_complex_name);
                 }
                 else {
+
+                    # include breakpoint info and distance of exon coordinates from breakpoints
                     
                     my @at_exon_junctions = ($left_entry->{chr} . ":" . $left_entry->{pt_align} . ":" . $left_entry->{exon}->{orient},
                                              $left_entry->{delta}, 
@@ -746,9 +775,21 @@ sub map_chimeric_reads_to_genes {
                     push (@x, $junction_text, $fusion_complex_name);
                     
                     # both at exon junctions
-                    
-                    
+                                        
                     $junction_breakpoint_to_read_names_href->{$fusion_complex_name}->{$junction_text}->{$read_name}++; # track junction read name to fusion name
+
+                    #########################
+                    ## examine anchor support.
+                    
+                    my $left_anchor_length = $left_entry->{anchor_length};
+                    my $right_anchor_length = $right_entry->{anchor_length};
+
+                    if ($left_anchor_length >= $LONG_ANCHOR_SIZE) {
+                        $junction_breakpoint_to_long_anchors_href->{$fusion_complex_name}->{$junction_text}->{'left'} = 1;
+                    }
+                    if ($right_anchor_length >= $LONG_ANCHOR_SIZE) {
+                        $junction_breakpoint_to_long_anchors_href->{$fusion_complex_name}->{$junction_text}->{'right'} = 1;
+                    }
                                         
                 }
             }
@@ -842,3 +883,39 @@ sub get_genome_coords_via_cigar {
 }
 
 
+####
+sub compute_anchor_length {
+    my ($read_coords_aref, $left_or_right, $orient) = @_;
+
+    # determine length of terminal alignment segment up to the breakpoint.
+    my @read_coords = @$read_coords_aref;
+
+    my $term_segment;
+
+    if ($left_or_right eq 'left') {
+        if ($orient eq '+') {
+            $term_segment = $read_coords[$#read_coords];
+        }
+        else {
+            $term_segment = $read_coords[0];
+        }
+    }
+    else {
+        # right segment
+        if ($orient eq '+') {
+            $term_segment = $read_coords[0];
+        }
+        else {
+            $term_segment = $read_coords[$#read_coords];
+        }
+    }
+
+    my ($lend, $rend) = @$term_segment;
+    my $seg_length = $rend - $lend + 1;
+    
+    return($seg_length);
+
+}
+
+
+    
