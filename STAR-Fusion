@@ -15,6 +15,8 @@ use Process_cmd;
 
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
+my $VERSION = "0.7.0";
+
 
 my $UTILDIR = "$FindBin::Bin/util";
 
@@ -82,6 +84,8 @@ my $usage = <<__EOUSAGE__;
 #    --verbose_level <int>                 verbosity (default: $verbose_level, max=2)
 #
 #    --no_filter                           do not filter predictions.
+# 
+#    --version                             report version ($VERSION)
 #
 ###################################################################################
 
@@ -97,6 +101,8 @@ my $no_filter = 0;
 my $left_fq_filename = "";
 my $right_fq_filename = "";
 my $chimeric_out_junctions_file = "";
+
+my $REPORT_VERSION = 0;
 
 &GetOptions ( 'help|h' => \$help_flag,
               
@@ -122,12 +128,19 @@ my $chimeric_out_junctions_file = "";
     
               'genome_lib_dir=s' => \$genome_lib_dir,
               
+              'version' => \$REPORT_VERSION,
     );
 
 
 if ($help_flag) {
     die $usage;
 }
+
+if ($REPORT_VERSION) {
+    print "\n\nSTAR-Fusion version: $VERSION\n\n";
+    exit(0);
+}
+
 unless ( ($left_fq_filename || $chimeric_out_junctions_file) && $genome_lib_dir) {
     die $usage;
 }
