@@ -35,6 +35,7 @@ my $MIN_JUNCTION_READS = 1;
 my $MIN_SUM_FRAGS = 2;
 my $MAX_PROMISCUITY = 3;  # perhaps a poor choice of words, but still a best fit IMHO.
 my $genome_lib_dir;
+my $CPU = 4; 
 
 
 my $usage = <<__EOUSAGE__;
@@ -62,6 +63,8 @@ my $usage = <<__EOUSAGE__;
 #
 #
 #  Optional:
+#
+#    --CPU <int>                           number of threads for running STAR (default: $CPU)
 #
 #    --min_junction_reads <int>            minimum number of junction-spanning reads required. Default: $MIN_JUNCTION_READS
 #
@@ -192,7 +195,7 @@ main: {
             . " --alignIntronMax 200000 "
             . " --chimSegmentReadGapMax parameter 3 "
             . " --alignSJstitchMismatchNmax 5 -1 5 5 "  #which allows for up to 5 mismatches for non-canonical GC/AG, and AT/AC junctions, and any number of mismatches for canonical junctions (the default values 0 -1 0 0 replicate the old behavior (from AlexD)
-            . " --runThreadN 4"
+            . " --runThreadN $CPU"
             . " --limitBAMsortRAM 31532137230 "
             . " --outSAMtype BAM SortedByCoordinate ";
         
