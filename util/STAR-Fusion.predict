@@ -10,12 +10,13 @@ use FindBin;
 use Set::IntervalTree;
 use File::Basename;
 use Data::Dumper;
-use lib ("$FindBin::Bin/../lib");
+use lib ("$FindBin::Bin/../PerlLib");
 use SAM_reader;
 use SAM_entry;
 use Gene_obj_indexer;
 use GTF_utils;
 use Process_cmd;
+use DelimParser;
 
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
@@ -288,13 +289,19 @@ main: {
     print STDERR "-outputting fusion candidates to file: $fusion_predictions_outfile\n";
 
     # print header
-    print $ofh join("\t", "#fusion_name", 
-                    "JunctionReads", "SpanningFrags", 
-                    "Splice_type",
-                    "LeftGene", "LeftBreakpoint",  
-                    "RightGene", "RightBreakpoint", 
-                    "JunctionReads",
-                    "SpanningFrags", "Long_double_anchor_support") . "\n";
+    my @column_headers = ("#FusionName", 
+                          "JunctionReadCount", 
+                          "SpanningFragCount", 
+                          "SpliceType",
+                          "LeftGene", 
+                          "LeftBreakpoint",  
+                          "RightGene", 
+                          "RightBreakpoint", 
+                          "JunctionReads",
+                          "SpanningFrags", 
+                          "LargeAnchorSupport");
+    
+    my $tab_writer = new DelimParser::Writer($ofh, "\t", \@column_headers);
     
     
     # examining fusions based on the specific junction breakpoint, regardless of genes assigned to.
@@ -308,21 +315,24 @@ main: {
         my $spanning_frags = join(",", @{$fusion_candidate->{spanning_frag_names}}) || ".";
         
         
-        print $ofh join("\t", $fusion_candidate->{fusion_simple_name}, 
-                        $fusion_candidate->{junction_count}, $fusion_candidate->{spanning_count},
-                        $fusion_candidate->{splice_type},
-                        $fusion_candidate->{left_gene}, $fusion_candidate->{left_coords}, 
-                        $fusion_candidate->{right_gene}, $fusion_candidate->{right_coords}, 
-                        $junction_reads, 
-                        $spanning_frags,
-                        $fusion_candidate->{long_double_anchor_support},
-            ) . "\n";
+        $tab_writer->write_row({ '#FusionName' => $fusion_candidate->{fusion_simple_name}, 
+                                 'JunctionReadCount' => $fusion_candidate->{junction_count}, 
+                                 'SpanningFragCount' => $fusion_candidate->{spanning_count},
+                                 'SpliceType' => $fusion_candidate->{splice_type},
+                                 'LeftGene' => $fusion_candidate->{left_gene}, 
+                                 'LeftBreakpoint' => $fusion_candidate->{left_coords}, 
+                                 'RightGene' => $fusion_candidate->{right_gene}, 
+                                 'RightBreakpoint' => $fusion_candidate->{right_coords}, 
+                                 'JunctionReads' => $junction_reads, 
+                                 'SpanningFrags' => $spanning_frags,
+                                 'LargeAnchorSupport' => $fusion_candidate->{long_double_anchor_support},
+                               }
+            );
         
     }
     
     close $ofh;
-    
-    
+        
 
     exit(0);
 

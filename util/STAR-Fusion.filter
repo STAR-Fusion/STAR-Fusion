@@ -4,13 +4,14 @@ use strict;
 use warnings;
 use Carp;
 use FindBin;
-use lib ("$FindBin::Bin/../lib");
+use lib ("$FindBin::Bin/../PerlLib");
 use Fasta_reader;
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);                                                 
 use TiedHash;
 use Process_cmd;
 use File::Basename;
 use Pipeliner;
+use DelimParser;
 
 my $Evalue = 1e-3;
 my $tmpdir = "/tmp";
@@ -112,21 +113,6 @@ $fusion_preds_file = &ensure_full_path($fusion_preds_file);
 $out_prefix = &ensure_full_path($out_prefix);
 
 
-=input_format:
-
-0       ETV6--NTRK3
-1       84
-2       18
-3       ONLY_REF_SPLICE
-4       ETV6^ENSG00000139083.6
-5       chr12:12022903:+
-6       NTRK3^ENSG00000140538.12
-7       chr15:88483984:-
-8       comma-delim list of junction reads
-9       comma-delim list of spanning frags
-
-=cut
-
 
 main: {
 
@@ -145,36 +131,27 @@ main: {
     
     my @fusions;
     open (my $fh, $fusion_preds_file) or die "Error, cannot open file $fusion_preds_file";
-    my $header = <$fh>;
-    unless ($header =~ /^\#/) {
-        die "Error, file $fusion_preds_file doesn't begin with a header line";
-    }
-    while (<$fh>) {
-        chomp;
-
-        my @x = split(/\t/);
-        my $fusion_name = $x[0];
-        my $J = $x[1];
-        my $S = $x[2];
-        my $splice_type = $x[3];
-        my $geneA = $x[4];
-        my $brkptA = $x[5];
-        my $geneB = $x[6];
-        my $brkptB = $x[7];
-        my $junction_reads = $x[8];
-        my $spanning_frags = $x[9];
-        my $long_double_anchor_support = $x[10];
+    
+    my $tab_reader = new DelimParser::Reader($fh, "\t");
+    
+    while (my $row = $tab_reader->get_row()) {
         
+        my $fusion_name = $row->{'#FusionName'};
+        my $J = $row->{JunctionReadCount};
+        my $S = $row->{SpanningFragCount};
+        my $splice_type = $row->{SpliceType};
+        my $geneA = $row->{LeftGene};
+        my $brkptA = $row->{LeftBreakpoint};
+        my $geneB = $row->{RightGene};
+        my $brkptB = $row->{RightBreakpoint};
+        my $junction_reads = $row->{JunctionReads};
+        my $spanning_frags = $row->{SpanningFrags};
+        my $long_double_anchor_support = $row->{LargeAnchorSupport};
         
-        my $rest = "";
-        if ($#x > 10) {
-            $rest = join("\t", @x[11..$#x]);
-        }
-        
-        #my $score = sqrt($J**2 + $S**2);
         my $score = $J*4 + $S;
         
         
+        #TODO: use keys that match the column headers for sanity sake
         my $fusion = { fusion_name => $fusion_name,
                        
                        splice_type => $splice_type,
@@ -195,50 +172,55 @@ main: {
 
                        score => $score, 
                        
-                       rest => $rest,
-                       
-                       line => "", # set right below
+                       row => $row,
         };
     
-    
-        my $line = join("\t", $fusion->{fusion_name}, $fusion->{J}, $fusion->{S}, $fusion->{splice_type},
-                        $fusion->{geneA}, $fusion->{brkptA}, $fusion->{geneB}, $fusion->{brkptB},
-                        $fusion->{junction_reads}, $fusion->{spanning_frags}, $fusion->{ldas}, $fusion->{rest});
-        
-
-        $fusion->{line} = $line;  # note, we'll need to reset this later after merging occurs for some entries.
-        
         push (@fusions, $fusion); 
     }
-    
-    print $filter_ofh $header;
-    print $stage1_ofh $header;
-    
+
+    my @column_headers = $tab_reader->get_column_headers();
+    my @filter_col_headers = (@column_headers, "Note");
+    my $filter_tab_writer = new DelimParser::Writer($filter_ofh, "\t", \@filter_col_headers);
+    my $stage1_tab_writer = new DelimParser::Writer($stage1_ofh, "\t", \@column_headers);
+        
     @fusions = reverse sort {$a->{score} <=> $b->{score} } @fusions;
     
-    @fusions = &merge_neighboring_nonref_splice(\@fusions, $filter_ofh);
+    @fusions = &merge_neighboring_nonref_splice(\@fusions, $filter_tab_writer);
 
 
-    @fusions = &remove_fusions_with_insufficient_support(\@fusions, $filter_ofh, $MIN_JUNCTION_READS, $MIN_SUM_FRAGS);
+    @fusions = &remove_fusions_with_insufficient_support(\@fusions, $filter_tab_writer, $MIN_JUNCTION_READS, $MIN_SUM_FRAGS);
     
-    @fusions = &remove_minor_nonref_isoforms(\@fusions, $filter_ofh);
+    @fusions = &remove_minor_nonref_isoforms(\@fusions, $filter_tab_writer);
 
 
     
     foreach my $fusion (@fusions) {
         # regenerating 'line' here, since merged entries will now have updated stats.        
-        my $line = join("\t", $fusion->{fusion_name}, $fusion->{J}, $fusion->{S}, $fusion->{splice_type},
-                        $fusion->{geneA}, $fusion->{brkptA}, $fusion->{geneB}, $fusion->{brkptB},
-                        $fusion->{junction_reads}, $fusion->{spanning_frags}, $fusion->{rest});
         
         
-        print $filter_ofh "$line\n";
-        print $stage1_ofh "$line\n";
+
+        my %row = ('#FusionName' => $fusion->{fusion_name}, 
+                   'JunctionReadCount' => $fusion->{J}, 
+                   'SpanningFragCount' => $fusion->{S}, 
+                   'SpliceType' => $fusion->{splice_type},
+                   'LeftGene' => $fusion->{geneA}, 
+                   'LeftBreakpoint' => $fusion->{brkptA}, 
+                   'RightGene' => $fusion->{geneB}, 
+                   'RightBreakpoint' => $fusion->{brkptB},
+                   'JunctionReads' => $fusion->{junction_reads}, 
+                   'SpanningFrags' => $fusion->{spanning_frags},
+                   'LargeAnchorSupport' => $fusion->{ldas},
+            );
+        
+
+            $stage1_tab_writer->write_row(\%row);
+            
+            $row{Note} = "Retained";
+            $filter_tab_writer->write_row(\%row);
     }
 
     close $filter_ofh;
     close $stage1_ofh;
-    
     
     ## Run the blast and promiscuity filter
     my $cmd = "$FindBin::Bin/../FusionFilter/blast_and_promiscuity_filter.pl --out_prefix $intermediates_out_prefix -E $Evalue --max_promiscuity $MAX_PROMISCUITY --fusion_preds $stage1_preds_file --genome_lib_dir $genome_lib_dir ";
@@ -249,12 +231,14 @@ main: {
     
     ## generate abridged versions, as all those read names take up a lot of space and are annoyoing to look at when you just want to know what fusions are predicted.
     
-
-    &process_cmd("cut -f1-8,11-100 $stage1_preds_file > $stage1_preds_file.abridged");
-    &process_cmd("cut -f1-8,11-100 $filter_info_file > $filter_info_file.abridged");
     
-    &process_cmd("cut -f1-8,11-100 $out_prefix.fusion_candidates.final > $out_prefix.fusion_candidates.final.abridged");
-    &process_cmd("cut -f1-8,11-100 $stage1_preds_file.post_blast_filter.post_promisc_filter > $stage1_preds_file.post_blast_filter.post_promisc_filter.abridged");
+
+    &process_cmd("$FindBin::Bin/column_exclusions.pl $stage1_preds_file JunctionReads,SpanningFrags > $stage1_preds_file.abridged");
+    &process_cmd("$FindBin::Bin/column_exclusions.pl $filter_info_file JunctionReads,SpanningFrags > $filter_info_file.abridged");
+    
+
+    &process_cmd("$FindBin::Bin/column_exclusions.pl $out_prefix.fusion_candidates.final  JunctionReads,SpanningFrags > $out_prefix.fusion_candidates.final.abridged");
+    &process_cmd("$FindBin::Bin/column_exclusions.pl $stage1_preds_file.post_blast_filter.post_promisc_filter JunctionReads,SpanningFrags > $stage1_preds_file.post_blast_filter.post_promisc_filter.abridged");
     
 
     exit(0);
@@ -263,7 +247,7 @@ main: {
         
 ####
 sub merge_neighboring_nonref_splice {
-    my ($fusions_aref, $ofh) = @_;
+    my ($fusions_aref, $filter_tab_writer) = @_;
 
     my @ret_fusions;
 
@@ -294,9 +278,13 @@ sub merge_neighboring_nonref_splice {
             my @remaining_fusions;
             foreach my $f (@nonref_fusions) {
                 if (&fusions_within_range($top_fusion, $f, $AGGREGATE_NOVEL_JUNCTION_DIST)) {
-                    print $ofh "#" . $f->{line} . "\tmerged into:\t" . $top_fusion->{line} . "\n"; # keep record of filtered and merged entries.
+                    my %row = %{$f->{row}};
+                    $row{Note} = "Merged"; # TODO: add more info here about how it was done.
+                    $row{'#FusionName'} = '#' . $row{'#FusionName'};
+                    $filter_tab_writer->write_row(\%row);
+                    
                     $top_fusion = &merge_fusions($top_fusion, $f);
-
+                    
                     
                 }
                 else {
@@ -405,7 +393,7 @@ sub merge_fusions {
 
 ####
 sub remove_minor_nonref_isoforms {
-    my ($fusions_aref, $ofh) = @_;
+    my ($fusions_aref, $filter_tab_writer) = @_;
     
     my @fusions = reverse sort { $a->{J}<=>$b->{J} 
                                  ||
@@ -422,12 +410,17 @@ sub remove_minor_nonref_isoforms {
         my $junction_support = $fusion->{J};
         my $span_support = $fusion->{S};
         
+        # in case we filter
+        my %row = %{$fusion->{row}};
+        $row{'#FusionName'} = '#' . $row{'#FusionName'};
+        
         my $dominant_isoform_support = $dominant_isoform_junc_support{$fusion_name};
         if (defined $dominant_isoform_support && $dominant_isoform_support > 0) {
             
             my $pct_dom_iso_support = $junction_support / $dominant_isoform_support * 100;
             if ($pct_dom_iso_support < $MIN_ALT_PCT_JUNCTION) {
-                print $ofh "#" . $fusion->{line} . "\tFILTERED DUE TO ONLY $pct_dom_iso_support % of dominant isoform support ($dominant_isoform_support)\n";
+                $row{Note} = "FILTERED DUE TO ONLY $pct_dom_iso_support % of dominant isoform support ($dominant_isoform_support)";
+                $filter_tab_writer->write_row(\%row);
                 next; 
             }
             
@@ -450,7 +443,7 @@ sub remove_minor_nonref_isoforms {
             
 ####
 sub remove_fusions_with_insufficient_support {
-    my ($fusions_aref, $filter_ofh, $min_J, $min_sum) = @_;
+    my ($fusions_aref, $filter_tab_writer, $min_J, $min_sum) = @_;
 
     my @ret_fusions;
 
@@ -461,31 +454,36 @@ sub remove_fusions_with_insufficient_support {
 
         my $sum = $fusion->{J} + $fusion->{S};
         
+        # in case it gets filtered
+        my %row = %{$fusion->{row}};
+        $row{'#FusionName'} = '#' . $row{'#FusionName'};
+        
         if ($sum < $min_sum) {
-            print $filter_ofh "#" . $fusion->{line} . "\tFILTERED DUE TO sum_support($sum) < min_support_required:$min_sum\n";
+            $row{Note} = "FILTERED DUE TO sum_support($sum) < min_support_required:$min_sum";
+            $filter_tab_writer->write_row(\%row);
             next;
         }
 
 
         if ($splice_type eq 'INCL_NON_REF_SPLICE' && $fusion->{J} < $MIN_NOVEL_JUNCTION_SUPPORT) { 
-            
-            
             # skip it
-            print $filter_ofh "#" . $fusion->{line} . "\tFILTERED DUE TO *novel* junction support $fusion->{J} < $MIN_NOVEL_JUNCTION_SUPPORT\n";
+            $row{Note} = "FILTERED DUE TO *novel* junction support $fusion->{J} < $MIN_NOVEL_JUNCTION_SUPPORT";
+            $filter_tab_writer->write_row(\%row);
             next; 
         }
 
         
         if ($fusion->{J} < $min_J) {
-            
             # skip it
-            print $filter_ofh "#" . $fusion->{line} . "\tFILTERED DUE TO junction read support ($fusion->{J}) < $min_J\n";
+            $row{Note} = "FILTERED DUE TO junction read support ($fusion->{J}) < $min_J";
+            $filter_tab_writer->write_row(\%row);
             next;
         }
 
 
         if ($fusion->{S} == 0 && $fusion->{ldas} !~ /YES/i) {
-            print $filter_ofh "#" . $fusion->{line} . "\tFILTERED DUE TO no spanning reads and no long double anchor support at breakpoint\n";
+            $row{Note} = "FILTERED DUE TO no spanning reads and no long double anchor support at breakpoint";
+            $filter_tab_writer->write_row(\%row);
             next;
         }
         

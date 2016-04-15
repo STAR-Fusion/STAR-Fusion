@@ -7,7 +7,7 @@ use warnings;
 use Carp;
 use Cwd;
 use FindBin;
-use lib ("$FindBin::Bin/lib");
+use lib ("$FindBin::Bin/PerlLib");
 use Pipeliner;
 use Set::IntervalTree;
 use File::Basename;
@@ -242,11 +242,11 @@ main: {
         
         if ($left_fq_filename) {
             ## convert vals to FFPM
-            $cmd = "$UTILDIR/convert_to_FFPM.pl $left_fq_filename $out_prefix.fusion_candidates.final.abridged > $out_prefix.fusion_candidates.final.abridged.FFPM";
+            $cmd = "$UTILDIR/incorporate_FFPM_into_final_report.pl $left_fq_filename $out_prefix.fusion_candidates.final.abridged > $out_prefix.fusion_candidates.final.abridged.FFPM";
             $pipeliner->add_commands(new Command($cmd, "$out_prefix.fusion_candidates.final.abridged.FFPM.ok") );
         }
     }
-                                 
+    
     $pipeliner->run();
     
     if ($no_filter) {
