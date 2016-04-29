@@ -1,3 +1,8 @@
+
+Version 0.7.0 (Mar 5, 2016)
+	Update to FusionFilter v0.1.0
+	Require long double anchor support for those fusions only supported by breakpoint/split reads and no spanning fragments, reduces FP rate.
+
 Version 0.6.0 (Dec 16, 2015)
 	including FFPM calculations in output summary.
 

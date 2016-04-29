@@ -7,13 +7,15 @@ use warnings;
 use Carp;
 use Cwd;
 use FindBin;
-use lib ("$FindBin::Bin/lib");
+use lib ("$FindBin::Bin/PerlLib");
 use Pipeliner;
 use Set::IntervalTree;
 use File::Basename;
 use Process_cmd;
 
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
+
+my $VERSION = "0.7.0";
 
 
 my $UTILDIR = "$FindBin::Bin/util";
@@ -33,6 +35,7 @@ my $MIN_JUNCTION_READS = 1;
 my $MIN_SUM_FRAGS = 2;
 my $MAX_PROMISCUITY = 3;  # perhaps a poor choice of words, but still a best fit IMHO.
 my $genome_lib_dir;
+my $CPU = 4; 
 
 
 my $usage = <<__EOUSAGE__;
@@ -61,6 +64,8 @@ my $usage = <<__EOUSAGE__;
 #
 #  Optional:
 #
+#    --CPU <int>                           number of threads for running STAR (default: $CPU)
+#
 #    --min_junction_reads <int>            minimum number of junction-spanning reads required. Default: $MIN_JUNCTION_READS
 #
 #    --min_sum_frags <int>                 minimum fusion support = ( # junction_reads + # spanning_frags ) Default: $MIN_SUM_FRAGS
@@ -82,6 +87,8 @@ my $usage = <<__EOUSAGE__;
 #    --verbose_level <int>                 verbosity (default: $verbose_level, max=2)
 #
 #    --no_filter                           do not filter predictions.
+# 
+#    --version                             report version ($VERSION)
 #
 ###################################################################################
 
@@ -97,6 +104,8 @@ my $no_filter = 0;
 my $left_fq_filename = "";
 my $right_fq_filename = "";
 my $chimeric_out_junctions_file = "";
+
+my $REPORT_VERSION = 0;
 
 &GetOptions ( 'help|h' => \$help_flag,
               
@@ -122,12 +131,19 @@ my $chimeric_out_junctions_file = "";
     
               'genome_lib_dir=s' => \$genome_lib_dir,
               
+              'version' => \$REPORT_VERSION,
     );
 
 
 if ($help_flag) {
     die $usage;
 }
+
+if ($REPORT_VERSION) {
+    print "\n\nSTAR-Fusion version: $VERSION\n\n";
+    exit(0);
+}
+
 unless ( ($left_fq_filename || $chimeric_out_junctions_file) && $genome_lib_dir) {
     die $usage;
 }
@@ -179,7 +195,7 @@ main: {
             . " --alignIntronMax 200000 "
             . " --chimSegmentReadGapMax parameter 3 "
             . " --alignSJstitchMismatchNmax 5 -1 5 5 "  #which allows for up to 5 mismatches for non-canonical GC/AG, and AT/AC junctions, and any number of mismatches for canonical junctions (the default values 0 -1 0 0 replicate the old behavior (from AlexD)
-            . " --runThreadN 4"
+            . " --runThreadN $CPU"
             . " --limitBAMsortRAM 31532137230 "
             . " --outSAMtype BAM SortedByCoordinate ";
         
@@ -226,11 +242,11 @@ main: {
         
         if ($left_fq_filename) {
             ## convert vals to FFPM
-            $cmd = "$UTILDIR/convert_to_FFPM.pl $left_fq_filename $out_prefix.fusion_candidates.final.abridged > $out_prefix.fusion_candidates.final.abridged.FFPM";
+            $cmd = "$UTILDIR/incorporate_FFPM_into_final_report.pl $left_fq_filename $out_prefix.fusion_candidates.final.abridged > $out_prefix.fusion_candidates.final.abridged.FFPM";
             $pipeliner->add_commands(new Command($cmd, "$out_prefix.fusion_candidates.final.abridged.FFPM.ok") );
         }
     }
-                                 
+    
     $pipeliner->run();
     
     if ($no_filter) {
