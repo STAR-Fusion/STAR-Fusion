@@ -495,9 +495,11 @@ sub find_exon_junction_matches {
                     
                     my ($exon_end5, $exon_end3) = ($exon_orient eq '+') ? ($exon_lend, $exon_rend) : ($exon_rend, $exon_lend);
                     
+
+                    my $overlaps_exon_flag = 0;
                     
-                    unless ($exon_lend <= $segment_rend && $exon_rend >= $segment_lend ) {
-                        next;
+                    if ($exon_lend <= $segment_rend && $exon_rend >= $segment_lend ) {
+                        $overlaps_exon_flag = 1;
                     }
                     # annotated exon overlaps transcript
                     
@@ -550,6 +552,8 @@ sub find_exon_junction_matches {
                                         chr => $chr,
                                         
                                         anchor_length => $anchor_length,
+
+                                        overlaps_exon => $overlaps_exon_flag,
                                         
                           });
                     
@@ -565,8 +569,14 @@ sub find_exon_junction_matches {
     if (@exon_hits) {
 
                 
-        @exon_hits = sort {$a->{delta}<=>$b->{delta}} @exon_hits;
+        @exon_hits = sort {
 
+            $b->{overlaps_exon} <=> $a->{overlaps_exon}
+            ||
+                $a->{delta} <=> $b->{delta}
+            
+        } @exon_hits;
+        
         #print Dumper(\@exon_hits);
         
         
