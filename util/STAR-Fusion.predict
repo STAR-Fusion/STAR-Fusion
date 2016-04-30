@@ -31,6 +31,8 @@ my $MIN_NOVEL_JUNCTION_SUPPORT = 3;
 my $MIN_SPAN_ONLY_SUPPORT = 5;
 my $genome_lib_dir;
 
+my $REQUIRE_EXON_OVERLAP_FLAG = 1; # fixed for now, but may parameterize later on.
+
 my $LONG_ANCHOR_SIZE = 25;
 
 my $usage = <<__EOUSAGE__;
@@ -509,6 +511,11 @@ sub find_exon_junction_matches {
                     
                     if ($exon_lend <= $segment_rend && $exon_rend >= $segment_lend ) {
                         $overlaps_exon_flag = 1;
+                    }
+                    else {
+                        if ($REQUIRE_EXON_OVERLAP_FLAG) {
+                            next;
+                        }
                     }
                     # annotated exon overlaps transcript
                     
