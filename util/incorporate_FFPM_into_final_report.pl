@@ -47,7 +47,14 @@ main: {
 sub get_num_total_frags {
     my ($fq_file) = @_;
 
-    my $num_lines = `cat $fq_file | wc -l`;
+    my $num_lines;
+    if ($fq_file =~ /\.gz/) {
+        $num_lines = `gunzip -c $fq_file | wc -l`;
+    }
+    else {
+        $num_lines = `cat $fq_file | wc -l`;
+    }
+    
     $num_lines =~ /^(\d+)/ or die "Error, cannot extract line count from [$num_lines]";
     $num_lines = $1;
 
