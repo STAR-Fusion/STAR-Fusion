@@ -1,3 +1,5 @@
+next:
+	FFPM stats computed correctly when using gzipped fastq files
 
 Version 0.7.0 (Mar 5, 2016)
 	Update to FusionFilter v0.1.0
