@@ -178,7 +178,7 @@ main: {
                                 
                 my $breakpoint_count = scalar(@junc_reads);
 
-                if ($splice_type ne "ONLY_REF_SPLICE" && $breakpoint_count < $MIN_NOVEL_JUNCTION_SUPPORT) { next; } # ignore likely noise
+                if ($splice_type eq "INCL_NON_REF_SPLICE" && $breakpoint_count < $MIN_NOVEL_JUNCTION_SUPPORT) { next; } # ignore likely noise
                 
                 # prune any junction reads from the span support for this fusion.
                 my %local_spanning_reads = map { + $_ => 1 } @spanning_reads;                
