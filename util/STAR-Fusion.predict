@@ -28,7 +28,9 @@ my $chimeric_junction_file;
 my $chimeric_out_sam;
 my $help_flag;
 my $MIN_NOVEL_JUNCTION_SUPPORT = 3;
-my $MIN_SPAN_ONLY_SUPPORT = 5;
+my $MIN_JUNCTION_READS = 1;
+my $MIN_SUM_FRAGS = 2;
+
 my $genome_lib_dir;
 
 my $REQUIRE_EXON_OVERLAP_FLAG = 1; # fixed for now, but may parameterize later on.
@@ -47,10 +49,15 @@ my $usage = <<__EOUSAGE__;
 #
 #  Optional:
 #
+#    --min_junction_reads <int>            minimum number of junction-spanning reads required. Default: $MIN_JUNCTION_READS
+#                                                                                                                 
+#    --min_sum_frags <int>                 minimum fusion support = ( # junction_reads + # spanning_frags ) Default: $MIN_SUM_FRAGS
+#                                                                                                                 
+#                                           when no spanning frags are found (default: 1)                         
+#
 #    --min_novel_junction_support <int>    default: $MIN_NOVEL_JUNCTION_SUPPORT  (minimum of $MIN_NOVEL_JUNCTION_SUPPORT junction reads required if breakpoint
 #                                                            lacks involvement of only reference junctions)
 #
-#    --min_span_only_support <int>         default: $MIN_SPAN_ONLY_SUPPORT (minimum of $MIN_SPAN_ONLY_SUPPORT) spanning frags required if no junction reads are found
 #
 #    --out_prefix|O <string>         output file prefix (default: $out_prefix)
 #    
@@ -68,7 +75,8 @@ __EOUSAGE__
               'genome_lib_dir=s' => \$genome_lib_dir,
               
               'min_novel_junction_support=i' => \$MIN_NOVEL_JUNCTION_SUPPORT,
-              'min_span_only_support=i' => \$MIN_SPAN_ONLY_SUPPORT,
+              'min_junction_reads=i' => \$MIN_JUNCTION_READS,
+              'min_sum_frags=i' => \$MIN_SUM_FRAGS,
               
               'out_prefix|O=s' => \$out_prefix,
               
@@ -242,9 +250,8 @@ main: {
             my $span_count = scalar(@spanning_reads);
 
 
-            if ($span_count < $MIN_SPAN_ONLY_SUPPORT) { next; } # ignore likely noise
+            if ($MIN_JUNCTION_READS > 0 || $span_count < $MIN_SUM_FRAGS) { next; }
             
-
             my $score = $span_count;
             
             my $fusion_candidate = { fusion_simple_name => $fusion_simple_name,
