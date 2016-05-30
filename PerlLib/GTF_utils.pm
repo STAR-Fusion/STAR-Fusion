@@ -80,13 +80,8 @@ sub GTF_to_gene_objs {
 
     my %coding_genes;
     
-    my $fh;
-    if ($gtf_filename =~ /\.gz$/) {
-        open ($fh, "gunzip -c $gtf_filename | ") or die "Error, cannot open  gunzip -c $gtf_filename | ";
-    }
-    else {
-        open ($fh, $gtf_filename) or die "Error, cannot open $gtf_filename";
-    }
+    
+    open (my $fh, $gtf_filename) or die "Error, cannot open $gtf_filename";
     while (<$fh>) {
         unless (/\w/) { next; }
         if (/^\#/) { next; } # comment line.
@@ -108,34 +103,25 @@ sub GTF_to_gene_objs {
         
         $gene_id_to_source{$gene_id} = $source;
 
-        $annot =~ /transcript_id \"([^\"]+)\"/  or confess "Error, cannot get transcript_id from $annot of line\n$_";
-        my $transcript_id = $1;
 
         if ($annot =~ /name \"([^\"]+)\"/) {
             my $name = $1;
             $gene_id_to_name{$gene_id} = $name;
         }
 
-
-        ## If there's more than one gene_name assignment per gene_id, only using the first one.
-        
         my $gene_name = "";
         if ($annot =~ /gene_name \"([^\"]+)\"/) {
             $gene_name = $1;
-            if (exists $gene_id_to_gene_name{$gene_id}) {
-                if ($gene_id_to_gene_name{$gene_id} ne $gene_name) {
-                    print STDERR "WARNING: gene name [ $gene_id_to_gene_name{$gene_id} ] already assigned to $gene_id.  Ignoring $gene_name assignment.\n";
-                }
-            }
-            else {
-                $gene_id_to_gene_name{$gene_id} = $gene_name;
-            }
+            $gene_id_to_gene_name{$gene_id} = $gene_name;
         }
         
         
 		# print "gene_id: $gene_id, transcrpt_id: $transcript_id, $type\n";
 
         if ($type eq 'transcript' || $type eq 'gene') { next; } # capture by exon coordinates
+
+        $annot =~ /transcript_id \"([^\"]+)\"/  or confess "Error, cannot get transcript_id from $annot of line\n$_";
+        my $transcript_id = $1;
 
         
         if ($type eq 'CDS' || $type eq 'stop_codon' || $type eq 'start_codon') {
