@@ -1,6 +1,7 @@
 next:
 	FFPM stats computed correctly when using gzipped fastq files
-
+	upgraded FusionFilter: better takes into account overlapping genes and no longer (inadvertently) filters them out as candidate paralogs.
+	
 Version 0.7.0 (Mar 5, 2016)
 	Update to FusionFilter v0.1.0
 	Require long double anchor support for those fusions only supported by breakpoint/split reads and no spanning fragments, reduces FP rate.
