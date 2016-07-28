@@ -1,4 +1,4 @@
-next:
+Version 0.8.0 (July 28, 2016):
 	FFPM stats computed correctly when using gzipped fastq files
 	upgraded FusionFilter: better takes into account overlapping genes and no longer (inadvertently) filters them out as candidate paralogs.
 	
