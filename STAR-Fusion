@@ -15,7 +15,7 @@ use Process_cmd;
 
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
-my $VERSION = "0.7.0";
+my $VERSION = "0.8.0";
 
 
 my $UTILDIR = "$FindBin::Bin/util";
