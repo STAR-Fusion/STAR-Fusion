@@ -49,10 +49,10 @@ main : {
         my ($right_splice, $right_entropy) = &examine_breakpoint_seq($break_right, \%seqs, 'right');
         
         $row->{LeftBreakDinuc} = $left_splice;
-        $row->{LeftBreakEntropy} = $left_entropy;
+        $row->{LeftBreakEntropy} = sprintf("%.4f", $left_entropy);
 
         $row->{RightBreakDinuc} = $right_splice;
-        $row->{RightBreakEntropy} = $right_entropy;
+        $row->{RightBreakEntropy} = sprintf("%.4f", $right_entropy);
         
         $tab_writer->write_row($row);
     }
