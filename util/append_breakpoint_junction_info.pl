@@ -94,7 +94,7 @@ sub examine_breakpoint_seq {
             $anchor_seq = substr($subseq, 2);
         }
         
-        print STDERR "+:$side:$subseq|$dinuc|$anchor_seq\n";
+        #print STDERR "+:$side:$subseq|$dinuc|$anchor_seq\n";
         
     }
     else {
@@ -122,7 +122,7 @@ sub examine_breakpoint_seq {
 
         }
 
-        print STDERR "-:$side:$subseq|$dinuc|$anchor_seq\n";
+        #print STDERR "-:$side:$subseq|$dinuc|$anchor_seq\n";
 
         $dinuc = &reverse_complement($dinuc);
         $anchor_seq = &reverse_complement($anchor_seq);
