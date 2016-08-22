@@ -186,7 +186,7 @@ main: {
                                 
                 my $breakpoint_count = scalar(@junc_reads);
 
-                if ($splice_type eq "INCL_NON_REF_SPLICE" && $breakpoint_count < $MIN_NOVEL_JUNCTION_SUPPORT) { next; } # ignore likely noise
+                
                 
                 # prune any junction reads from the span support for this fusion.
                 my %local_spanning_reads = map { + $_ => 1 } @spanning_reads;                
@@ -250,7 +250,7 @@ main: {
             my $span_count = scalar(@spanning_reads);
 
 
-            if ($MIN_JUNCTION_READS > 0 || $span_count < $MIN_SUM_FRAGS) { next; }
+
             
             my $score = $span_count;
             
@@ -311,7 +311,10 @@ main: {
                           "LargeAnchorSupport");
     
     my $tab_writer = new DelimParser::Writer($ofh, "\t", \@column_headers);
-    
+
+    my $filt_file = "$intermediates_dir/fusion_candidates.preliminary.filt_info";
+    open (my $ofh_filt, ">$filt_file") or die "Error, cannot write to $filt_file";
+    my $filt_tab_writer = new DelimParser::Writer($ofh_filt, "\t", [@column_headers, "FILTER_REASON"]);
     
     # examining fusions based on the specific junction breakpoint, regardless of genes assigned to.
     
@@ -319,30 +322,61 @@ main: {
 
 
     foreach my $fusion_candidate (@fusion_candidates) {
+
+        
+        ## determine if we're filtering the fusion due to insufficient evidence.
+        
+        my $filt_reason = ".";
+        
+        
+        my $junction_count = $fusion_candidate->{junction_count};
+        my $spanning_count = $fusion_candidate->{spanning_count};
+        my $sum_frags = $junction_count + $spanning_count;
+        my $splice_type = $fusion_candidate->{splice_type};
+        
+        
+        if ($sum_frags < $MIN_SUM_FRAGS) {
+            $filt_reason = "sum_frags:$sum_frags<min_sum_frags:$MIN_SUM_FRAGS";
+        }
+        elsif ($MIN_JUNCTION_READS > 0 && $junction_count < $MIN_JUNCTION_READS) {
+            $filt_reason = "J$junction_count<$MIN_JUNCTION_READS";
+        }
+        elsif ($splice_type eq "INCL_NON_REF_SPLICE" && $junction_count < $MIN_NOVEL_JUNCTION_SUPPORT) { 
+            $filt_reason = "incl_non_ref_splice&J{$junction_count}<${MIN_NOVEL_JUNCTION_SUPPORT}";
+            
+        } 
+
+        
         
         my $junction_reads = join(",", @{$fusion_candidate->{junction_read_names}}) || ".";
         my $spanning_frags = join(",", @{$fusion_candidate->{spanning_frag_names}}) || ".";
         
+        my $row = { '#FusionName' => $fusion_candidate->{fusion_simple_name}, 
+                    'JunctionReadCount' => $fusion_candidate->{junction_count}, 
+                    'SpanningFragCount' => $fusion_candidate->{spanning_count},
+                    'SpliceType' => $fusion_candidate->{splice_type},
+                    'LeftGene' => $fusion_candidate->{left_gene}, 
+                    'LeftBreakpoint' => $fusion_candidate->{left_coords}, 
+                    'RightGene' => $fusion_candidate->{right_gene}, 
+                    'RightBreakpoint' => $fusion_candidate->{right_coords}, 
+                    'JunctionReads' => $junction_reads, 
+                    'SpanningFrags' => $spanning_frags,
+                    'LargeAnchorSupport' => $fusion_candidate->{long_double_anchor_support},
+                    'FILTER_REASON' => $filt_reason,
+        };
+
+        $filt_tab_writer->write_row($row);
         
-        $tab_writer->write_row({ '#FusionName' => $fusion_candidate->{fusion_simple_name}, 
-                                 'JunctionReadCount' => $fusion_candidate->{junction_count}, 
-                                 'SpanningFragCount' => $fusion_candidate->{spanning_count},
-                                 'SpliceType' => $fusion_candidate->{splice_type},
-                                 'LeftGene' => $fusion_candidate->{left_gene}, 
-                                 'LeftBreakpoint' => $fusion_candidate->{left_coords}, 
-                                 'RightGene' => $fusion_candidate->{right_gene}, 
-                                 'RightBreakpoint' => $fusion_candidate->{right_coords}, 
-                                 'JunctionReads' => $junction_reads, 
-                                 'SpanningFrags' => $spanning_frags,
-                                 'LargeAnchorSupport' => $fusion_candidate->{long_double_anchor_support},
-                               }
-            );
+        
+        if ($filt_reason eq '.') {
+            $tab_writer->write_row($row);
+        }
         
     }
     
     close $ofh;
-        
-
+    close $ofh_filt;
+    
     exit(0);
 
     
