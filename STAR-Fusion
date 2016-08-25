@@ -137,6 +137,9 @@ my $REPORT_VERSION = 0;
               'genome_lib_dir=s' => \$genome_lib_dir,
               
               'version' => \$REPORT_VERSION,
+              
+              'CPU=i' => \$CPU,
+
     );
 
 
