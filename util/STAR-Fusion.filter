@@ -203,23 +203,30 @@ main: {
     foreach my $fusion (@fusions) {
         # regenerating 'line' here, since merged entries will now have updated stats.        
         
+        my %row = %{$fusion->{row}}; # init to initial info
         
+        # now update it
 
-        my %row = ('#FusionName' => $fusion->{fusion_name}, 
-                   'JunctionReadCount' => $fusion->{J}, 
-                   'SpanningFragCount' => $fusion->{S}, 
-                   'SpliceType' => $fusion->{splice_type},
-                   'LeftGene' => $fusion->{geneA}, 
-                   'LeftBreakpoint' => $fusion->{brkptA}, 
-                   'RightGene' => $fusion->{geneB}, 
-                   'RightBreakpoint' => $fusion->{brkptB},
-                   'JunctionReads' => $fusion->{junction_reads}, 
-                   'SpanningFrags' => $fusion->{spanning_frags},
-                   'LargeAnchorSupport' => $fusion->{ldas},
+        my %rowadj = ('#FusionName' => $fusion->{fusion_name}, 
+                      'JunctionReadCount' => $fusion->{J}, 
+                      'SpanningFragCount' => $fusion->{S}, 
+                      'SpliceType' => $fusion->{splice_type},
+                      'LeftGene' => $fusion->{geneA}, 
+                      'LeftBreakpoint' => $fusion->{brkptA}, 
+                      'RightGene' => $fusion->{geneB}, 
+                      'RightBreakpoint' => $fusion->{brkptB},
+                      'JunctionReads' => $fusion->{junction_reads}, 
+                      'SpanningFrags' => $fusion->{spanning_frags},
+                      'LargeAnchorSupport' => $fusion->{ldas},
             );
         
+        # now update original row.
+        foreach my $key (keys %rowadj) {
+            $row{$key} = $rowadj{$key};
+        }
+        
 
-            $stage1_tab_writer->write_row(\%row);
+        $stage1_tab_writer->write_row(\%row);
             
             $row{Note} = "Retained";
             $filter_tab_writer->write_row(\%row);

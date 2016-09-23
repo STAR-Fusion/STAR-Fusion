@@ -230,13 +230,21 @@ main: {
     $pipeliner->add_commands(new Command($cmd, "$out_prefix.STAR-Fusion.predict.ok"));
     
     my $predicted_fusions_file = "$out_prefix.fusion_candidates.preliminary";
-    
+
+    ## add breakpoint / splice junction info
+
+    my $predicted_fusions_with_splice_info = "$predicted_fusions_file.wSpliceInfo";
+
+    $cmd = "$UTILDIR/append_breakpoint_junction_info.pl $predicted_fusions_file $genome_lib_dir > $predicted_fusions_with_splice_info";
+
+    $pipeliner->add_commands(new Command($cmd, "$predicted_fusions_with_splice_info.ok"));
+        
     unless ($no_filter) {
            
         ## filter fusions
         
         $cmd = "$UTILDIR/STAR-Fusion.filter "
-            . " --fusion_preds $predicted_fusions_file "
+            . " --fusion_preds $predicted_fusions_with_splice_info "
             . " -E $Evalue "
             . " --tmpdir $tmpdir "
             . " --min_junction_reads $MIN_JUNCTION_READS "
@@ -264,7 +272,7 @@ main: {
     if ($no_filter) {
          
         print STDERR "\n\n *** Note: --no_filtering in effect, so outputs have not been filtered for likely false positives.\n";
-        print STDERR "\n\tSee output: $out_prefix.fusion_candidates.preliminary\n\n";
+        print STDERR "\n\tSee output: $predicted_fusions_with_splice_info\n\n";
     }
     else {
         
