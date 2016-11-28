@@ -91,6 +91,9 @@ my $usage = <<__EOUSAGE__;
 #
 #    --no_filter                           do not filter predictions.
 # 
+#    --STAR_use_shared_memory              use shared memory among multiple processes for the STAR alignment step
+#                                          (when all your jobs are done, be sure to run: 'STAR --genomeLoad Remove' to unload it)
+#
 #    --version                             report version ($VERSION)
 #
 ###################################################################################
@@ -109,6 +112,7 @@ my $right_fq_filename = "";
 my $chimeric_out_junctions_file = "";
 
 my $REPORT_VERSION = 0;
+my $USE_SHARED_MEMORY = 0;
 
 &GetOptions ( 'help|h' => \$help_flag,
               
@@ -139,6 +143,8 @@ my $REPORT_VERSION = 0;
               'version' => \$REPORT_VERSION,
               
               'CPU=i' => \$CPU,
+
+              'STAR_use_shared_memory' => \$USE_SHARED_MEMORY,
 
     );
 
@@ -206,6 +212,10 @@ main: {
             . " --runThreadN $CPU"
             . " --limitBAMsortRAM 31532137230 "
             . " --outSAMtype BAM SortedByCoordinate ";
+        
+        if ($USE_SHARED_MEMORY) {
+            $cmd .= " --genomeLoad LoadAndKeep ";
+        }
         
         if ($left_fq_filename =~ /\.gz$/) {
             $cmd .= " --readFilesCommand zcat ";
