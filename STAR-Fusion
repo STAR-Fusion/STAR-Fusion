@@ -92,7 +92,8 @@ my $usage = <<__EOUSAGE__;
 #    --no_filter                           do not filter predictions.
 # 
 #    --STAR_use_shared_memory              use shared memory among multiple processes for the STAR alignment step
-#                                          (when all your jobs are done, be sure to run: 'STAR --genomeLoad Remove' to unload it)
+#                                           # note, when this option is used, twopass mode is disabled, as it's incompatible w/ shared mem.
+#                                          ** (when all your jobs are done, be sure to run: 'STAR --genomeLoad Remove' to unload it) **
 #
 #    --version                             report version ($VERSION)
 #
@@ -200,7 +201,6 @@ main: {
         ## run STAR to align reads:
         my $cmd = "STAR --genomeDir $star_index_dir "
             . " --readFilesIn $left_fq_filename $right_fq_filename "
-            . " --twopassMode Basic "
             . " --outReadsUnmapped None "
             . " --chimSegmentMin 12 "
             . " --chimJunctionOverhangMin 12 "
@@ -215,6 +215,10 @@ main: {
         
         if ($USE_SHARED_MEMORY) {
             $cmd .= " --genomeLoad LoadAndKeep ";
+        }
+        else {
+            # note, twopassMode is incompatible with shared memory (--genomeLoad LoadAndKeep)
+            $cmd .= " --twopassMode Basic ";
         }
         
         if ($left_fq_filename =~ /\.gz$/) {
