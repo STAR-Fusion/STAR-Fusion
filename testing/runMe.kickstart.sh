@@ -7,7 +7,7 @@ fi
 
 ## set genome_lib_dir (see: http://FusionFilter.github.io for details)
 
-../STAR-Fusion -J __kickstart_data/Chimeric.out.junction -O star_fusion_kickstarted_outdir --genome_lib_dir $CTAT_GENOME_LIB --verbose_level 2
+../STAR-Fusion -J __kickstart_data/Chimeric.out.junction -O star_fusion_kickstarted_outdir --genome_lib_dir $CTAT_GENOME_LIB --verbose_level 2 --left_fq reads_1.fq.gz  --right_fq reads_2.fq.g
 
 
 

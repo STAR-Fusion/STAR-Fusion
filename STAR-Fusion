@@ -163,6 +163,11 @@ unless ( ($left_fq_filename || $chimeric_out_junctions_file) && $genome_lib_dir)
     die $usage;
 }
 
+if (@ARGV) {
+    die "Error, don't understand arguments: [@ARGV] ";
+}
+
+
 unless (-d $genome_lib_dir) {
     die "Error, cannot locate genome_lib_dir: $genome_lib_dir";
 }
@@ -192,7 +197,9 @@ main: {
     
     my $pipeliner = new Pipeliner(-verbose => $verbose_level);
     
-    if ($left_fq_filename) {
+    unless ($chimeric_out_junctions_file) {
+        $chimeric_out_junctions_file = "Chimeric.out.junction";
+        
         my $star_index_dir = "$genome_lib_dir/ref_genome.fa.star.idx";
         unless (-d $star_index_dir) {
             die "Error, cannot locate star index at $star_index_dir";
@@ -229,9 +236,7 @@ main: {
     }
     
     ## predict fusions
-    unless ($chimeric_out_junctions_file) {
-        $chimeric_out_junctions_file = "Chimeric.out.junction";
-    }
+
     
     my $cmd = "$UTILDIR/STAR-Fusion.predict "
         . " -J $chimeric_out_junctions_file "
