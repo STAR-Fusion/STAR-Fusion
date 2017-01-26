@@ -63,7 +63,7 @@ main : {
 
 ####
 sub examine_breakpoint_seq {
-    my ($breakpoint_info, $seqs_href, $side) = @_;
+    my ($breakpoint_info, $side) = @_;
 
     unless ($side eq 'left' || $side eq 'right') { 
         die "Error, cannot parse side ($side) as 'left|right' ";
@@ -140,19 +140,20 @@ sub get_substr {
     my $rend = $start_pos + $length;
 
     my $cmd = "samtools faidx $genome_fasta $chr:$lend-$rend";
-    print STDERR "CMD: $cmd\n";
+    #print STDERR "CMD: $cmd\n";
     
     my $seq = `$cmd`;
 
     if ($?) {
-        die "Error, command: $cmd died with ret $ret";
+        die "Error, command: $cmd died with ret $?";
     }
     
     chomp $seq;
     
     my @lines = split(/\n/, $seq);
     shift @lines; # remove header
-    my $seq = join("", @lines);
+    
+    my $raw_seq = join("", @lines);
 
-    return($seq);
+    return($raw_seq);
 }
