@@ -17,12 +17,16 @@ my $genome_lib_dir = $ARGV[1] or die $usage;
 
 my $ANCHOR_SEQ_LENGTH = 15;
 
+
+
+my $genome_fasta = "$genome_lib_dir/ref_genome.fa";
+
+unless (-s $genome_fasta) {
+    die "Error, cannot locate genome fasta file: $genome_fasta";
+}
+
 main : {
 
-    my $genome_fasta = "$genome_lib_dir/ref_genome.fa";
-    unless (-s $genome_fasta) {
-        die "Error, cannot locate genome fasta file: $genome_fasta";
-    }
     
     open (my $fh, $fusion_dat_file) or die $!;
     my $tab_reader = new DelimParser::Reader($fh, "\t");
@@ -33,20 +37,14 @@ main : {
 
     my $tab_writer = new DelimParser::Writer(*STDOUT, "\t", \@column_headers);
 
-
-    my $fasta_reader = new Fasta_reader($genome_fasta);
-    
-    my %seqs = $fasta_reader->retrieve_all_seqs_hash();
-
-
     while (my $row = $tab_reader->get_row()) {
         
         my $break_left = $row->{LeftBreakpoint};
         my $break_right = $row->{RightBreakpoint};
         
-        my ($left_splice, $left_entropy) = &examine_breakpoint_seq($break_left, \%seqs, 'left');
+        my ($left_splice, $left_entropy) = &examine_breakpoint_seq($break_left, 'left');
 
-        my ($right_splice, $right_entropy) = &examine_breakpoint_seq($break_right, \%seqs, 'right');
+        my ($right_splice, $right_entropy) = &examine_breakpoint_seq($break_right, 'right');
         
         $row->{LeftBreakDinuc} = $left_splice;
         $row->{LeftBreakEntropy} = sprintf("%.4f", $left_entropy);
@@ -81,7 +79,7 @@ sub examine_breakpoint_seq {
         if ($side eq 'left') {
             my $coord_start = $coord - $ANCHOR_SEQ_LENGTH + 1;
             
-            $subseq = substr($seqs_href->{$chr}, $coord_start -1, $ANCHOR_SEQ_LENGTH + 2);
+            $subseq = &get_substr($chr, $coord_start -1, $ANCHOR_SEQ_LENGTH + 2);
             $dinuc = substr($subseq, -2);
             $anchor_seq = substr($subseq, 0, $ANCHOR_SEQ_LENGTH);
 
@@ -89,7 +87,7 @@ sub examine_breakpoint_seq {
         elsif ($side eq 'right') {
             my $coord_start = $coord - 2;
             
-            $subseq = substr($seqs_href->{$chr}, $coord_start -1, $ANCHOR_SEQ_LENGTH + 2);
+            $subseq = &get_substr($chr, $coord_start -1, $ANCHOR_SEQ_LENGTH + 2);
             $dinuc = substr($subseq, 0, 2);
             $anchor_seq = substr($subseq, 2);
         }
@@ -105,7 +103,7 @@ sub examine_breakpoint_seq {
         if ($side eq 'left') {
             my $coord_start = $coord - 2;
             
-            $subseq = substr($seqs_href->{$chr}, $coord_start -1, $ANCHOR_SEQ_LENGTH + 2);
+            $subseq = &get_substr($chr, $coord_start -1, $ANCHOR_SEQ_LENGTH + 2);
             $dinuc = substr($subseq, 0, 2);
             $anchor_seq = substr($subseq, 2);
 
@@ -114,14 +112,12 @@ sub examine_breakpoint_seq {
         elsif ($side eq 'right') {
             my $coord_start = $coord - $ANCHOR_SEQ_LENGTH + 1;
             
-            $subseq = substr($seqs_href->{$chr}, $coord_start -1, $ANCHOR_SEQ_LENGTH + 2);
+            $subseq = &get_substr($chr, $coord_start -1, $ANCHOR_SEQ_LENGTH + 2);
             $dinuc = substr($subseq, -2);
             $anchor_seq = substr($subseq, 0, $ANCHOR_SEQ_LENGTH);
-
-
-
+            
         }
-
+        
         #print STDERR "-:$side:$subseq|$dinuc|$anchor_seq\n";
 
         $dinuc = &reverse_complement($dinuc);
@@ -133,4 +129,30 @@ sub examine_breakpoint_seq {
     
 
     return($dinuc, $anchor_seq_entropy);
+}
+
+
+####
+sub get_substr {
+    my ($chr, $start_pos, $length) = @_;
+
+    my $lend = $start_pos + 1;
+    my $rend = $start_pos + $length;
+
+    my $cmd = "samtools faidx $genome_fasta $chr:$lend-$rend";
+    print STDERR "CMD: $cmd\n";
+    
+    my $seq = `$cmd`;
+
+    if ($?) {
+        die "Error, command: $cmd died with ret $ret";
+    }
+    
+    chomp $seq;
+    
+    my @lines = split(/\n/, $seq);
+    shift @lines; # remove header
+    my $seq = join("", @lines);
+
+    return($seq);
 }
