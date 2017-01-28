@@ -664,9 +664,10 @@ sub get_overlapping_genes {
 
     unless (ref $interval_tree) {
         # no genes on that chr?
+        print STDERR "WARNING: no annotations defined for chr: [$chr]\n";
         return();
     }
-
+    
     if ($rend < $lend) {
         print STDERR "Error, $chr:$lend-$rend coordinates out of order";
         return();
