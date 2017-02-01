@@ -1,3 +1,9 @@
+Version 1.0.0 (Feb 1, 2017)
+	including dinucleotide splice sites in the report
+	incorporate FFPM values whenever fastq reads are given, regardless of using the chimeric junction files direction.
+	uses samtools to extract sequence regions from the genome, rather than putting the entire genome into memory.
+	
+
 Version 0.8.0 (July 28, 2016):
 	FFPM stats computed correctly when using gzipped fastq files
 	upgraded FusionFilter: better takes into account overlapping genes and no longer (inadvertently) filters them out as candidate paralogs.
