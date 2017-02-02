@@ -2,9 +2,10 @@ FROM ubuntu:16.04
 
 MAINTAINER bhaas@broadinstitute.org
 
-RUN apt-get update && apt-get install -y gcc g++ perl python automake make wget curl libdb-dev && \
+RUN apt-get update && apt-get install -y gcc g++ perl python automake make \
+                                       wget curl libdb-dev \
+				       bzip2 zlibc zlib1g zlib1g-dev && \
     apt-get clean
-
 
 RUN curl -L https://cpanmin.us | perl - App::cpanminus
 
@@ -21,6 +22,10 @@ RUN mkdir $DATA
 
 RUN cpanm install Set::IntervalTree
 
+RUN cpanm install DB_File
+
+RUN cpanm install URI::Escape
+
 
 ######################
 ## Tool installations:
@@ -29,7 +34,6 @@ RUN cpanm install Set::IntervalTree
 
 ##############
 ## STAR
-
 
 RUN STAR_URL="https://github.com/alexdobin/STAR/archive/2.5.2a.tar.gz" &&\
     wget -P $SRC $STAR_URL &&\
@@ -58,10 +62,28 @@ RUN FI_URL="https://github.com/FusionInspector/FusionInspector/releases/download
 
 ENV FUSION_INSPECTOR_HOME $SRC/FusionInspector-v1.0.0
 
-RUN cpanm install DB_File
 
-RUN cpanm install URI::Escape
+########
+# Samtools
+
+RUN SAMTOOLS_URL="https://github.com/samtools/samtools/releases/download/1.3.1/samtools-1.3.1.tar.bz2" && \
+   cd $SRC && \
+   wget $SAMTOOLS_URL && \
+   tar xvf samtools-1.3.1.tar.bz2 && \
+   cd samtools-1.3.1/htslib-1.3.1 && ./configure && make && make install && \
+   cd ../ && ./configure --without-curses && make && make install
 
 
+########
+# Trinity
+
+RUN TRINITY_URL="https://github.com/trinityrnaseq/trinityrnaseq/archive/Trinity-v2.3.2.tar.gz" && \
+   cd $SRC && \
+   wget $TRINITY_URL && \
+   tar xvf Trinity-v2.3.2.tar.gz && \
+   cd trinityrnaseq-Trinity-v2.3.2 && make
+
+
+ENV TRINITY_HOME /usr/local/src/trinityrnaseq-Trinity-v2.3.2
 
 

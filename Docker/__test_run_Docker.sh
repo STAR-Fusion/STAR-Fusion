@@ -18,4 +18,10 @@ fi
 
 VERSION=`cat VERSION.txt`
 
-docker run -v `pwd`/../:/data --rm trinityctat/ctatfusion:${VERSION} /usr/local/src/STAR-Fusion-v1.0.0/STAR-Fusion --left_fq /data/testing/reads_1.fq.gz --right_fq /data/testing/reads_2.fq.gz --genome_lib_dir /data/GRCh37_gencode_v19_CTAT_lib_July272016_prebuilt -O /data/testing/test_docker_outdir
+# run STAR-Fusion
+docker run -v `pwd`/../:/data --rm trinityctat/ctatfusion:${VERSION} /usr/local/src/STAR-Fusion-v1.0.0/STAR-Fusion --left_fq /data/testing/reads_1.fq.gz --right_fq /data/testing/reads_2.fq.gz --genome_lib_dir /data/GRCh37_gencode_v19_CTAT_lib_July272016_prebuilt -O /data/testing/test_docker_outdir/StarFusionOut
+
+
+# run FusionInspector
+docker run -v `pwd`/../:/data --rm trinityctat/ctatfusion:${VERSION} /usr/local/src/FusionInspector-v1.0.0/FusionInspector --fusions /data/testing/test_docker_outdir/StarFusionOut/star-fusion.fusion_candidates.final.abridged.FFPM --left_fq /data/testing/reads_1.fq.gz --right_fq /data/testing/reads_2.fq.gz --genome_lib /data/GRCh37_gencode_v19_CTAT_lib_July272016_prebuilt --out_prefix finspector --out_dir /data/testing/test_docker_outdir/FusionInspectorOut --include_Trinity
+
