@@ -58,6 +58,10 @@ RUN FI_URL="https://github.com/FusionInspector/FusionInspector/releases/download
 
 ENV FUSION_INSPECTOR_HOME $SRC/FusionInspector-v1.0.0
 
+RUN cpanm install DB_File
 
 RUN cpanm install URI::Escape
+
+
+
 
