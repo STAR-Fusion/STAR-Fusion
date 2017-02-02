@@ -4,7 +4,7 @@ MAINTAINER bhaas@broadinstitute.org
 
 RUN apt-get update && apt-get install -y gcc g++ perl python automake make \
                                        wget curl libdb-dev \
-				       bzip2 zlibc zlib1g zlib1g-dev && \
+				       bzip2 zlibc zlib1g zlib1g-dev  default-jre && \
     apt-get clean
 
 RUN curl -L https://cpanmin.us | perl - App::cpanminus
@@ -87,4 +87,13 @@ RUN TRINITY_URL="https://github.com/trinityrnaseq/trinityrnaseq/archive/Trinity-
 
 ENV TRINITY_HOME /usr/local/src/trinityrnaseq-Trinity-v2.3.2
 
+
+########
+# GMAP
+
+RUN GMAP_URL="http://research-pub.gene.com/gmap/src/gmap-gsnap-2017-01-14.tar.gz" && \
+    cd $SRC && \
+    wget $GMAP_URL && \
+    tar xvf gmap-gsnap-2017-01-14.tar.gz && \
+    cd gmap-2017-01-14 && ./configure && make && make install
 
