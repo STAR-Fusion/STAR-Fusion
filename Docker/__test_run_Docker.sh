@@ -20,4 +20,4 @@ VERSION=`cat VERSION.txt`
 
 docker pull trinityctat/ctatfusion:${VERSION}
 
-docker run -v `pwd`/../:/data --rm trinityctat/ctatfusion /usr/local/src/STAR-Fusion-v1.0.0/STAR-Fusion --left_fq /data/testing/rs_eads_1.fq.gz --right_fq /data/testing/reads_2.fq.gz --genome_lib_dir /data/Docker/GRCh37_gencode_v19_CTAT_lib_July272016_prebuilt -O outdir
+docker run -v `pwd`/../:/data --rm trinityctat/ctatfusion /usr/local/src/STAR-Fusion-v1.0.0/STAR-Fusion --left_fq /data/testing/reads_1.fq.gz --right_fq /data/testing/reads_2.fq.gz --genome_lib_dir /data/Docker/GRCh37_gencode_v19_CTAT_lib_July272016_prebuilt -O outdir
