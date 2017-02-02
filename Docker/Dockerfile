@@ -55,12 +55,13 @@ ENV STAR_FUSION_HOME $SRC/STAR-Fusion-v1.0.0
 ###################
 ## FusionInspector
 
-RUN FI_URL="https://github.com/FusionInspector/FusionInspector/releases/download/v1.0.0/FusionInspector-v1.0.0.FULL.tar.gz" && \
+ENV FI_VERSION v1.0.1
+RUN FI_URL="https://github.com/FusionInspector/FusionInspector/releases/download/${FI_VERSION}/FusionInspector-${FI_VERSION}.FULL.tar.gz" && \
     cd $SRC && \
     wget $FI_URL && \
-    tar -xvf FusionInspector-v1.0.0.FULL.tar.gz
+    tar -xvf FusionInspector-${FI_VERSION}.FULL.tar.gz
 
-ENV FUSION_INSPECTOR_HOME $SRC/FusionInspector-v1.0.0
+ENV FUSION_INSPECTOR_HOME $SRC/FusionInspector-${FI_VERSION}
 
 
 ########
