@@ -218,6 +218,7 @@ main: {
             . " --alignSJstitchMismatchNmax 5 -1 5 5 "  #which allows for up to 5 mismatches for non-canonical GC/AG, and AT/AC junctions, and any number of mismatches for canonical junctions (the default values 0 -1 0 0 replicate the old behavior (from AlexD)
             . " --runThreadN $CPU"
             . " --limitBAMsortRAM 31532137230 "
+            . " --outSAMstrandField intronMotif "
             . " --outSAMtype BAM SortedByCoordinate ";
         
         if ($USE_SHARED_MEMORY) {
