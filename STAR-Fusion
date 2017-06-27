@@ -212,8 +212,8 @@ main: {
             . " --chimSegmentMin 12 "
             . " --chimJunctionOverhangMin 12 "
             . " --alignSJDBoverhangMin 10 "   
-            . " --alignMatesGapMax 200000 "
-            . " --alignIntronMax 200000 "
+            . " --alignMatesGapMax 100000 "
+            . " --alignIntronMax 100000 "
             . " --chimSegmentReadGapMax 3 "
             . " --alignSJstitchMismatchNmax 5 -1 5 5 "  #which allows for up to 5 mismatches for non-canonical GC/AG, and AT/AC junctions, and any number of mismatches for canonical junctions (the default values 0 -1 0 0 replicate the old behavior (from AlexD)
             . " --runThreadN $CPU"
