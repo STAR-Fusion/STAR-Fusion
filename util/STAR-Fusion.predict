@@ -771,19 +771,22 @@ sub map_chimeric_reads_to_genes {
             next;
         }
 
-        if (@A_hits) {
-            my @left_genes;
-            foreach my $A_hit (@A_hits) {
-                push (@left_genes, $A_hit->{gene_id});
+        {
+            # appending text as audit trail
+            if (@A_hits) {
+                my @left_genes;
+                foreach my $A_hit (@A_hits) {
+                    push (@left_genes, $A_hit->{gene_id} . "[" . $A_hit->{sense_or_antisense} . "]");
+                }
+                push (@x, "Left:" . join(",", @left_genes) );
             }
-            push (@x, "Left:" . join(",", @left_genes) );
-        }
-        if (@B_hits) {
-            my @right_genes;
-            foreach my $B_hit (@B_hits) {
-                push (@right_genes, $B_hit->{gene_id});
+            if (@B_hits) {
+                my @right_genes;
+                foreach my $B_hit (@B_hits) {
+                    push (@right_genes, $B_hit->{gene_id} . "[" . $B_hit->{sense_or_antisense} . "]");
+                }
+                push (@x, "Right:" . join(",", @right_genes));
             }
-            push (@x, "Right:" . join(",", @right_genes));
         }
         
 
