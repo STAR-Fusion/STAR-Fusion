@@ -20,7 +20,7 @@ main: {
     my $tab_reader = new DelimParser::Reader($fh, "\t");
 
     my @column_headers = $tab_reader->get_column_headers();
-    push (@column_headers, "J_FFPM", "S_FFPM");
+    push (@column_headers, "FFPM");
 
     my $tab_writer = new DelimParser::Writer(*STDOUT, "\t", \@column_headers);
     
@@ -32,9 +32,8 @@ main: {
         my $J_FFPM = &compute_FFPM($J, $num_frags);
         my $S_FFPM = &compute_FFPM($S, $num_frags);
 
-        $row->{J_FFPM} = $J_FFPM;
-        $row->{S_FFPM} = $S_FFPM;
-
+        $row->{FFPM} = $J_FFPM + $S_FFPM;
+        
         $tab_writer->write_row($row);
     }
     close $fh;

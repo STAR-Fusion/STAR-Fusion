@@ -7,3 +7,6 @@
 [submodule "STAR-Fusion.wiki"]
 	path = STAR-Fusion.wiki
 	url = https://github.com/STAR-Fusion/STAR-Fusion.wiki.git
+[submodule "FusionInspector"]
+	path = FusionInspector
+	url = git@github.com:FusionInspector/FusionInspector.git
