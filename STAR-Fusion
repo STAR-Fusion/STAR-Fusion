@@ -66,6 +66,14 @@ my $usage = <<__EOUSAGE__;
 #
 #  Optional:
 #
+#    --extract_fusion_reads                retrieves the fusion supporting reads from the fastq files
+#
+#    --FusionInspector <inspect|validate>  include FusionInspector, options:
+#                                               'inspect' - considers only StarFusion-identified fusion reads in context of identified fusions (fast)
+#                                               'validate' - examines all reads, recovers evidence, computes fusion allele fractions (slow) 
+#
+#    --denovo_reconstruct                  attempt to reconstruct fusion transcripts using de novo assembly (requires --FusionInspector)
+#
 #    --CPU <int>                           number of threads for running STAR (default: $CPU)
 #
 #    --min_junction_reads <int>            minimum number of junction-spanning reads required. Default: $MIN_JUNCTION_READS
@@ -119,6 +127,11 @@ my $chimeric_out_junctions_file = "";
 my $REPORT_VERSION = 0;
 my $USE_SHARED_MEMORY = 0;
 
+my $EXTRACT_FUSION_READS = 0;
+my $FUSIONINSPECTOR_MODE = 0;
+my $DENOVO_RECONSTRUCT = 0;
+
+
 &GetOptions ( 'help|h' => \$help_flag,
               
               'left_fq=s' => \$left_fq_filename,
@@ -151,6 +164,12 @@ my $USE_SHARED_MEMORY = 0;
 
               'STAR_use_shared_memory' => \$USE_SHARED_MEMORY,
               'STAR_MAX_MATE_DIST=i' => \$STAR_MAX_MATE_DIST,
+
+              'extract_fusion_reads' => \$EXTRACT_FUSION_READS,
+              'FusionInspector=s' => \$FUSIONINSPECTOR_MODE,
+              'denovo_reconstruct' => \$DENOVO_RECONSTRUCT,
+              
+
     );
 
 
@@ -166,6 +185,25 @@ if ($REPORT_VERSION) {
 unless ( ($left_fq_filename || $chimeric_out_junctions_file) && $genome_lib_dir) {
     die $usage;
 }
+
+
+if ($FUSIONINSPECTOR_MODE) {
+    unless ($FUSIONINSPECTOR_MODE =~ /^(inspect|validate)$/) {
+        die "Error, --FusionInspector option can be 'inspect' or 'validate', [$FUSIONINSPECTOR_MODE] not recognized ";
+    }
+    $EXTRACT_FUSION_READS = 1; # just in case.
+}
+if ($EXTRACT_FUSION_READS) {
+    unless ($left_fq_filename) {
+        die "Error, need --left_fq (and --right_fq for PE reads) set with --FusionInspector or --extract_fusion_reads ";
+    }
+}
+
+
+if ($DENOVO_RECONSTRUCT && ! $FUSIONINSPECTOR_MODE) {
+    die "Error, --denovo_reconstruct requires that you employ --FusionInspector ";
+}
+
 
 if (@ARGV) {
     die "Error, don't understand arguments: [@ARGV] ";
@@ -290,6 +328,14 @@ main: {
             $pipeliner->add_commands(new Command($cmd, "$out_prefix.fusion_candidates.final.abridged.FFPM.ok") );
         }
     }
+
+    if ($EXTRACT_FUSION_READS) {
+        my $cmd = "$UTILDIR/get_FUSION_EVIDENCE_fastqs.pl --fusions $out_prefix.fusion_candidates.final --output_prefix $out_prefix --left_fq $left_fq_filename";
+        if ($right_fq_filename) {
+            $cmd .= " --right_fq $right_fq_filename";
+        }
+        $pipeliner->add_commands(new Command($cmd, "_extract_fusion_reads.ok"));
+    }
     
     $pipeliner->run();
     
@@ -300,7 +346,7 @@ main: {
     }
     else {
         
-        print STDERR "\n\n\t* Process complete.  See output: $out_prefix.fusion_candidates.final (or .abridged version)\n\n\n";
+        print STDERR "\n\n\t* STAR-Fusion complete.  See output: $out_prefix.fusion_candidates.final (or .abridged version)\n\n\n";
     }
     
     exit(0);

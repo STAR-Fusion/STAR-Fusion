@@ -9,12 +9,52 @@ use Process_cmd;
 use DelimParser;
 use Data::Dumper;
 
-my $usage = "\n\n\tusage: $0 fusion_predictions.final  left.fq right.fq output_prefix\n\n";
+use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);  
 
-my $fusion_results_file = $ARGV[0] or die $usage;
-my $left_fq = $ARGV[1] or die $usage;
-my $right_fq = $ARGV[2] or die $usage;
-my $output_prefix = $ARGV[3] or die $usage;
+
+my $usage = <<__EOUSAGE__;
+
+######################################################################################
+#
+#  --fusions <string>           fusion predictions 'final' output file (not abridged)
+#
+#  --left_fq <string>           /1 fastq file (or SE reads)
+#
+#  --right_fq <string>          /2 fastq file (optional, required for PE reads)
+#
+#  --output_prefix <string>     output prefix
+#
+######################################################################################
+
+__EOUSAGE__
+
+    ;
+
+
+my $help_flag;
+
+my $fusion_results_file;
+my $left_fq;
+my $right_fq;
+my $output_prefix;
+
+
+&GetOptions( 'help|h' => \$help_flag,
+
+             'fusions=s' => \$fusion_results_file,
+             
+             'left_fq=s' => \$left_fq,
+             'right_fq=s' => \$right_fq,
+             'output_prefix=s' => \$output_prefix,
+    );
+
+if ($help_flag) {
+    die $usage;
+}
+
+unless ($fusion_results_file && $left_fq && $output_prefix) {
+    die $usage;
+}
 
 
 main: {
@@ -54,9 +94,10 @@ main: {
         
     &write_fastq_files($left_fq, "$output_prefix.fusion_evidence_reads_1.fq", \%core_frag_name_to_fusion_name);
     
-    &write_fastq_files($right_fq, "$output_prefix.fusion_evidence_reads_2.fq", \%core_frag_name_to_fusion_name);
+    if ($right_fq) {
+        &write_fastq_files($right_fq, "$output_prefix.fusion_evidence_reads_2.fq", \%core_frag_name_to_fusion_name);
+    }
     
-
     print STDERR "\nDone.\n\n";
     
     exit(0);
@@ -82,8 +123,9 @@ sub write_fastq_files {
             my $record_text = $fq_record->get_fastq_record();
             chomp $record_text;
             my @lines = split(/\n/, $record_text);
-            shift @lines;
-            print $ofh join("\n", "\@${fusion_name}", @lines) . "\n";
+            my ($_1, $_2, $_3, $_4) = @lines;
+            $_3 = "+$fusion_name"; # encode the fusion name in the 3rd line, which is otherwise useless anyway
+            print $ofh join("\n", ($_1, $_2, $_3, $_4)) . "\n";
         }
     }
     
