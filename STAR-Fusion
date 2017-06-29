@@ -18,7 +18,8 @@ use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 my $VERSION = "0.8.0";
 
 
-my $UTILDIR = "$FindBin::Bin/util";
+my $BASEDIR = "$FindBin::Bin";
+my $UTILDIR = "$BASEDIR/util";
 
 ## Options
 my $output_dir = "";
@@ -348,6 +349,54 @@ main: {
         
         print STDERR "\n\n\t* STAR-Fusion complete.  See output: $out_prefix.fusion_candidates.final (or .abridged version)\n\n\n";
     }
+
+    
+
+    
+    if ($FUSIONINSPECTOR_MODE) {
+
+        my $FI_outdir = "$output_dir/FusionInspector";
+        
+        if ($FUSIONINSPECTOR_MODE eq 'inspect') {
+            ## use the extracted fusion evidence reads
+            my $FI_left_fq = "$out_prefix.fusion_evidence_reads_1.fq";
+            my $cmd = "$BASEDIR/FusionInspector/FusionInspector --fusions $out_prefix.fusion_candidates.final.abridged "
+                . " --out_prefix finspector --min_junction_reads $MIN_JUNCTION_READS --min_novel_junction_support $MIN_NOVEL_JUNCTION_SUPPORT "
+                . " --prep_for_IGV --max_promiscuity $MAX_PROMISCUITY --out_dir $FI_outdir "
+                . " --genome_lib_dir $genome_lib_dir --only_fusion_reads --fusion_contigs_only "
+                . " --left_fq $FI_left_fq";
+            if ($right_fq_filename) {
+                my $FI_right_fq = "$out_prefix.fusion_evidence_reads_2.fq";
+                $cmd .= " --right_fq $FI_right_fq ";
+            }
+            if ($DENOVO_RECONSTRUCT) {
+                $cmd .= " --include_Trinity ";
+            }
+            
+            $pipeliner->add_commands(new Command($cmd, "_fi_inspect.ok"));
+        }
+        else {
+            # validate mode
+            # use all original reads.
+            my $cmd = "$BASEDIR/FusionInspector/FusionInspector --fusions $out_prefix.fusion_candidates.final.abridged "
+                . " --out_prefix finspector --min_junction_reads $MIN_JUNCTION_READS --min_novel_junction_support $MIN_NOVEL_JUNCTION_SUPPORT "
+                . " --prep_for_IGV --max_promiscuity $MAX_PROMISCUITY --out_dir $FI_outdir "
+                . " --genome_lib_dir $genome_lib_dir "
+                . " --left_fq $left_fq_filename";
+            if ($right_fq_filename) {
+                my $FI_right_fq = "$out_prefix.fusion_evidence_reads_2.fq";
+                $cmd .= " --right_fq $right_fq_filename ";
+            }
+            if ($DENOVO_RECONSTRUCT) {
+                $cmd .= " --include_Trinity ";
+            }
+            
+            $pipeliner->add_commands(new Command($cmd, "_fi_validate.ok"));
+        }
+
+        $pipeliner->run();
+    }
+    
     
     exit(0);
     
