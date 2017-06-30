@@ -239,21 +239,15 @@ main: {
     my $cmd = "$FindBin::Bin/../FusionFilter/blast_and_promiscuity_filter.pl --out_prefix $intermediates_out_prefix -E $Evalue --max_promiscuity $MAX_PROMISCUITY --fusion_preds $stage1_preds_file --genome_lib_dir $genome_lib_dir ";
     &process_cmd($cmd);  # generates $out_prefix.final and $out_prefix.filt
 
-    # rename final output file:
-    rename("$intermediates_out_prefix.final", "$out_prefix.fusion_candidates.final");
-    
-    ## generate abridged versions, as all those read names take up a lot of space and are annoyoing to look at when you just want to know what fusions are predicted.
-    
-    
-
+    # make abridged versions:
     &process_cmd("$FindBin::Bin/column_exclusions.pl $stage1_preds_file JunctionReads,SpanningFrags > $stage1_preds_file.abridged");
-    &process_cmd("$FindBin::Bin/column_exclusions.pl $filter_info_file JunctionReads,SpanningFrags > $filter_info_file.abridged");
-    
 
-    &process_cmd("$FindBin::Bin/column_exclusions.pl $out_prefix.fusion_candidates.final  JunctionReads,SpanningFrags > $out_prefix.fusion_candidates.final.abridged");
-    &process_cmd("$FindBin::Bin/column_exclusions.pl $stage1_preds_file.post_blast_filter.post_promisc_filter JunctionReads,SpanningFrags > $stage1_preds_file.post_blast_filter.post_promisc_filter.abridged");
+    rename("$intermediates_out_prefix.final", "$intermediates_out_prefix.filtered");
+        
+    # rename final output file:
+    &process_cmd("ln -s $intermediates_out_prefix.filtered $out_prefix.fusion_candidates.preliminary.filtered");
     
-
+    
     exit(0);
 }
 

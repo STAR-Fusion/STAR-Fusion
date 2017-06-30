@@ -228,14 +228,22 @@ main: {
     }
     
     chdir $output_dir or die "Error, cannot cd to $output_dir";
+
+    my $checkpoints_dir = "$output_dir/_starF_checkpoints";
+    unless (-d $checkpoints_dir) {
+        &process_cmd("mkdir -p $checkpoints_dir");
+    }
     
+    my $preliminary_outdir = "$output_dir/star-fusion.preliminary";
+    unless (-d $preliminary_outdir) {
+        &process_cmd("mkdir -p $preliminary_outdir");
+    }
     
     if ($out_prefix =~ m|/$|) {
         # not allowing to end as a directory, must be a filename
         die "Error, --out_prefix must be a file name and not a directory name, although you can include directories in the path to the file name to be created.";
     }
     
-    $out_prefix = &ensure_full_path($out_prefix);
     my $out_prefix_basename = basename($out_prefix);
     
     my $pipeliner = new Pipeliner(-verbose => $verbose_level);
@@ -276,7 +284,7 @@ main: {
             $cmd .= " --readFilesCommand zcat ";
         }
         
-        $pipeliner->add_commands(Command->new($cmd, "star.ok"));
+        $pipeliner->add_commands(Command->new($cmd, "$checkpoints_dir/star.ok"));
     }
     
     ## predict fusions
@@ -288,20 +296,22 @@ main: {
         . " --min_junction_reads $MIN_JUNCTION_READS "
         . " --min_sum_frags $MIN_SUM_FRAGS "
         . " --min_novel_junction_support $MIN_NOVEL_JUNCTION_SUPPORT "
-        . " -O $out_prefix ";
+        . " -O $preliminary_outdir/$out_prefix ";
     
-    $pipeliner->add_commands(new Command($cmd, "$out_prefix.STAR-Fusion.predict.ok"));
+    $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/$out_prefix.STAR-Fusion.predict.ok"));
     
-    my $predicted_fusions_file = "$out_prefix.fusion_candidates.preliminary";
-
+    my $predicted_fusions_file = "$preliminary_outdir/$out_prefix.fusion_candidates.preliminary";
+    
     ## add breakpoint / splice junction info
 
     my $predicted_fusions_with_splice_info = "$predicted_fusions_file.wSpliceInfo";
 
     $cmd = "$UTILDIR/append_breakpoint_junction_info.pl $predicted_fusions_file $genome_lib_dir > $predicted_fusions_with_splice_info";
 
-    $pipeliner->add_commands(new Command($cmd, "$predicted_fusions_with_splice_info.ok"));
-        
+    $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/predicted_fusions_with_splice_info.ok"));
+
+    my $prelim_fusion_file = $predicted_fusions_with_splice_info;
+    
     unless ($no_filter) {
            
         ## filter fusions
@@ -318,24 +328,40 @@ main: {
             . " --min_alt_pct_junction $MIN_ALT_PCT_JUNCTION "
             . " --aggregate_novel_junction_dist $AGGREGATE_NOVEL_JUNCTION_DIST "
             . " --genome_lib_dir $genome_lib_dir "
-            . " --out_prefix $out_prefix";
+            . " --out_prefix $preliminary_outdir/$out_prefix";
         
-        $pipeliner->add_commands(new Command($cmd, "$out_prefix.STAR-Fusion.filter.ok"));
+        $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/STAR-Fusion.filter.ok"));
+        
+
+        $prelim_fusion_file = "$preliminary_outdir/$out_prefix.fusion_candidates.preliminary.filtered";
         
         
-        if ($left_fq_filename) {
-            ## convert vals to FFPM
-            $cmd = "$UTILDIR/incorporate_FFPM_into_final_report.pl $left_fq_filename $out_prefix.fusion_candidates.final.abridged > $out_prefix.fusion_candidates.final.abridged.FFPM";
-            $pipeliner->add_commands(new Command($cmd, "$out_prefix.fusion_candidates.final.abridged.FFPM.ok") );
-        }
     }
 
+    if ($left_fq_filename) {
+        ## convert vals to FFPM
+        $cmd = "$UTILDIR/incorporate_FFPM_into_final_report.pl $left_fq_filename $prelim_fusion_file > $prelim_fusion_file.FFPM";
+        $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/FFPM.ok") );
+
+        $prelim_fusion_file = "$prelim_fusion_file.FFPM";
+    }
+
+    # generate final fusion prediction output files:
+    my $final_output_fusions = "$out_prefix.fusion_predictions.tsv";
+    $pipeliner->add_commands(new Command("cp $prelim_fusion_file $final_output_fusions", "$checkpoints_dir/cp_final.ok"));
+    
+    ## make abridged versions:
+    my $abridged_final_output = $final_output_fusions;
+    $abridged_final_output =~ s/\.tsv$/.abridged.tsv/;
+    $pipeliner->add_commands(new Command("$UTILDIR/column_exclusions.pl $final_output_fusions JunctionReads,SpanningFrags > $abridged_final_output", "$checkpoints_dir/abridged_final"));
+
+    
     if ($EXTRACT_FUSION_READS) {
         my $cmd = "$UTILDIR/get_FUSION_EVIDENCE_fastqs.pl --fusions $out_prefix.fusion_candidates.final --output_prefix $out_prefix --left_fq $left_fq_filename";
         if ($right_fq_filename) {
             $cmd .= " --right_fq $right_fq_filename";
         }
-        $pipeliner->add_commands(new Command($cmd, "_extract_fusion_reads.ok"));
+        $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/extract_fusion_reads.ok"));
     }
     
     $pipeliner->run();

@@ -28,7 +28,7 @@ unless (-s $genome_fasta) {
 main : {
 
     
-    open (my $fh, $fusion_dat_file) or die $!;
+    open (my $fh, $fusion_dat_file) or die "Error, cannot open file: $fusion_dat_file";
     my $tab_reader = new DelimParser::Reader($fh, "\t");
 
     my @column_headers = $tab_reader->get_column_headers();
