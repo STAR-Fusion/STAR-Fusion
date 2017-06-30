@@ -10,3 +10,6 @@
 [submodule "FusionInspector"]
 	path = FusionInspector
 	url = git@github.com:FusionInspector/FusionInspector.git
+[submodule "FusionAnnotator"]
+	path = FusionAnnotator
+	url = git@github.com:FusionAnnotator/FusionAnnotator.git
