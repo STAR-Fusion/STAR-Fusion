@@ -194,12 +194,12 @@ if ($FUSIONINSPECTOR_MODE) {
     }
     $EXTRACT_FUSION_READS = 1; # just in case.
 }
+
 if ($EXTRACT_FUSION_READS) {
     unless ($left_fq_filename) {
         die "Error, need --left_fq (and --right_fq for PE reads) set with --FusionInspector or --extract_fusion_reads ";
     }
 }
-
 
 if ($DENOVO_RECONSTRUCT && ! $FUSIONINSPECTOR_MODE) {
     die "Error, --denovo_reconstruct requires that you employ --FusionInspector ";
@@ -355,6 +355,10 @@ main: {
     $abridged_final_output =~ s/\.tsv$/.abridged.tsv/;
     $pipeliner->add_commands(new Command("$UTILDIR/column_exclusions.pl $final_output_fusions JunctionReads,SpanningFrags > $abridged_final_output", "$checkpoints_dir/abridged_final"));
 
+    ## annotate fusions.
+    $cmd = "$BASEDIR/FusionAnnotator/FusionAnnotator --genome_lib_dir $genome_lib_dir --annotate $abridged_final_output > $abridged_final_output.annotated";
+    $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/fusion_annotator.ok"));
+    
     
     if ($EXTRACT_FUSION_READS) {
         my $cmd = "$UTILDIR/get_FUSION_EVIDENCE_fastqs.pl --fusions $out_prefix.fusion_candidates.final --output_prefix $out_prefix --left_fq $left_fq_filename";
