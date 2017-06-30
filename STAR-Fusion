@@ -361,7 +361,7 @@ main: {
     
     
     if ($EXTRACT_FUSION_READS) {
-        my $cmd = "$UTILDIR/get_FUSION_EVIDENCE_fastqs.pl --fusions $out_prefix.fusion_candidates.final --output_prefix $out_prefix --left_fq $left_fq_filename";
+        my $cmd = "$UTILDIR/get_FUSION_EVIDENCE_fastqs.pl --fusions $out_prefix.fusion_predictions.tsv --output_prefix $out_prefix --left_fq $left_fq_filename";
         if ($right_fq_filename) {
             $cmd .= " --right_fq $right_fq_filename";
         }
@@ -379,9 +379,7 @@ main: {
         
         print STDERR "\n\n\t* STAR-Fusion complete.  See output: $out_prefix.fusion_candidates.final (or .abridged version)\n\n\n";
     }
-
     
-
     
     if ($FUSIONINSPECTOR_MODE) {
 
@@ -390,7 +388,7 @@ main: {
         if ($FUSIONINSPECTOR_MODE eq 'inspect') {
             ## use the extracted fusion evidence reads
             my $FI_left_fq = "$out_prefix.fusion_evidence_reads_1.fq";
-            my $cmd = "$BASEDIR/FusionInspector/FusionInspector --fusions $out_prefix.fusion_candidates.final.abridged "
+            my $cmd = "$BASEDIR/FusionInspector/FusionInspector --fusions $abridged_final_output "
                 . " --out_prefix finspector --min_junction_reads $MIN_JUNCTION_READS --min_novel_junction_support $MIN_NOVEL_JUNCTION_SUPPORT "
                 . " --prep_for_IGV --max_promiscuity $MAX_PROMISCUITY --out_dir $FI_outdir "
                 . " --genome_lib_dir $genome_lib_dir --only_fusion_reads --fusion_contigs_only "
@@ -408,7 +406,7 @@ main: {
         else {
             # validate mode
             # use all original reads.
-            my $cmd = "$BASEDIR/FusionInspector/FusionInspector --fusions $out_prefix.fusion_candidates.final.abridged "
+            my $cmd = "$BASEDIR/FusionInspector/FusionInspector --fusions $abridged_final_output "
                 . " --out_prefix finspector --min_junction_reads $MIN_JUNCTION_READS --min_novel_junction_support $MIN_NOVEL_JUNCTION_SUPPORT "
                 . " --prep_for_IGV --max_promiscuity $MAX_PROMISCUITY --out_dir $FI_outdir "
                 . " --genome_lib_dir $genome_lib_dir "
