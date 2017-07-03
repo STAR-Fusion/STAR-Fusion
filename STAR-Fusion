@@ -22,7 +22,7 @@ my $BASEDIR = "$FindBin::Bin";
 my $UTILDIR = "$BASEDIR/util";
 
 ## Options
-my $output_dir = "";
+my $output_dir = "STAR-Fusion_outdir";
 my $out_prefix = "star-fusion";
 my $chimeric_junction_file;
 my $help_flag;
@@ -61,7 +61,7 @@ my $usage = <<__EOUSAGE__;
 #
 #    --genome_lib_dir <string>             directory containing genome lib (see http://STAR-Fusion.github.io)
 #
-#    --output_dir|O <string>               output directory   
+#    --output_dir|O <string>               output directory  (default: $output_dir) 
 #
 #
 #
