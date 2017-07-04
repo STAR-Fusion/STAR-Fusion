@@ -67,6 +67,8 @@ my $usage = <<__EOUSAGE__;
 #
 #  Optional:
 #
+#    --annotate                            annotate fusions based on known cancer fusions and those found in normal tissues
+#
 #    --extract_fusion_reads                retrieves the fusion supporting reads from the fastq files
 #
 #    --FusionInspector <inspect|validate>  include FusionInspector, options:
@@ -131,7 +133,7 @@ my $USE_SHARED_MEMORY = 0;
 my $EXTRACT_FUSION_READS = 0;
 my $FUSIONINSPECTOR_MODE = 0;
 my $DENOVO_RECONSTRUCT = 0;
-
+my $ANNOTATE = 0;
 
 &GetOptions ( 'help|h' => \$help_flag,
               
@@ -154,6 +156,8 @@ my $DENOVO_RECONSTRUCT = 0;
               'E=f' => \$Evalue,
               'tmpdir=s' => \$tmpdir,
               'verbose_level=i' => \$verbose_level,
+
+              'annotate' => \$ANNOTATE,
     
               'no_filter' => \$no_filter,
     
@@ -355,9 +359,11 @@ main: {
     $abridged_final_output =~ s/\.tsv$/.abridged.tsv/;
     $pipeliner->add_commands(new Command("$UTILDIR/column_exclusions.pl $final_output_fusions JunctionReads,SpanningFrags > $abridged_final_output", "$checkpoints_dir/abridged_final"));
 
-    ## annotate fusions.
-    $cmd = "$BASEDIR/FusionAnnotator/FusionAnnotator --genome_lib_dir $genome_lib_dir --annotate $abridged_final_output > $abridged_final_output.annotated";
-    $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/fusion_annotator.ok"));
+    if ($ANNOTATE) {
+        ## annotate fusions.
+        $cmd = "$BASEDIR/FusionAnnotator/FusionAnnotator --genome_lib_dir $genome_lib_dir --annotate $abridged_final_output > $abridged_final_output.annotated";
+        $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/fusion_annotator.ok"));
+    }
     
     
     if ($EXTRACT_FUSION_READS) {
