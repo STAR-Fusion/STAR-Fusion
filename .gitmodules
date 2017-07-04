@@ -9,7 +9,7 @@
 	url = https://github.com/STAR-Fusion/STAR-Fusion.wiki.git
 [submodule "FusionInspector"]
 	path = FusionInspector
-	url = https://github.com:FusionInspector/FusionInspector.git
+	url = https://github.com/FusionInspector/FusionInspector.git
 [submodule "FusionAnnotator"]
 	path = FusionAnnotator
-	url = https://github.com:FusionAnnotator/FusionAnnotator.git
+	url = https://github.com/FusionAnnotator/FusionAnnotator.git
