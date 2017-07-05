@@ -11,10 +11,12 @@ standard:
 all: standard \
      kickstart \
      kickstart_evreads \
-     denovo_reconstruct \
      kickstart_annotate \
      kickstart_coding_effect \
-     kickstart_FI_inspect
+     kickstart_FI_inspect \
+     standard_denovo_reconstruct \
+     standard_annotate \
+     standard_coding_effect
 
 
 #####################################################
@@ -37,8 +39,15 @@ kickstart_FI_inspect: kickstart_coding_effect
 ###################################
 #### Full mode, starting from reads
 
-denovo_reconstruct:
-	./__misc_tests/runMe.denovo_reconstruct.sh
+standard_denovo_reconstruct: standard
+	./__misc_tests/runMe.sh --denovo_reconstruct --FusionInspector validate 
+
+standard_annotate: standard
+	./__misc_tests/runMe.sh --FusionInspector validate --annotate 
+
+standard_coding_effect: standard_annotate
+	./__misc_tests/runMe.sh --FusionInspector validate --annotate --examine_coding_effect
+
 
 
 clean:
