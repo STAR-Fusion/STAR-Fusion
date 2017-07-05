@@ -69,6 +69,8 @@ my $usage = <<__EOUSAGE__;
 #
 #    --annotate                            annotate fusions based on known cancer fusions and those found in normal tissues
 #
+#    --examine_coding_effect               explore impact of fusions on coding sequences
+#
 #    --extract_fusion_reads                retrieves the fusion supporting reads from the fastq files
 #
 #    --FusionInspector <inspect|validate>  include FusionInspector, options:
@@ -134,6 +136,7 @@ my $EXTRACT_FUSION_READS = 0;
 my $FUSIONINSPECTOR_MODE = 0;
 my $DENOVO_RECONSTRUCT = 0;
 my $ANNOTATE = 0;
+my $EXAMINE_CODING_EFFECT = 0;
 
 &GetOptions ( 'help|h' => \$help_flag,
               
@@ -158,7 +161,8 @@ my $ANNOTATE = 0;
               'verbose_level=i' => \$verbose_level,
 
               'annotate' => \$ANNOTATE,
-    
+              'examine_coding_effect' => \$EXAMINE_CODING_EFFECT,
+              
               'no_filter' => \$no_filter,
     
               'genome_lib_dir=s' => \$genome_lib_dir,
@@ -359,12 +363,26 @@ main: {
     $abridged_final_output =~ s/\.tsv$/.abridged.tsv/;
     $pipeliner->add_commands(new Command("$UTILDIR/column_exclusions.pl $final_output_fusions JunctionReads,SpanningFrags > $abridged_final_output", "$checkpoints_dir/abridged_final"));
 
+    
     if ($ANNOTATE) {
         ## annotate fusions.
-        $cmd = "$BASEDIR/FusionAnnotator/FusionAnnotator --genome_lib_dir $genome_lib_dir --annotate $abridged_final_output > $abridged_final_output.annotated";
+
+        my $annotated_fusions_filename = $abridged_final_output;
+        $annotated_fusions_filename =~ s/\.tsv$/.annotated.tsv/;
+        $cmd = "$BASEDIR/FusionAnnotator/FusionAnnotator --genome_lib_dir $genome_lib_dir --annotate $abridged_final_output > $annotated_fusions_filename";
         $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/fusion_annotator.ok"));
+        $abridged_final_output = $annotated_fusions_filename;
     }
     
+    if ($EXAMINE_CODING_EFFECT) {
+        
+        my $coding_eff_filename = $abridged_final_output;
+        $coding_eff_filename =~ s/\.tsv$/.coding_effect.tsv/; 
+        
+        $cmd = "$BASEDIR/FusionAnnotator/util/fusion_to_coding_region_effect.pl  --fusions $abridged_final_output --genome_lib_dir $genome_lib_dir > $coding_eff_filename";
+        $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/coding_eff.ok"));
+        $abridged_final_output = $coding_eff_filename;
+    }
     
     if ($EXTRACT_FUSION_READS) {
         my $cmd = "$UTILDIR/get_FUSION_EVIDENCE_fastqs.pl --fusions $out_prefix.fusion_predictions.tsv --output_prefix $out_prefix --left_fq $left_fq_filename";
