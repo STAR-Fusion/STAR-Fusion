@@ -408,21 +408,20 @@ main: {
     if ($FUSIONINSPECTOR_MODE) {
 
         my $FI_outdir = "$output_dir/FusionInspector";
+
+        my $FI_cmd = "";
         
         if ($FUSIONINSPECTOR_MODE eq 'inspect') {
             ## use the extracted fusion evidence reads
             my $FI_left_fq = "$out_prefix.fusion_evidence_reads_1.fq";
-            my $cmd = "$BASEDIR/FusionInspector/FusionInspector --fusions $abridged_final_output "
+            $FI_cmd = "$BASEDIR/FusionInspector/FusionInspector --fusions $abridged_final_output "
                 . " --out_prefix finspector --min_junction_reads $MIN_JUNCTION_READS --min_novel_junction_support $MIN_NOVEL_JUNCTION_SUPPORT "
                 . " --prep_for_IGV --max_promiscuity $MAX_PROMISCUITY --out_dir $FI_outdir "
                 . " --genome_lib_dir $genome_lib_dir --only_fusion_reads --fusion_contigs_only "
                 . " --left_fq $FI_left_fq";
             if ($right_fq_filename) {
                 my $FI_right_fq = "$out_prefix.fusion_evidence_reads_2.fq";
-                $cmd .= " --right_fq $FI_right_fq ";
-            }
-            if ($DENOVO_RECONSTRUCT) {
-                $cmd .= " --include_Trinity ";
+                $FI_cmd .= " --right_fq $FI_right_fq ";
             }
             
             $pipeliner->add_commands(new Command($cmd, "_fi_inspect.ok"));
@@ -430,22 +429,30 @@ main: {
         else {
             # validate mode
             # use all original reads.
-            my $cmd = "$BASEDIR/FusionInspector/FusionInspector --fusions $abridged_final_output "
+            $FI_cmd = "$BASEDIR/FusionInspector/FusionInspector --fusions $abridged_final_output "
                 . " --out_prefix finspector --min_junction_reads $MIN_JUNCTION_READS --min_novel_junction_support $MIN_NOVEL_JUNCTION_SUPPORT "
                 . " --prep_for_IGV --max_promiscuity $MAX_PROMISCUITY --out_dir $FI_outdir "
                 . " --genome_lib_dir $genome_lib_dir "
                 . " --left_fq $left_fq_filename";
             if ($right_fq_filename) {
                 my $FI_right_fq = "$out_prefix.fusion_evidence_reads_2.fq";
-                $cmd .= " --right_fq $right_fq_filename ";
+                $FI_cmd .= " --right_fq $right_fq_filename ";
             }
-            if ($DENOVO_RECONSTRUCT) {
-                $cmd .= " --include_Trinity ";
-            }
-            
-            $pipeliner->add_commands(new Command($cmd, "_fi_validate.ok"));
         }
 
+        if ($DENOVO_RECONSTRUCT) {
+            $FI_cmd .= " --include_Trinity ";
+        }
+        if ($ANNOTATE) {
+            $FI_cmd .= " --annotate ";
+        }
+        if ($EXAMINE_CODING_EFFECT) {
+            $FI_cmd .= " --examine_coding_effect ";
+        }
+                
+        $pipeliner->add_commands(new Command($FI_cmd, "_fi_${FUSIONINSPECTOR_MODE}_" . length($FI_cmd) . ".ok"));
+        
+        
         $pipeliner->run();
     }
     
