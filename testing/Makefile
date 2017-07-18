@@ -5,11 +5,11 @@ right_fq="reads_2.fq.gz"
 
 
 kickstart:
-	./__misc_tests/runMe.kickstart.sh
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -J __kickstart_data/Chimeric.out.junction -O star_fusion_kickstarted_outdir 
 
 
 standard:
-	./__misc_tests/runMe.sh
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir
 
 
 all: standard \
@@ -21,7 +21,7 @@ all: standard \
      standard_denovo_reconstruct \
      standard_annotate \
      standard_coding_effect \
-     standard_SEQ \
+     standard_SE \
      kickstart_SE \
 
 
