@@ -50,7 +50,7 @@ my $usage = <<__EOUSAGE__;
 #
 #  To include running STAR:
 #
-#      --left_fq <string>                    left.fq file
+#      --left_fq <string>                    left.fq file (or single.fq)
 #
 #      --right_fq <string>                   right.fq file  (actually optional, but highly recommended)
 #
@@ -435,7 +435,6 @@ main: {
                 . " --genome_lib_dir $genome_lib_dir "
                 . " --left_fq $left_fq_filename";
             if ($right_fq_filename) {
-                my $FI_right_fq = "$out_prefix.fusion_evidence_reads_2.fq";
                 $FI_cmd .= " --right_fq $right_fq_filename ";
             }
         }

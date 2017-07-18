@@ -1,5 +1,9 @@
 
 
+left_fq="reads_1.fq.gz"
+right_fq="reads_2.fq.gz"
+
+
 kickstart:
 	./__misc_tests/runMe.kickstart.sh
 
@@ -16,40 +20,57 @@ all: standard \
      kickstart_FI_inspect \
      standard_denovo_reconstruct \
      standard_annotate \
-     standard_coding_effect
+     standard_coding_effect \
+     standard_SEQ \
+     kickstart_SE \
 
 
 #####################################################
 #### Kickstart, starting from chimeric junctions file
 
 kickstart_evreads: kickstart
-	./__misc_tests/runMe.kickstart.sh --extract_fusion_reads
+	../STAR-Fusion -J __kickstart_data/Chimeric.out.junction --genome_lib_dir ${CTAT_GENOME_LIB}  --extract_fusion_reads --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_kickstarted_outdir
 
 kickstart_annotate: kickstart
-	./__misc_tests/runMe.kickstart.sh --annotate
+	../STAR-Fusion -J __kickstart_data/Chimeric.out.junction --genome_lib_dir ${CTAT_GENOME_LIB} --annotate --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_kickstarted_outdir
 
 kickstart_coding_effect: kickstart_annotate
-	./__misc_tests/runMe.kickstart.sh --examine_coding_effect --annotate
+	../STAR-Fusion -J __kickstart_data/Chimeric.out.junction --genome_lib_dir ${CTAT_GENOME_LIB} --examine_coding_effect --annotate --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_kickstarted_outdir
 
 
 kickstart_FI_inspect: kickstart_coding_effect
-	./__misc_tests/runMe.kickstart.sh --examine_coding_effect --annotate --FusionInspector inspect
+	../STAR-Fusion -J __kickstart_data/Chimeric.out.junction --genome_lib_dir ${CTAT_GENOME_LIB}  --examine_coding_effect --annotate --FusionInspector inspect --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_kickstarted_outdir
 
 
 ###################################
 #### Full mode, starting from reads
 
 standard_denovo_reconstruct: standard
-	./__misc_tests/runMe.sh --denovo_reconstruct --FusionInspector validate 
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --denovo_reconstruct --FusionInspector validate --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir
 
 standard_annotate: standard
-	./__misc_tests/runMe.sh --FusionInspector validate --annotate 
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --FusionInspector validate --annotate --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir
 
 standard_coding_effect: standard_annotate
-	./__misc_tests/runMe.sh --FusionInspector validate --annotate --examine_coding_effect
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --FusionInspector validate --annotate --examine_coding_effect --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir
 
 
+##################################
+#### Single-end reads instead of pairs
+
+standard_SE:
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --FusionInspector inspect --annotate --examine_coding_effect --left_fq ${left_fq} -O star_fusion_SE_outdir
+
+kickstart_SE:
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB} -J __kickstart_data/Chimeric.out.junction  --FusionInspector inspect --annotate --examine_coding_effect --left_fq ${left_fq} -O star_fusion_SE_outdir_kickstart
+
+
+
+######################
+## Cleanup
 
 clean:
 	rm -rf ./star_fusion_outdir
 	rm -rf ./star_fusion_kickstarted_outdir
+	rm -rf ./star_fusion_SE_outdir
+	rm -rf ./star_fusion_SE_outdir_kickstart
