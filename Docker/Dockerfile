@@ -97,3 +97,5 @@ RUN GMAP_URL="http://research-pub.gene.com/gmap/src/gmap-gsnap-2017-01-14.tar.gz
 # patch for Set::IntervalTree
 RUN cp /usr/local/src/STAR-Fusion_v1.1.0/plugins/Set-IntervalTree-0.01/blib/lib/auto/Set/IntervalTree/autosplit.ix /usr/local/src/STAR-Fusion_v1.1.0/PerlLib/auto/Set/IntervalTree/.
 
+ENV PERL5LIB ${STAR_FUSION_HOME}/PerlLib
+
