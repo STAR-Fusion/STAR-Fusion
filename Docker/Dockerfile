@@ -20,7 +20,7 @@ RUN mkdir $DATA
 
 ## perl lib installations
 
-RUN cpanm install Set::IntervalTree
+#RUN cpanm install Set::IntervalTree  # now included w/ STAR-Fusion
 
 RUN cpanm install DB_File
 
@@ -35,33 +35,28 @@ RUN cpanm install URI::Escape
 ##############
 ## STAR
 
-RUN STAR_URL="https://github.com/alexdobin/STAR/archive/2.5.2a.tar.gz" &&\
+ENV STAR_VERSION=2.5.3a
+
+RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" &&\
     wget -P $SRC $STAR_URL &&\
-    tar -xvf $SRC/2.5.2a.tar.gz -C $SRC && \
-    mv $SRC/STAR-2.5.2a/bin/Linux_x86_64_static/STAR /usr/local/bin
+    tar -xvf $SRC/${STAR_VERSION}.tar.gz -C $SRC && \
+    mv $SRC/STAR-${STAR_VERSION}/bin/Linux_x86_64_static/STAR /usr/local/bin
 
 
 ###############
 ## STAR-Fusion:
 
-RUN STAR_FUSION_URL="https://github.com/STAR-Fusion/STAR-Fusion/releases/download/v1.0.0/STAR-Fusion-v1.0.0.FULL.tar.gz" && \
+ENV STAR_FUSION_VERSION=1.1.0
+
+RUN STAR_FUSION_URL="https://github.com/STAR-Fusion/STAR-Fusion/releases/download/v${STAR_FUSION_VERSION}/STAR-Fusion_v${STAR_FUSION_VERSION}.tar.gz" && \
     cd $SRC && \
     wget $STAR_FUSION_URL && \
-    tar xvf STAR-Fusion-v1.0.0.FULL.tar.gz
+    tar xvf STAR-Fusion_v${STAR_FUSION_VERSION}.tar.gz && \
+    cd STAR-Fusion_v${STAR_FUSION_VERSION} && make
 
-ENV STAR_FUSION_HOME $SRC/STAR-Fusion-v1.0.0
+ENV STAR_FUSION_HOME $SRC/STAR-Fusion_v${STAR_FUSION_VERSION}
 
-
-###################
-## FusionInspector
-
-ENV FI_VERSION v1.0.1
-RUN FI_URL="https://github.com/FusionInspector/FusionInspector/releases/download/${FI_VERSION}/FusionInspector-${FI_VERSION}.FULL.tar.gz" && \
-    cd $SRC && \
-    wget $FI_URL && \
-    tar -xvf FusionInspector-${FI_VERSION}.FULL.tar.gz
-
-ENV FUSION_INSPECTOR_HOME $SRC/FusionInspector-${FI_VERSION}
+## FusionInspector now included with STAR-Fusion
 
 
 ########
@@ -78,14 +73,16 @@ RUN SAMTOOLS_URL="https://github.com/samtools/samtools/releases/download/1.3.1/s
 ########
 # Trinity
 
-RUN TRINITY_URL="https://github.com/trinityrnaseq/trinityrnaseq/archive/Trinity-v2.3.2.tar.gz" && \
+ENV TRINITY_VERSION=2.4.0
+
+RUN TRINITY_URL="https://github.com/trinityrnaseq/trinityrnaseq/archive/Trinity-v${TRINITY_VERSION}.tar.gz" && \
    cd $SRC && \
    wget $TRINITY_URL && \
-   tar xvf Trinity-v2.3.2.tar.gz && \
-   cd trinityrnaseq-Trinity-v2.3.2 && make
+   tar xvf Trinity-v${TRINITY_VERSION}.tar.gz && \
+   cd trinityrnaseq-Trinity-v${TRINITY_VERSION} && make
 
 
-ENV TRINITY_HOME /usr/local/src/trinityrnaseq-Trinity-v2.3.2
+ENV TRINITY_HOME /usr/local/src/trinityrnaseq-Trinity-v${TRINITY_VERSION}
 
 
 ########
@@ -96,4 +93,7 @@ RUN GMAP_URL="http://research-pub.gene.com/gmap/src/gmap-gsnap-2017-01-14.tar.gz
     wget $GMAP_URL && \
     tar xvf gmap-gsnap-2017-01-14.tar.gz && \
     cd gmap-2017-01-14 && ./configure && make && make install
+
+# patch for Set::IntervalTree
+RUN cp /usr/local/src/STAR-Fusion_v1.1.0/plugins/Set-IntervalTree-0.01/blib/lib/auto/Set/IntervalTree/autosplit.ix /usr/local/src/STAR-Fusion_v1.1.0/PerlLib/auto/Set/IntervalTree/.
 
