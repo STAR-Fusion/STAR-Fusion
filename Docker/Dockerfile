@@ -99,3 +99,7 @@ RUN cp /usr/local/src/STAR-Fusion_v1.1.0/plugins/Set-IntervalTree-0.01/blib/lib/
 
 ENV PERL5LIB ${STAR_FUSION_HOME}/PerlLib
 
+RUN cpanm install Carp::Assert
+RUN cpanm install JSON/XS.pm
+
+
