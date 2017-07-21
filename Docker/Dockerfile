@@ -103,3 +103,17 @@ RUN cpanm install Carp::Assert
 RUN cpanm install JSON/XS.pm
 
 
+## slight hack to Trinity v2.4.0 to avoid failing on few reads in genome-guided mode:
+COPY ensure_coord_sorted_sam.pl /usr/local/src/trinityrnaseq-Trinity-v2.4.0/util/support_scripts/ensure_coord_sorted_sam.pl
+
+RUN apt-get install unzip
+
+## Bowtie2
+WORKDIR $SRC
+RUN wget https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.3.2/bowtie2-2.3.2-linux-x86_64.zip/download -O bowtie2-2.3.2-linux-x86_64.zip && \
+    unzip bowtie2-2.3.2-linux-x86_64.zip && \
+        mv bowtie2-2.3.2/bowtie2* $BIN && \
+	    rm *.zip && \
+	        rm -r bowtie2-2.3.2
+
+
