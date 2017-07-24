@@ -4,7 +4,8 @@ MAINTAINER bhaas@broadinstitute.org
 
 RUN apt-get update && apt-get install -y gcc g++ perl python automake make \
                                        wget curl libdb-dev \
-				       bzip2 zlibc zlib1g zlib1g-dev  default-jre && \
+				       bzip2 zlibc zlib1g zlib1g-dev  default-jre \
+				       unzip && \
     apt-get clean
 
 RUN curl -L https://cpanmin.us | perl - App::cpanminus
@@ -20,16 +21,42 @@ RUN mkdir $DATA
 
 ## perl lib installations
 
-#RUN cpanm install Set::IntervalTree  # now included w/ STAR-Fusion
-
+RUN cpanm install Set::IntervalTree  # now included w/ STAR-Fusion
 RUN cpanm install DB_File
-
 RUN cpanm install URI::Escape
-
+RUN cpanm install Carp::Assert
+RUN cpanm install JSON::XS.pm
 
 ######################
 ## Tool installations:
 ######################
+
+
+
+########
+# GMAP
+
+RUN GMAP_URL="http://research-pub.gene.com/gmap/src/gmap-gsnap-2017-01-14.tar.gz" && \
+    cd $SRC && \
+    wget $GMAP_URL && \
+    tar xvf gmap-gsnap-2017-01-14.tar.gz && \
+    cd gmap-2017-01-14 && ./configure && make && make install
+
+
+ENV PERL5LIB ${STAR_FUSION_HOME}/PerlLib
+
+
+
+
+
+
+## Bowtie2
+WORKDIR $SRC
+RUN wget https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.3.2/bowtie2-2.3.2-linux-x86_64.zip/download -O bowtie2-2.3.2-linux-x86_64.zip && \
+    unzip bowtie2-2.3.2-linux-x86_64.zip && \
+    mv bowtie2-2.3.2/bowtie2* $BIN && \
+    rm *.zip && \
+    rm -r bowtie2-2.3.2
 
 
 ##############
@@ -85,35 +112,7 @@ RUN TRINITY_URL="https://github.com/trinityrnaseq/trinityrnaseq/archive/Trinity-
 ENV TRINITY_HOME /usr/local/src/trinityrnaseq-Trinity-v${TRINITY_VERSION}
 
 
-########
-# GMAP
-
-RUN GMAP_URL="http://research-pub.gene.com/gmap/src/gmap-gsnap-2017-01-14.tar.gz" && \
-    cd $SRC && \
-    wget $GMAP_URL && \
-    tar xvf gmap-gsnap-2017-01-14.tar.gz && \
-    cd gmap-2017-01-14 && ./configure && make && make install
-
-# patch for Set::IntervalTree
-RUN cp /usr/local/src/STAR-Fusion_v1.1.0/plugins/Set-IntervalTree-0.01/blib/lib/auto/Set/IntervalTree/autosplit.ix /usr/local/src/STAR-Fusion_v1.1.0/PerlLib/auto/Set/IntervalTree/.
-
-ENV PERL5LIB ${STAR_FUSION_HOME}/PerlLib
-
-RUN cpanm install Carp::Assert
-RUN cpanm install JSON/XS.pm
-
-
 ## slight hack to Trinity v2.4.0 to avoid failing on few reads in genome-guided mode:
-COPY ensure_coord_sorted_sam.pl /usr/local/src/trinityrnaseq-Trinity-v2.4.0/util/support_scripts/ensure_coord_sorted_sam.pl
-
-RUN apt-get install unzip
-
-## Bowtie2
-WORKDIR $SRC
-RUN wget https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.3.2/bowtie2-2.3.2-linux-x86_64.zip/download -O bowtie2-2.3.2-linux-x86_64.zip && \
-    unzip bowtie2-2.3.2-linux-x86_64.zip && \
-        mv bowtie2-2.3.2/bowtie2* $BIN && \
-	    rm *.zip && \
-	        rm -r bowtie2-2.3.2
+COPY ensure_coord_sorted_sam.pl ${TRINITY_HOME}/util/support_scripts/ensure_coord_sorted_sam.pl
 
 

@@ -74,3 +74,5 @@ clean:
 	rm -rf ./star_fusion_kickstarted_outdir
 	rm -rf ./star_fusion_SE_outdir
 	rm -rf ./star_fusion_SE_outdir_kickstart
+	(rm -rf ./test_docker_outdir) || sudo rm -rf ./test_docker_outdir
+
