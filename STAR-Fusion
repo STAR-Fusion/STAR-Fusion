@@ -278,6 +278,7 @@ main: {
             . " --runThreadN $CPU"
             . " --limitBAMsortRAM 31532137230 "
             . " --outSAMstrandField intronMotif "
+            . " --outSAMunmapped Within "
             . " --outSAMtype BAM SortedByCoordinate ";
         
         if ($USE_SHARED_MEMORY) {
