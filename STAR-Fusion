@@ -20,7 +20,7 @@ my $VERSION = "__BLEEDING_EDGE__ Do not use - pull versioned release from: https
 
 my $BASEDIR = "$FindBin::Bin";
 my $UTILDIR = "$BASEDIR/util";
-my $PLUGINSDIR "$BASEDIR/plugins";
+my $PLUGINSDIR = "$BASEDIR/plugins";
 
 ## Options
 my $output_dir = "STAR-Fusion_outdir";
@@ -233,6 +233,10 @@ if ($BBMERGE_flag && ! $right_fq_filename) {
 }
 
 
+
+my $checkpoints_dir = "$output_dir/_starF_checkpoints";
+my $star_index_dir = "$genome_lib_dir/ref_genome.fa.star.idx";
+
 main: {
     
     $output_dir = &ensure_full_path($output_dir);
@@ -249,7 +253,6 @@ main: {
     
     chdir $output_dir or die "Error, cannot cd to $output_dir";
 
-    my $checkpoints_dir = "$output_dir/_starF_checkpoints";
     unless (-d $checkpoints_dir) {
         &process_cmd("mkdir -p $checkpoints_dir");
     }
@@ -271,24 +274,30 @@ main: {
     unless ($chimeric_out_junctions_file) {
         $chimeric_out_junctions_file = "Chimeric.out.junction";
         
-        my $star_index_dir = "$genome_lib_dir/ref_genome.fa.star.idx";
+
         unless (-d $star_index_dir) {
             die "Error, cannot locate star index at $star_index_dir";
         }
         
-        &run_Star($pipeliner, $left_fq_filename, $right_fq_filename, "std");
+        &run_STAR($pipeliner, $left_fq_filename, $right_fq_filename, "std");
     
         if ($BBMERGE_flag) {
-            &run_BBMerge($pipeliner, $left_fq_filename, $right_fq_filename);
+            my $bbmerge_fq = &run_BBMerge($pipeliner, $left_fq_filename, $right_fq_filename);
 
+            &run_STAR($pipeliner, $bbmerge_fq, "", "bbmerge");
             
+            $pipeliner->add_commands(Command->new("bash -c \"set -eou pipefail; cat std.Chimeric.out.junction bbmerge.Chimeric.out.junction | sed s/\@merged-/\@/ > $chimeric_out_junctions_file\" ",
+                                                  "$checkpoints_dir/combine_chimeric_junction_files.ok"));
         }
-        
+        else {
+            # just symlink to expected chimeric junction file:
+            $pipeliner->add_commands(Command->new("ln -s std.Chimeric.out.junction $chimeric_out_junctions_file",
+                                                  "$checkpoints_dir/symlink_chim_junctions.ok"));
+        }
         
     }
     
     ## predict fusions
-
     
     my $cmd = "$UTILDIR/STAR-Fusion.predict "
         . " -J $chimeric_out_junctions_file "
@@ -535,6 +544,14 @@ sub run_STAR {
 sub run_BBMerge {
     my ($pipeliner, $left_fq_filename, $right_fq_filename) = @_;
 
-    my $cmd = "$PLUGINSDIR/plugins/bbmap/bbmerge.sh in1=$left_fq_filename in2=$right_fq_filename out=bbmerged.fq";
+    my $cmd = "$PLUGINSDIR/bbmap/bbmerge.sh in1=$left_fq_filename in2=$right_fq_filename out=bbmerged.fq";
+
+    $pipeliner->add_commands(Command->new($cmd, "$checkpoints_dir/bbmerge.ok"));
+
+    # adjust the fq record names so we know these are the merged records later on.
+    $pipeliner->add_commands(Command->new("$UTILDIR/make_merged_prefix_fq.pl bbmerged.fq > bbmerged.adj.fq", "$checkpoints_dir/bbmerge.add_merged_token.ok"));
+
+    return("bbmerged.adj.fq");
+}
 
     

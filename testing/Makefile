@@ -12,6 +12,10 @@ standard:
 	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir
 
 
+standard_bbmerge:
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_bbmerge_outdir --bbmerge
+
+
 all: standard \
      kickstart \
      kickstart_evreads \
@@ -23,6 +27,7 @@ all: standard \
      standard_coding_effect \
      standard_SE \
      kickstart_SE \
+     standard_bbmerge
 
 
 #####################################################
@@ -74,5 +79,6 @@ clean:
 	rm -rf ./star_fusion_kickstarted_outdir
 	rm -rf ./star_fusion_SE_outdir
 	rm -rf ./star_fusion_SE_outdir_kickstart
+	rm -rf ./star_fusion_bbmerge_outdir
 	(rm -rf ./test_docker_outdir) || sudo rm -rf ./test_docker_outdir
 
