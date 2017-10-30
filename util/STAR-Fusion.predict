@@ -69,6 +69,8 @@ __EOUSAGE__
     ;
 
 
+my $DEBUG;
+
 &GetOptions ( 'h' => \$help_flag,
               
               'chimeric_junction|J=s' => \$chimeric_junction_file,
@@ -79,7 +81,8 @@ __EOUSAGE__
               'min_sum_frags=i' => \$MIN_SUM_FRAGS,
               
               'out_prefix|O=s' => \$out_prefix,
-              
+
+              'd' => \$DEBUG,
     );
 
 
@@ -500,7 +503,7 @@ sub find_exon_junction_matches {
 
     my ($genome_coords_aref, $read_coords_aref) = &get_genome_coords_via_cigar($rst, $cigar);
     
-    #print "Genome coords for aln: " . Dumper(\$genome_coords_aref);
+    print STDERR "Genome coords for aln: $chr " . Dumper(\$genome_coords_aref) if $DEBUG;
 
 
     my $anchor_length = &compute_anchor_length($read_coords_aref, $left_or_right, $orient);
@@ -512,6 +515,8 @@ sub find_exon_junction_matches {
         my ($segment_lend, $segment_rend) = @$coordset;
         
         foreach my $gene_id (&get_overlapping_genes($chr_to_interval_tree_href, $chr, $segment_lend, $segment_rend)) {
+
+            print STDERR "\t-overlapping gene: $gene_id (searched: $chr, $segment_lend-$segment_rend)\n" if $DEBUG;
             
             foreach my $transcript_id (keys %{$chr_gene_trans_to_exons_href->{$chr}->{$gene_id}}) {
                 
@@ -524,9 +529,11 @@ sub find_exon_junction_matches {
                 
                 unless ($trans_lend <= $coord && $trans_rend >= $coord) { 
                     # no overlap for this isoform of the gene.
+                    print STDERR "\t\t- *no* overlap of transcript: $transcript_id, skipping...\n" if $DEBUG;
                     next; 
                 }
-                
+
+                print STDERR "\t\t-overlaps trans: $transcript_id\n" if $DEBUG;
                 ## exclude first and last exons, only looking at internal boundaries
                 $exons[0]->{terminal} = 1;
                 $exons[$#exons]->{terminal} = 1;
@@ -634,7 +641,7 @@ sub find_exon_junction_matches {
             
         } @exon_hits;
         
-        #print Dumper(\@exon_hits);
+        print STDERR "\t\tExon hits:" .  Dumper(\@exon_hits) if $DEBUG;
         
         
         # only best per gene
@@ -761,10 +768,11 @@ sub map_chimeric_reads_to_genes {
         my @A_hits = &find_exon_junction_matches($chrA, $coordA, $orientA, 'left', $chr_to_interval_tree_href, $chr_gene_trans_to_exons_href, $rst_A, $cigar_A);
 
         my @B_hits = &find_exon_junction_matches($chrB, $coordB, $orientB, 'right', $chr_to_interval_tree_href, $chr_gene_trans_to_exons_href, $rst_B, $cigar_B);
-        
-        #print STDERR "A: " . Dumper(\@A_hits);
-        #print STDERR "B: " . Dumper(\@B_hits);
-        
+
+        if ($DEBUG) {
+            print STDERR "A: " . Dumper(\@A_hits);
+            print STDERR "B: " . Dumper(\@B_hits);
+        }
         
         if (&found_selfie(\@A_hits, \@B_hits) ) {
             # skip it. likely FP
