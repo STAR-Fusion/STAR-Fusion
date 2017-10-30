@@ -232,21 +232,19 @@ if ($BBMERGE_flag && ! $right_fq_filename) {
     die "Error, can only use --bbmerge if paired-end reads are used ";
 }
 
+# ensure full paths:
+$output_dir = &ensure_full_path($output_dir);
+$genome_lib_dir = &ensure_full_path($genome_lib_dir);
+$left_fq_filename = &ensure_full_path($left_fq_filename) if $left_fq_filename;
+$right_fq_filename = &ensure_full_path($right_fq_filename) if $right_fq_filename;
+$chimeric_out_junctions_file = &ensure_full_path($chimeric_out_junctions_file) if $chimeric_out_junctions_file;
 
 
 my $checkpoints_dir = "$output_dir/_starF_checkpoints";
 my $star_index_dir = "$genome_lib_dir/ref_genome.fa.star.idx";
 
 main: {
-    
-    $output_dir = &ensure_full_path($output_dir);
-    $genome_lib_dir = &ensure_full_path($genome_lib_dir);
-    $left_fq_filename = &ensure_full_path($left_fq_filename) if $left_fq_filename;
-    $right_fq_filename = &ensure_full_path($right_fq_filename) if $right_fq_filename;
-    $chimeric_out_junctions_file = &ensure_full_path($chimeric_out_junctions_file) if $chimeric_out_junctions_file;
-
-    
-    
+            
     unless (-d $output_dir) {
         &process_cmd("mkdir -p $output_dir");
     }
@@ -286,7 +284,7 @@ main: {
 
             &run_STAR($pipeliner, $bbmerge_fq, "", "bbmerge");
             
-            $pipeliner->add_commands(Command->new("bash -c \"set -eou pipefail; cat std.Chimeric.out.junction bbmerge.Chimeric.out.junction | sed s/\@merged-/\@/ > $chimeric_out_junctions_file\" ",
+            $pipeliner->add_commands(Command->new("bash -c \"set -eou pipefail; cat std.Chimeric.out.junction bbmerge.Chimeric.out.junction | sed s/merged-// > $chimeric_out_junctions_file\" ",
                                                   "$checkpoints_dir/combine_chimeric_junction_files.ok"));
         }
         else {
