@@ -405,8 +405,8 @@ main: {
     
     
     if ($FUSIONINSPECTOR_MODE) {
-
-        my $FI_outdir = "$output_dir/FusionInspector";
+        
+        my $FI_outdir = "$output_dir/FusionInspector-${FUSIONINSPECTOR_MODE}";
 
         my $FI_cmd = "";
         
