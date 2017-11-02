@@ -27,7 +27,9 @@ all: standard \
      standard_coding_effect \
      standard_SE \
      kickstart_SE \
-     standard_bbmerge
+     standard_bbmerge \
+     standard_bbmerge_FI_inspect \
+     standard_bbmerge_FI_validate
 
 
 #####################################################
@@ -68,6 +70,19 @@ standard_SE:
 
 kickstart_SE:
 	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB} -J __kickstart_data/Chimeric.out.junction  --FusionInspector inspect --annotate --examine_coding_effect --left_fq ${left_fq} -O star_fusion_SE_outdir_kickstart
+
+
+##############################
+### bbmerge
+
+standard_bbmerge_FI_inspect: standard_bbmerge
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_bbmerge_outdir --bbmerge --FusionInspector inspect --annotate --examine_coding_effect 
+
+
+standard_bbmerge_FI_validate: standard_bbmerge
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_bbmerge_outdir --bbmerge --FusionInspector validate --annotate --examine_coding_effect 
+
+
 
 
 
