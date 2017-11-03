@@ -85,3 +85,11 @@ RUN TRINITY_URL="https://github.com/trinityrnaseq/trinityrnaseq/archive/Trinity-
 ENV TRINITY_HOME /usr/local/src/trinityrnaseq-Trinity-v${TRINITY_VERSION}
 
 
+## Bowtie2
+WORKDIR $SRC
+RUN wget https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.3.3.1/bowtie2-2.3.3.1-linux-x86_64.zip/download -O bowtie2-2.3.3.1-linux-x86_64.zip && \
+    unzip bowtie2-2.3.3.1-linux-x86_64.zip && \
+    mv bowtie2-2.3.3.1-linux-x86_64/bowtie2* $BIN && \
+    rm *.zip && \
+    rm -r bowtie2-2.3.3.1-linux-x86_64
+
