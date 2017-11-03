@@ -32,33 +32,6 @@ RUN cpanm install JSON::XS.pm
 ######################
 
 
-
-########
-# GMAP
-
-RUN GMAP_URL="http://research-pub.gene.com/gmap/src/gmap-gsnap-2017-01-14.tar.gz" && \
-    cd $SRC && \
-    wget $GMAP_URL && \
-    tar xvf gmap-gsnap-2017-01-14.tar.gz && \
-    cd gmap-2017-01-14 && ./configure && make && make install
-
-
-ENV PERL5LIB ${STAR_FUSION_HOME}/PerlLib
-
-
-
-
-
-
-## Bowtie2
-WORKDIR $SRC
-RUN wget https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.3.2/bowtie2-2.3.2-linux-x86_64.zip/download -O bowtie2-2.3.2-linux-x86_64.zip && \
-    unzip bowtie2-2.3.2-linux-x86_64.zip && \
-    mv bowtie2-2.3.2/bowtie2* $BIN && \
-    rm *.zip && \
-    rm -r bowtie2-2.3.2
-
-
 ##############
 ## STAR
 
@@ -73,15 +46,15 @@ RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" 
 ###############
 ## STAR-Fusion:
 
-ENV STAR_FUSION_VERSION=1.1.0
+ENV STAR_FUSION_VERSION=1.2.0
 
-RUN STAR_FUSION_URL="https://github.com/STAR-Fusion/STAR-Fusion/releases/download/v${STAR_FUSION_VERSION}/STAR-Fusion_v${STAR_FUSION_VERSION}.tar.gz" && \
+RUN STAR_FUSION_URL="https://github.com/STAR-Fusion/STAR-Fusion/releases/download/STAR-Fusion-v1.2.0/STAR-Fusion-v1.2.0.FULL.tar.gz" && \
     cd $SRC && \
     wget $STAR_FUSION_URL && \
-    tar xvf STAR-Fusion_v${STAR_FUSION_VERSION}.tar.gz && \
-    cd STAR-Fusion_v${STAR_FUSION_VERSION} && make
+    tar xvf STAR-Fusion-v1.2.0.FULL.tar.gz && \
+    cd STAR-Fusion-v1.2.0 && make
 
-ENV STAR_FUSION_HOME $SRC/STAR-Fusion_v${STAR_FUSION_VERSION}
+ENV STAR_FUSION_HOME $SRC/STAR-Fusion-v1.2.0
 
 ## FusionInspector now included with STAR-Fusion
 
@@ -100,7 +73,7 @@ RUN SAMTOOLS_URL="https://github.com/samtools/samtools/releases/download/1.3.1/s
 ########
 # Trinity
 
-ENV TRINITY_VERSION=2.4.0
+ENV TRINITY_VERSION=2.5.1
 
 RUN TRINITY_URL="https://github.com/trinityrnaseq/trinityrnaseq/archive/Trinity-v${TRINITY_VERSION}.tar.gz" && \
    cd $SRC && \
@@ -110,9 +83,5 @@ RUN TRINITY_URL="https://github.com/trinityrnaseq/trinityrnaseq/archive/Trinity-
 
 
 ENV TRINITY_HOME /usr/local/src/trinityrnaseq-Trinity-v${TRINITY_VERSION}
-
-
-## slight hack to Trinity v2.4.0 to avoid failing on few reads in genome-guided mode:
-COPY ensure_coord_sorted_sam.pl ${TRINITY_HOME}/util/support_scripts/ensure_coord_sorted_sam.pl
 
 
