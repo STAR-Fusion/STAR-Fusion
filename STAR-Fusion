@@ -15,8 +15,8 @@ use Process_cmd;
 
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
-#my $VERSION = "1.1.0";
-my $VERSION = "__BLEEDING_EDGE__ Do not use - pull versioned release from: https://github.com/STAR-Fusion/STAR-Fusion/releases";
+my $VERSION = "1.2.0";
+#my $VERSION = "__BLEEDING_EDGE__ Do not use - pull versioned release from: https://github.com/STAR-Fusion/STAR-Fusion/releases";
 
 my $BASEDIR = "$FindBin::Bin";
 my $UTILDIR = "$BASEDIR/util";

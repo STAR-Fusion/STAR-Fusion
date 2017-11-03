@@ -1,3 +1,26 @@
+STAR-Fusion Release v1.2.0
+	Added --bbmerge : runs STAR w/ paired-end reads but then also runs STAR using 'super-reads' assembled via the bbmerge software.  This helps in cases where fragments are short and/or the paired-end reads overlap.
+	Bugfixes related to inframe vs. frameshift detection wrt setting coding phases of exons.
+	Removed filtering of blast-pairs where sequences are shared due to physical overlap on the genome (false negatives).
+	FusionInspector 'inspect' and 'validate' modes write to corresponding separately named directories.
+	Plug-n-play ctat genome libs are updated wrt removing blast pairs for overlapping genes and CDS phasing information for reference proteins. (GRCh37_gencode_v19_CTAT_lib_Nov012017 and GRCh38_gencode_v26_CTAT_lib_Nov012017)
+
+	Instead of downloading the new ctat genome lib, users can patch the earlier: GRCh37_gencode_v19_CTAT_lib_July192017 or GRCh38_gencode_v26_CTAT_lib_July192017 involving 3 steps:
+	   cd /path/to/existing/ctat_genome_lib_dir
+           STAR-Fusion/FusionFilter/util/index_blast_pairs.remove_overlapping_genes.pl .
+	   STAR-Fusion/FusionFilter/util/build_prot_info_db.pl --gtf ref_annot.gtf --genome_fa ref_genome.fa --out_prefix ref_annot
+
+	
+STAR-Fusion Release v1.1.0
+	Much new functionality is included in this release v1.1.0:
+	Note: v1.1.0 requires a new CTAT_genome_lib: https://data.broadinstitute.org/Trinity/CTAT_RESOURCE_LIB/
+	annotating fusions based on known cancer fusions (--annotate)
+	exploring the effects on fused coding regions, reconstructing candidate fusion transcripts and fusion proteins (--examine_coding_effect)
+	extracting the fastq reads that provide the evidence for fusion transcripts (use --extract_fusion_reads)
+	perform 'in silico validation' of fusion transcripts using FusionInspector ( --FusionInspector <inspect|validate> )
+	de novo reconstruct fusion transcripts using Trinity (--denovo_reconstruct)
+
+
 Version 1.0.0 (Feb 1, 2017)
 	including dinucleotide splice sites in the report
 	incorporate FFPM values whenever fastq reads are given, regardless of using the chimeric junction files direction.
