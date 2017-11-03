@@ -93,3 +93,12 @@ RUN wget https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.3.3.1/bowti
     rm *.zip && \
     rm -r bowtie2-2.3.3.1-linux-x86_64
 
+########
+# GMAP
+
+RUN GMAP_URL="http://research-pub.gene.com/gmap/src/gmap-gsnap-2017-10-30.tar.gz" && \
+    cd $SRC && \
+    wget $GMAP_URL && \
+    tar xvf gmap-gsnap-2017-10-30.tar.gz && \
+    cd gmap-2017-10-30 && ./configure && make && make install
+
