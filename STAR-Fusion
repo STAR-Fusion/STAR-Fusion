@@ -36,13 +36,14 @@ my $verbose_level = 2;
 my $MIN_JUNCTION_READS = 1;
 my $MIN_SUM_FRAGS = 2;
 my $MAX_PROMISCUITY = 3;  # perhaps a poor choice of words, but still a best fit IMHO.
-my $genome_lib_dir;
+my $genome_lib_dir = $ENV{CTAT_GENOME_LIB};
 my $CPU = 4; 
 my $REQUIRE_LDAS = 1;
 
 my $BBMERGE_flag = 0;
 
 my $STAR_MAX_MATE_DIST = 100000;
+
 
 my $usage = <<__EOUSAGE__;
 
@@ -63,12 +64,11 @@ my $usage = <<__EOUSAGE__;
 #
 #
 #    --genome_lib_dir <string>             directory containing genome lib (see http://STAR-Fusion.github.io)
-#
-#    --output_dir|O <string>               output directory  (default: $output_dir) 
-#
-#
+#                                          (required to specify, unless env var CTAT_GENOME_LIB is set to it)
 #
 #  Optional:
+#
+#    --output_dir|O <string>               output directory  (default: $output_dir) 
 #
 #    --bbmerge                             to handle overlapping fusion reads, use bbmerge to first assemble the reads.
 #   
@@ -111,6 +111,8 @@ my $usage = <<__EOUSAGE__;
 #
 #    --no_filter                           do not filter predictions.
 # 
+#    --STAR_PATH <string>                  /path/to/STAR  (default: uses STAR found in PATH setting).
+#
 #    --STAR_use_shared_memory              use shared memory among multiple processes for the STAR alignment step
 #                                           # note, when this option is used, twopass mode is disabled, as it's incompatible w/ shared mem.
 #                                          ** (when all your jobs are done, be sure to run: 'STAR --genomeLoad Remove' to unload it) **
@@ -142,6 +144,9 @@ my $FUSIONINSPECTOR_MODE = 0;
 my $DENOVO_RECONSTRUCT = 0;
 my $ANNOTATE = 0;
 my $EXAMINE_CODING_EFFECT = 0;
+
+my $STAR_PROG;
+
 
 &GetOptions ( 'help|h' => \$help_flag,
               
@@ -179,6 +184,8 @@ my $EXAMINE_CODING_EFFECT = 0;
               'STAR_use_shared_memory' => \$USE_SHARED_MEMORY,
               'STAR_MAX_MATE_DIST=i' => \$STAR_MAX_MATE_DIST,
 
+              'STAR_PATH=s' => \$STAR_PROG,
+              
               'extract_fusion_reads' => \$EXTRACT_FUSION_READS,
               'FusionInspector=s' => \$FUSIONINSPECTOR_MODE,
               'denovo_reconstruct' => \$DENOVO_RECONSTRUCT,
@@ -200,6 +207,21 @@ unless ( ($left_fq_filename || $chimeric_out_junctions_file) && $genome_lib_dir)
     die $usage;
 }
 
+if ($STAR_PROG) {
+    unless (-e $STAR_PROG) {
+        die "Error, STAR program set to $STAR_PROG but can't be found";
+    }
+    # adding path to star to the PATH setting in case it needs to be used for FusionInspector later on.
+    my $star_basedir = &ensure_full_path(dirname($STAR_PROG));
+    $ENV{PATH} = "$star_basedir:$ENV{PATH}";
+}
+else {
+    $STAR_PROG = `which STAR`;
+    chomp $STAR_PROG;
+    unless ($STAR_PROG =~ /\w/) {
+        die "Error, cannot locate STAR program in the PATH setting";
+    }
+}
 
 if ($FUSIONINSPECTOR_MODE) {
     unless ($FUSIONINSPECTOR_MODE =~ /^(inspect|validate)$/) {
@@ -489,7 +511,7 @@ sub run_STAR {
     my ($pipeliner, $left_fq_filename, $right_fq_filename, $output_prefix) = @_;
     
     ## run STAR to align reads:
-    my $cmd = "STAR --genomeDir $star_index_dir "
+    my $cmd = "$STAR_PROG --genomeDir $star_index_dir "
         . " --readFilesIn $left_fq_filename $right_fq_filename "
         . " --outReadsUnmapped None "
         . " --chimSegmentMin 12 "
