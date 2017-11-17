@@ -1009,7 +1009,7 @@ sub build_interval_tree {
     }
 
     my $time_end = time();
-    my $duration = sprintf("%.2", ($time_end - $time_start) / 60);
+    my $duration = sprintf("%.2f", ($time_end - $time_start) / 60);
     
     print STDERR "-done building interval tree ($duration min).\n";
     
