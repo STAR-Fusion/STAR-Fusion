@@ -9,7 +9,6 @@ use Cwd;
 use FindBin;
 use lib ("$FindBin::Bin/PerlLib");
 use Pipeliner;
-use Set::IntervalTree;
 use File::Basename;
 use Process_cmd;
 
