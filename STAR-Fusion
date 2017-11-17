@@ -111,15 +111,22 @@ my $usage = <<__EOUSAGE__;
 #
 #    --no_filter                           do not filter predictions.
 # 
+#    --STAR_max_mate_dist <int>            maximum distance between mates  (also used for the maximum intron length value)  default:  $STAR_MAX_MATE_DIST
+#
+#    --version                             report version ($VERSION)
+#
+#  STAR program configurations:
+#
 #    --STAR_PATH <string>                  /path/to/STAR  (default: uses STAR found in PATH setting).
 #
 #    --STAR_use_shared_memory              use shared memory among multiple processes for the STAR alignment step
 #                                           # note, when this option is used, twopass mode is disabled, as it's incompatible w/ shared mem.
-#                                          ** (when all your jobs are done, be sure to run: 'STAR --genomeLoad Remove' to unload it) **
+#                                          ** (when all your jobs are done, be sure to run: 'STAR-Fusion --STAR_Remove' to unload it) **
 #
-#    --STAR_max_mate_dist <int>            maximum distance between mates  (also used for the maximum intron length value)  default:  $STAR_MAX_MATE_DIST
+#    --STAR_LoadAndExit                    runs STAR to load the genome index into shared RAM, then exits.
 #
-#    --version                             report version ($VERSION)
+#    --STAR_Remove                         removes genome from shared RAM and exits.
+#
 #
 ###################################################################################
 
@@ -147,6 +154,9 @@ my $EXAMINE_CODING_EFFECT = 0;
 
 my $STAR_PROG;
 my $DEVEL_STAR;
+
+my $STAR_LOAD_AND_EXIT;
+my $STAR_REMOVE;
 
 &GetOptions ( 'help|h' => \$help_flag,
               
@@ -181,7 +191,11 @@ my $DEVEL_STAR;
               
               'CPU=i' => \$CPU,
 
+              # shared memory options
               'STAR_use_shared_memory' => \$USE_SHARED_MEMORY,
+              'STAR_LoadAndExit' => \$STAR_LOAD_AND_EXIT,
+              'STAR_Remove' => \$STAR_REMOVE,
+              
               'STAR_MAX_MATE_DIST=i' => \$STAR_MAX_MATE_DIST,
 
               'STAR_PATH=s' => \$STAR_PROG,
@@ -206,10 +220,6 @@ if ($REPORT_VERSION) {
     exit(0);
 }
 
-unless ( ($left_fq_filename || $chimeric_out_junctions_file) && $genome_lib_dir) {
-    die $usage;
-}
-
 if ($STAR_PROG) {
     unless (-e $STAR_PROG) {
         die "Error, STAR program set to $STAR_PROG but can't be found";
@@ -225,6 +235,11 @@ else {
         die "Error, cannot locate STAR program in the PATH setting";
     }
 }
+
+
+
+
+
 
 if ($FUSIONINSPECTOR_MODE) {
     unless ($FUSIONINSPECTOR_MODE =~ /^(inspect|validate)$/) {
@@ -258,15 +273,37 @@ if ($BBMERGE_flag && ! $right_fq_filename) {
 }
 
 # ensure full paths:
-$output_dir = &ensure_full_path($output_dir);
+
 $genome_lib_dir = &ensure_full_path($genome_lib_dir);
+my $star_index_dir = "$genome_lib_dir/ref_genome.fa.star.idx";
+
+if ($STAR_LOAD_AND_EXIT) {
+    my $cmd = "$STAR_PROG --genomeDir $star_index_dir --genomeLoad LoadAndExit";
+    &process_cmd($cmd);
+    print STDERR "-done loading genome into shared memory.\n";
+    exit(0);
+}
+elsif ($STAR_REMOVE) {
+    my $cmd = "$STAR_PROG --genomeDir $star_index_dir --genomeLoad Remove";
+    &process_cmd($cmd);
+    print STDERR "-done removing genome from shared memory.\n";
+    exit(0);
+}
+
+
+unless ( ($left_fq_filename || $chimeric_out_junctions_file) && $genome_lib_dir) {
+    die $usage;
+}
+
+
+$output_dir = &ensure_full_path($output_dir);
 $left_fq_filename = &ensure_full_path($left_fq_filename) if $left_fq_filename;
 $right_fq_filename = &ensure_full_path($right_fq_filename) if $right_fq_filename;
 $chimeric_out_junctions_file = &ensure_full_path($chimeric_out_junctions_file) if $chimeric_out_junctions_file;
 
 
 my $checkpoints_dir = "$output_dir/_starF_checkpoints";
-my $star_index_dir = "$genome_lib_dir/ref_genome.fa.star.idx";
+
 
 main: {
             
@@ -350,6 +387,7 @@ main: {
         
         $cmd = "$UTILDIR/STAR-Fusion.filter "
             . " --fusion_preds $predicted_fusions_with_splice_info "
+            . " -J $chimeric_out_junctions_file "
             . " -E $Evalue "
             . " --tmpdir $tmpdir "
             . " --min_junction_reads $MIN_JUNCTION_READS "
@@ -544,6 +582,7 @@ sub run_STAR {
     }
     else {
         # note, twopassMode is incompatible with shared memory (--genomeLoad LoadAndKeep)
+        $cmd .= " --genomeLoad NoSharedMemory ";
         $cmd .= " --twopassMode Basic ";
     }
     
