@@ -146,7 +146,7 @@ my $ANNOTATE = 0;
 my $EXAMINE_CODING_EFFECT = 0;
 
 my $STAR_PROG;
-
+my $DEVEL_STAR;
 
 &GetOptions ( 'help|h' => \$help_flag,
               
@@ -191,6 +191,9 @@ my $STAR_PROG;
               'denovo_reconstruct' => \$DENOVO_RECONSTRUCT,
               
               'bbmerge' => \$BBMERGE_flag,
+    
+
+              'DEVEL_STAR' => \$DEVEL_STAR,
     );
 
 
@@ -519,13 +522,22 @@ sub run_STAR {
         . " --alignSJDBoverhangMin 10 "   
         . " --alignMatesGapMax $STAR_MAX_MATE_DIST "
         . " --alignIntronMax $STAR_MAX_MATE_DIST "
-        . " --chimSegmentReadGapMax 3 "
         . " --alignSJstitchMismatchNmax 5 -1 5 5 "  #which allows for up to 5 mismatches for non-canonical GC/AG, and AT/AC junctions, and any number of mismatches for canonical junctions (the default values 0 -1 0 0 replicate the old behavior (from AlexD)
         . " --runThreadN $CPU"
         . " --limitBAMsortRAM 31532137230 "
         . " --outSAMstrandField intronMotif "
         . " --outSAMunmapped Within "
         . " --outSAMtype BAM SortedByCoordinate ";
+
+
+
+    if ($DEVEL_STAR) {
+        $cmd .= " --chimMultimapScoreRange 10 --chimMultimapNmax 50 --chimNonchimScoreDropMin 10 ";
+    }
+    else {
+        $cmd .= " --chimSegmentReadGapMax 3 ";
+    }
+    
     
     if ($USE_SHARED_MEMORY) {
         $cmd .= " --genomeLoad LoadAndKeep ";

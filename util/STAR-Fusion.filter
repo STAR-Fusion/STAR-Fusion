@@ -35,6 +35,8 @@ my $usage = <<__EOUSAGE__;
 #                                 Required formatting is:  
 #                                 geneA--geneB (tab) junction_read_count (tab) spanning_read_count (tab) ... rest
 #
+#  --chimeric_junction|J <string>        Chimeric.out.junction file
+#
 #  --out_prefix <string>          prefix for output filename (will tack on .final and .final.abridged)
 #
 #  --genome_lib_dir <string>      genome lib directory for FusionFilter
@@ -74,10 +76,13 @@ my $help_flag;
 my $fusion_preds_file;
 my $out_prefix;
 my $genome_lib_dir;
+my $chimeric_out_junctions_file;
+
 
 &GetOptions ( 'h' => \$help_flag, 
               
               'fusion_preds=s' => \$fusion_preds_file,
+              'chimeric_junction|J=s' => \$chimeric_out_junctions_file,
                             
               'out_prefix=s' => \$out_prefix,
 
@@ -110,7 +115,7 @@ if ($help_flag) {
     die $usage;
 }
 
-unless ($fusion_preds_file && $genome_lib_dir && $out_prefix) {
+unless ($fusion_preds_file && $genome_lib_dir && $out_prefix && $chimeric_out_junctions_file) {
     die $usage;
 }
 
@@ -154,9 +159,7 @@ main: {
         my $spanning_frags = $row->{SpanningFrags};
         my $long_double_anchor_support = $row->{LargeAnchorSupport};
         
-        my $score = $J*4 + $S;
-        
-        
+                
         #TODO: use keys that match the column headers for sanity sake
         my $fusion = { fusion_name => $fusion_name,
                        
@@ -176,11 +179,13 @@ main: {
                        
                        ldas => $long_double_anchor_support,
 
-                       score => $score, 
+                       score => undef, # assigned below
                        
                        row => $row,
         };
-    
+
+        &score_fusion($fusion);
+        
         push (@fusions, $fusion); 
     }
 
@@ -193,7 +198,19 @@ main: {
     
     @fusions = &merge_neighboring_nonref_splice(\@fusions, $filter_tab_writer);
 
+    @fusions = reverse sort {$a->{score} <=> $b->{score} } @fusions;
 
+    &assign_reads_parsimoniously(@fusions);
+    
+    @fusions = reverse sort {$a->{score} <=> $b->{score} } @fusions;
+
+
+    my %read_mapping_counts = &parse_read_mapping_counts($chimeric_out_junctions_file);
+    
+    &penalize_nondominant_fusion_multimap_reads(\@fusions, \%read_mapping_counts);
+
+    @fusions = reverse sort {$a->{score} <=> $b->{score} } @fusions;
+    
     @fusions = &remove_fusions_with_insufficient_support(\@fusions, $filter_tab_writer, $MIN_JUNCTION_READS, $MIN_SUM_FRAGS);
     
     @fusions = &remove_minor_nonref_isoforms(\@fusions, $filter_tab_writer);
@@ -389,11 +406,9 @@ sub merge_fusions {
 
     $fusion_keep->{junction_reads} = join(",", @new_junc_read_list) || ".";
     $fusion_keep->{spanning_frags} = join(",", @new_span_frag_list) || ".";
-
     
-    $fusion_keep->{score} = 4 * $new_count_junc_reads + $new_count_span_frags;
+    &score_fusion($fusion_keep);
     
-
     return($fusion_keep);
 }
 
@@ -501,5 +516,145 @@ sub remove_fusions_with_insufficient_support {
     }
 
     return(@ret_fusions);
+}
+
+####
+sub score_fusion {
+    my ($fusion) = @_;
+
+    my $J = $fusion->{J};
+    my $S = $fusion->{S};
+    
+    my $score = $J*4 + $S;
+
+    $fusion->{score} = $score;
+}
+
+####
+sub assign_reads_parsimoniously {
+    my @fusions = @_;
+
+    ## Reads can be assigned uniquely to one fusion, given to that fusion with the highest preliminary score.
+    ## After reassignment, fusions are rescored.
+
+    my %read_allocated;
+
+    foreach my $fusion (@fusions) {
+
+        # examine junction reads first
+        my $junction_reads_string = $fusion->{junction_reads};
+        if ($junction_reads_string ne '.') {
+            my @j_reads = split(/,/, $junction_reads_string);
+            my @retained_j_reads;
+            foreach my $j_read (@j_reads) {
+                unless ($read_allocated{$j_read}) {
+                    push (@retained_j_reads, $j_read);
+                    $read_allocated{$j_read} = 1;
+                }
+            }
+            if (@retained_j_reads) {
+                $fusion->{J} = scalar(@retained_j_reads);
+                $fusion->{junction_reads} = join(",", @retained_j_reads);
+            }
+            else {
+                $fusion->{J} = 0;
+                $fusion->{junction_reads} = ".";
+            }
+        }
+    
+        ## now spanning frags
+        my $spanning_frags_string = $fusion->{spanning_frags};
+        if ($spanning_frags_string ne '.') {
+            my @s_frags = split(/,/, $spanning_frags_string);
+            my @retained_s_frags;
+            foreach my $s_frag (@s_frags) {
+                unless ($read_allocated{$s_frag}) {
+                    push (@retained_s_frags, $s_frag);
+                    $read_allocated{$s_frag} = 1;
+                }
+            }
+            if (@retained_s_frags) {
+                $fusion->{S} = scalar(@retained_s_frags);
+                $fusion->{spanning_frags} = join(",", @retained_s_frags);
+            }
+            else {
+                $fusion->{S} = 0;
+                $fusion->{spanning_frags} = '.';
+            }
+        }
+
+        &score_fusion($fusion);
+    }
+
+    return;
+}
+
+
+####
+sub parse_read_mapping_counts {
+    my ($chimeric_junctions_file) = @_;
+
+    my %read_counts;
+    
+    open(my $fh, $chimeric_junctions_file) or die "Error, cannot open file $chimeric_junctions_file";
+    while (<$fh>) {
+        chomp;
+        my @x = split(/\t/);
+        my $read_name = $x[9];
+
+        $read_counts{$read_name}++;
+    }
+    close $fh;
+    
+    return(%read_counts);
+    
+}
+
+sub penalize_nondominant_fusion_multimap_reads {
+    my ($fusions_aref, $read_mapping_counts_href) = @_;
+
+    my %seen_genes;
+
+    foreach my $fusion (@$fusions_aref) {
+        my $geneA = $fusion->{geneA};
+        my $geneB = $fusion->{geneB};
+
+        if ($seen_genes{$geneA} || $seen_genes{$geneB}) {
+            ## penalize multimapping reads
+            my $junction_reads_string = $fusion->{junction_reads};
+            if ($junction_reads_string ne '.') {
+                my $new_J_count = 0;
+                my @J_reads = split(/,/, $junction_reads_string);
+                foreach my $J_read (@J_reads) {
+                    my $mapping_count = $read_mapping_counts_href->{$J_read};
+                    unless ($mapping_count) {
+                        confess "Error, missing mapping count for junction read: [$J_read] ";
+                    }
+                    $new_J_count +=  1/$mapping_count;
+                }
+                $fusion->{J} = int($new_J_count + 0.5);
+            }
+
+            my $spanning_frags_string = $fusion->{spanning_frags};
+            if ($spanning_frags_string ne '.') {
+                my $new_S_count = 0;
+                my @S_frags = split(/,/, $spanning_frags_string);
+                foreach my $S_frag (@S_frags) {
+                    my $mapping_count = $read_mapping_counts_href->{$S_frag};
+                    unless ($mapping_count) {
+                        confess "Error, missing mapping count for spanning frag: [$S_frag] ";
+                    }
+                    $new_S_count += 1/$mapping_count;
+                }
+                $fusion->{S} = int($new_S_count + 0.5);
+            }
+
+            &score_fusion($fusion);
+        }
+        $seen_genes{$geneA} = 1;
+        $seen_genes{$geneB} = 1;
+    }
+
+    return;
 }
 
