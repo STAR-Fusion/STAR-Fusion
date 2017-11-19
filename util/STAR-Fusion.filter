@@ -207,7 +207,7 @@ main: {
 
     my %read_mapping_counts = &parse_read_mapping_counts($chimeric_out_junctions_file);
     
-    &penalize_nondominant_fusion_multimap_reads(\@fusions, \%read_mapping_counts);
+    &penalize_nondominant_fusion_multimap_reads(\@fusions, \%read_mapping_counts, $intermediates_out_prefix);
 
     @fusions = reverse sort {$a->{score} <=> $b->{score} } @fusions;
     
@@ -611,50 +611,66 @@ sub parse_read_mapping_counts {
 }
 
 sub penalize_nondominant_fusion_multimap_reads {
-    my ($fusions_aref, $read_mapping_counts_href) = @_;
+    my ($fusions_aref, $read_mapping_counts_href, $outfile_prefix) = @_;
 
-    my %seen_genes;
+    open(my $ofh, ">$outfile_prefix.scores_adjusted_for_multimapping") or die "Error, cannot write to file: $outfile_prefix.scores_adjusted_for_multimapping";
+    
+    
+    my %seen_reads;
 
     foreach my $fusion (@$fusions_aref) {
-        my $geneA = $fusion->{geneA};
-        my $geneB = $fusion->{geneB};
-
-        if ($seen_genes{$geneA} || $seen_genes{$geneB}) {
-            ## penalize multimapping reads
-            my $junction_reads_string = $fusion->{junction_reads};
-            if ($junction_reads_string ne '.') {
-                my $new_J_count = 0;
-                my @J_reads = split(/,/, $junction_reads_string);
-                foreach my $J_read (@J_reads) {
-                    my $mapping_count = $read_mapping_counts_href->{$J_read};
-                    unless ($mapping_count) {
-                        confess "Error, missing mapping count for junction read: [$J_read] ";
-                    }
+        
+        
+        my ($fusion_name, $orig_J, $orig_S) = ($fusion->{'#FusionName'}, $fusion->{J}, $fusion->{S});
+        
+        ## penalize multimapping reads
+        my $junction_reads_string = $fusion->{junction_reads};
+        if ($junction_reads_string ne '.') {
+            my $new_J_count = 0;
+            my @J_reads = split(/,/, $junction_reads_string);
+            foreach my $J_read (@J_reads) {
+                my $mapping_count = $read_mapping_counts_href->{$J_read};
+                unless ($mapping_count) {
+                    confess "Error, missing mapping count for junction read: [$J_read] ";
+                }
+                if (! $seen_reads{$J_read}) {
+                    $new_J_count += 1;
+                    $seen_reads{$J_read} = 1;
+                }
+                else {
                     $new_J_count +=  1/$mapping_count;
                 }
-                $fusion->{J} = int($new_J_count + 0.5);
             }
-
-            my $spanning_frags_string = $fusion->{spanning_frags};
-            if ($spanning_frags_string ne '.') {
-                my $new_S_count = 0;
-                my @S_frags = split(/,/, $spanning_frags_string);
-                foreach my $S_frag (@S_frags) {
-                    my $mapping_count = $read_mapping_counts_href->{$S_frag};
-                    unless ($mapping_count) {
-                        confess "Error, missing mapping count for spanning frag: [$S_frag] ";
-                    }
+            $fusion->{J} = int($new_J_count + 0.5);
+        }
+        
+        my $spanning_frags_string = $fusion->{spanning_frags};
+        if ($spanning_frags_string ne '.') {
+            my $new_S_count = 0;
+            my @S_frags = split(/,/, $spanning_frags_string);
+            foreach my $S_frag (@S_frags) {
+                my $mapping_count = $read_mapping_counts_href->{$S_frag};
+                unless ($mapping_count) {
+                    confess "Error, missing mapping count for spanning frag: [$S_frag] ";
+                }
+                if (! $seen_reads{$S_frag}) {
+                    $new_S_count += 1;
+                    $seen_reads{$S_frag} = 1;
+                }
+                else {
                     $new_S_count += 1/$mapping_count;
                 }
-                $fusion->{S} = int($new_S_count + 0.5);
             }
-
-            &score_fusion($fusion);
+            $fusion->{S} = int($new_S_count + 0.5);
         }
-        $seen_genes{$geneA} = 1;
-        $seen_genes{$geneB} = 1;
+        
+        &score_fusion($fusion);
+
+        print $ofh join("\t", $fusion_name, "($orig_J,$orig_S)", "->", "($fusion->{J},$fusion->{S})") . "\n";
     }
 
+    close $ofh;
+    
     return;
 }
 
