@@ -621,7 +621,7 @@ sub penalize_nondominant_fusion_multimap_reads {
     foreach my $fusion (@$fusions_aref) {
         
         
-        my ($fusion_name, $orig_J, $orig_S) = ($fusion->{'#FusionName'}, $fusion->{J}, $fusion->{S});
+        my ($fusion_name, $orig_J, $orig_S) = ($fusion->{fusion_name}, $fusion->{J}, $fusion->{S});
         
         ## penalize multimapping reads
         my $junction_reads_string = $fusion->{junction_reads};
