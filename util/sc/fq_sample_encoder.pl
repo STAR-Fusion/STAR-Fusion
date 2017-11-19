@@ -34,11 +34,11 @@ sub parse_samples_file {
     my @left_fq_array;
     my @right_fq_array;
     
-    open(my $fh, $samples_file) or die "Error, cannot open file: $samples_file";
+    open(my $fh, $samples_file) or die "Error, cannot open samples file: $samples_file";
     while (<$fh>) {
         chomp;
         my @x = split(/\t/);
-        my ($sample_name, $left_fq_file, $right_fq_file) = split(/\t/);
+        my ($sample_name, $left_fq_file, $right_fq_file) = split(/\s+/);
 
         push (@left_fq_array, [$sample_name, $left_fq_file]);
 
@@ -61,7 +61,8 @@ sub write_sample_encoded_fq {
 
     foreach my $sample_fq (@$fq_list_aref) {
         my ($sample_name, $fq_file) = @$sample_fq;
-
+        print STDERR "\t-processing file: $fq_file\n";
+        
         my $fq_reader = new Fastq_reader($fq_file);
 
         while (my $record = $fq_reader->next()) {
