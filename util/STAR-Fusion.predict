@@ -658,7 +658,7 @@ sub map_chimeric_reads_to_genes {
         if ($counter % 100 == 0) {
             my $time = time();
             my $seconds = $time - $start_time;
-            if ($seconds) {
+            if ($seconds && $counter % 10000 == 0) {
                 my $rate = sprintf("%.2f", $counter / $seconds * 60);
                 print STDERR "\r[$counter], rate=$rate/min ";
             }
