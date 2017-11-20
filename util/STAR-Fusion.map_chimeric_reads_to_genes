@@ -10,12 +10,6 @@ use FindBin;
 use lib ("$FindBin::Bin/../PerlLib");
 use File::Basename;
 use Data::Dumper;
-use SAM_reader;
-use SAM_entry;
-use Gene_obj_indexer;
-use GTF_utils;
-use Process_cmd;
-use DelimParser;
 use Set::IntervalTree;
 use JSON::XS;
 
