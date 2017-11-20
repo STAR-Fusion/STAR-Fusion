@@ -1,0 +1,192 @@
+#!/usr/bin/env perl
+
+# contributed by Brian Haas, Broad Institute, 2015
+
+use strict;
+use warnings;
+use Carp;
+use Cwd;
+use FindBin;
+use lib ("$FindBin::Bin/../PerlLib");
+use Data::Dumper;
+use Set::IntervalTree;
+use JSON::XS;
+
+use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
+
+my $UTILDIR = "$FindBin::Bin/util";
+
+## Options
+my $chimeric_junction_file;
+my $help_flag;
+my $min_pct_multimapping_to_genes;
+
+my $LONG_ANCHOR_SIZE = 25;
+
+my $usage = <<__EOUSAGE__;
+
+
+##################################################################################################
+
+Removes chimeric reads that have the following properties:
+
+    -both chim ends hit the same gene (selfie)
+    -less than -M percent of the mappings hit any 2 genes (indication of non-specific mappings)
+
+###################################################################################################
+#
+#  Required:
+#
+#    --annotated_junctions|J <string>     annotated junctions file, chimeric reads mapped to genes
+#
+#    -M <int>                             min pct of multimapping reads that should map to 2 genes
+#                                         (avoids multimapping reads that lack specificity)
+#                                           value must be between [1,100]
+#
+#    --filt_file <string>                 file to write the problematic reads to (those removed).
+#                                         The primary output (passing reads) is to stdout.
+#
+#    
+###################################################################################################
+
+
+__EOUSAGE__
+
+    ;
+
+
+my $DEBUG;
+
+my $filt_file;
+
+&GetOptions ( 'h' => \$help_flag,
+              
+              'annotated_junction|J=s' => \$chimeric_junction_file,
+              'M=i' => \$min_pct_multimapping_to_genes,
+              'filt_file=s' => \$filt_file,
+              'd' => \$DEBUG,
+    );
+
+
+if ($help_flag) {
+    die $usage;
+}
+unless ($chimeric_junction_file && $min_pct_multimapping_to_genes && $filt_file) {
+    die $usage;
+}
+
+unless ($min_pct_multimapping_to_genes >= 1 && $min_pct_multimapping_to_genes <= 100) {
+    die $usage;
+}
+
+
+my $JSON_DECODER = JSON::XS->new();
+
+main: {
+    
+
+    my %data;
+
+    {
+        open(my $fh, $chimeric_junction_file) or die "Error, cannot open file: $chimeric_junction_file";
+        while (<$fh>) {
+            my $line = $_;
+            chomp;
+            my @x = split(/\t/);
+            my $read_name = $x[9];
+            
+            push (@{$data{$read_name}}, $line);
+        }
+        close $fh;
+    }
+
+    open(my $ofh_filt, ">$filt_file") or die "Error, cannot write to $filt_file";
+    
+    
+    foreach my $read_name (keys %data) {
+        my @lines = @{$data{$read_name}};
+
+        my $pct_paired_gene_mappings = &compute_pct_alns_mapping_to_gene_pairs(@lines);
+
+        my @filter_reasons;
+        if ($pct_paired_gene_mappings <= $min_pct_multimapping_to_genes) {
+            push (@filter_reasons, "Pct (" . sprintf("%.2f", $pct_paired_gene_mappings) . "%) of alignments lacked paired gene anchors");
+        }
+
+        if (my $selfie = &contains_selfie_match(@lines)) {
+            push (@filter_reasons, "Contains selfie ($selfie) match.");
+        }
+            
+        if (@filter_reasons) {
+            print $ofh_filt "#" . join("; ", @filter_reasons) . "\n";
+            print $ofh_filt join("", @lines) . "\n";
+        }
+        else {
+            print join("", @lines);
+        }
+    }
+
+
+    exit(0);
+    
+}
+
+####
+sub compute_pct_alns_mapping_to_gene_pairs {
+    my (@lines) = @_;
+
+    my $num_mapped_to_paired_genes = 0;
+    
+    foreach my $line (@lines) {
+        my @x = split(/\t/, $line);
+        if ($x[14] =~ /gene_id/ && $x[15] =~ /gene_id/) {
+            $num_mapped_to_paired_genes++;
+        }
+    }
+
+    my $pct = $num_mapped_to_paired_genes / scalar(@lines) * 100;
+
+    return($pct);
+}
+
+####
+sub contains_selfie_match {
+    my (@lines) = @_;
+
+    foreach my $line (@lines) {
+        chomp $line;
+        my @x = split(/\t/, $line);
+        
+        my $json_left = $x[14];
+        my $json_right = $x[15];
+
+        if ($json_left eq '.' || $json_right eq '.') {
+            next;
+        }
+
+        my $left_genes_aref = $JSON_DECODER->decode($json_left);
+        my $right_genes_aref = $JSON_DECODER->decode($json_right);
+
+        foreach my $left_gene_struct (@$left_genes_aref) {
+
+            my $left_gene_id = $left_gene_struct->{gene_id};
+
+            $left_gene_id =~ s/\^.*$//;
+            
+            foreach my $right_gene_struct (@$right_genes_aref) {
+                
+                my $right_gene_id = $right_gene_struct->{gene_id};
+                $right_gene_id =~ s/\^.*$//;
+
+                if ($left_gene_id eq $right_gene_id) {
+                    return($left_gene_id);
+                }
+            }
+        }
+    }
+
+    return(undef);
+}
+
+
+                
