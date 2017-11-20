@@ -263,7 +263,7 @@ my $SHOW_FULL_USAGE_INFO;
               
               'bbmerge' => \$BBMERGE_flag,
     
-
+              
               'DEVEL_STAR' => \$DEVEL_STAR,
     
               'show_full_usage_info' => \$SHOW_FULL_USAGE_INFO,
@@ -328,6 +328,10 @@ if (@ARGV) {
     die "Error, don't understand arguments: [@ARGV] ";
 }
 
+unless ($genome_lib_dir) {
+    # neither env var or the --genome_lib_dir param is set.
+    die $usage;
+}
 
 unless (-d $genome_lib_dir) {
     die "Error, cannot locate genome_lib_dir: $genome_lib_dir";
@@ -458,22 +462,15 @@ main: {
     
     my $predicted_fusions_file = "$preliminary_outdir/$out_prefix.fusion_candidates.preliminary";
     
-    ## add breakpoint / splice junction info
-
-    my $predicted_fusions_with_splice_info = "$predicted_fusions_file.wSpliceInfo";
-
-    $cmd = "$UTILDIR/append_breakpoint_junction_info.pl $predicted_fusions_file $genome_lib_dir > $predicted_fusions_with_splice_info";
-
-    $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/predicted_fusions_with_splice_info.ok"));
-
-    my $prelim_fusion_file = $predicted_fusions_with_splice_info;
+    
+    my $prelim_fusion_file = $predicted_fusions_file;
     
     unless ($no_filter) {
            
         ## filter fusions
         
         $cmd = "$UTILDIR/STAR-Fusion.filter "
-            . " --fusion_preds $predicted_fusions_with_splice_info "
+            . " --fusion_preds $prelim_fusion_file "
             . " -J $chimeric_out_junctions_file "
             . " --tmpdir $tmpdir "
             . " --min_junction_reads $MIN_JUNCTION_READS "
@@ -502,7 +499,19 @@ main: {
 
         $prelim_fusion_file = "$prelim_fusion_file.FFPM";
     }
+    
+    ## add breakpoint / splice junction info
 
+    my $predicted_fusions_with_splice_info = "$predicted_fusions_file.wSpliceInfo";
+
+    $cmd = "$UTILDIR/append_breakpoint_junction_info.pl $prelim_fusion_file $genome_lib_dir > $predicted_fusions_with_splice_info";
+
+    $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/predicted_fusions_with_splice_info.ok"));
+
+    $prelim_fusion_file = $predicted_fusions_with_splice_info;
+
+    
+    
     # generate final fusion prediction output files:
     my $final_output_fusions = "$out_prefix.fusion_predictions.tsv";
     $pipeliner->add_commands(new Command("cp $prelim_fusion_file $final_output_fusions", "$checkpoints_dir/cp_final.ok"));
@@ -546,7 +555,7 @@ main: {
     if ($no_filter) {
          
         print STDERR "\n\n *** Note: --no_filtering in effect, so outputs have not been filtered for likely false positives.\n";
-        print STDERR "\n\tSee output: $predicted_fusions_with_splice_info\n\n";
+        print STDERR "\n\tSee output: $prelim_fusion_file\n\n";
     }
     else {
         
