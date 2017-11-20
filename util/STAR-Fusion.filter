@@ -13,7 +13,6 @@ use File::Basename;
 use Pipeliner;
 use DelimParser;
 
-my $Evalue = 1e-3;
 my $tmpdir = "/tmp";
 
 my $MIN_NOVEL_JUNCTION_SUPPORT = 3;
@@ -22,7 +21,9 @@ my $AGGREGATE_NOVEL_JUNCTION_DIST = 5;
 
 my $MIN_JUNCTION_READS = 1;
 my $MIN_SUM_FRAGS = 2;
-my $MAX_PROMISCUITY = 3;  # perhaps a poor choice of words, but still a best fit IMHO.
+my $MAX_PROMISCUITY = 10;
+my $MIN_PCT_DOM_PROM = 20;
+
 my $REQUIRE_LDAS = 1;
 
 my $usage = <<__EOUSAGE__;
@@ -43,17 +44,13 @@ my $usage = <<__EOUSAGE__;
 #
 # Optional: 
 #
-#  -E <float>                     E-value threshold for blast searches (default: $Evalue)
-#
 #  --tmpdir <string>              file for temporary files (default: $tmpdir)
 #
-#    --min_junction_reads <int>            minimum number of junction-spanning reads required. Default: $MIN_JUNCTION_READS
+#  --min_junction_reads <int>            minimum number of junction-spanning reads required. Default: $MIN_JUNCTION_READS
 #
-#    --max_promiscuity <int>               maximum number of partners allowed for a given fusion. Default: $MAX_PROMISCUITY
+#  --min_sum_frags <int>                 minimum fusion support = ( # junction_reads + # spanning_frags ) Default: $MIN_SUM_FRAGS
 #
-#    --min_sum_frags <int>                 minimum fusion support = ( # junction_reads + # spanning_frags ) Default: $MIN_SUM_FRAGS
-#
-#    --require_LDAS 0|1                    require long double anchor support for split reads                 
+#  --require_LDAS 0|1                    require long double anchor support for split reads                 
 #                                           when no spanning frags are found (default: 1)                   
 #
 #
@@ -61,6 +58,12 @@ my $usage = <<__EOUSAGE__;
 #                                                        lacks involvement of only reference junctions)
 #
 #  --min_alt_pct_junction <float>        default: $MIN_ALT_PCT_JUNCTION  ($MIN_ALT_PCT_JUNCTION % of the dominant isoform junction support)
+#
+#  --max_promiscuity <int>               maximum number of partners allowed for a given fusion. Default: $MAX_PROMISCUITY
+#
+#  --min_pct_dom_promiscuity <int>       for promiscuous fusions, those with less than this support of the dominant scoring pair
+#                                        are filtered prior to applying the max_promiscuity filter.
+#                                        (default: $MIN_PCT_DOM_PROM)
 #
 #  --aggregate_novel_junction_dist <int>  default: $AGGREGATE_NOVEL_JUNCTION_DIST (non-ref junctions within $AGGREGATE_NOVEL_JUNCTION_DIST are merged into single calls)
 #
@@ -86,7 +89,6 @@ my $chimeric_out_junctions_file;
                             
               'out_prefix=s' => \$out_prefix,
 
-              'E=f' => \$Evalue,
               'tmpdir=s' => \$tmpdir,
               
               'min_novel_junction_support=i' => \$MIN_NOVEL_JUNCTION_SUPPORT,
@@ -99,7 +101,8 @@ my $chimeric_out_junctions_file;
               'require_LDAS=i' => \$REQUIRE_LDAS,
               
               'max_promiscuity=i' => \$MAX_PROMISCUITY,
-        
+              'min_pct_dom_promiscuity=i' => \$MIN_PCT_DOM_PROM,
+              
               'genome_lib_dir=s' => \$genome_lib_dir,
               
               
@@ -200,10 +203,6 @@ main: {
 
     @fusions = reverse sort {$a->{score} <=> $b->{score} } @fusions;
 
-    #&assign_reads_parsimoniously(@fusions);
-    
-    #@fusions = reverse sort {$a->{score} <=> $b->{score} } @fusions;
-
 
     my %read_mapping_counts = &parse_read_mapping_counts($chimeric_out_junctions_file);
     
@@ -253,7 +252,7 @@ main: {
     close $stage1_ofh;
     
     ## Run the blast and promiscuity filter
-    my $cmd = "$FindBin::Bin/../FusionFilter/blast_and_promiscuity_filter.pl --out_prefix $intermediates_out_prefix -E $Evalue --max_promiscuity $MAX_PROMISCUITY --fusion_preds $stage1_preds_file --genome_lib_dir $genome_lib_dir ";
+    my $cmd = "$FindBin::Bin/../FusionFilter/blast_and_promiscuity_filter.pl --out_prefix $intermediates_out_prefix --max_promiscuity $MAX_PROMISCUITY --min_pct_dom_promiscuity $MIN_PCT_DOM_PROM  --fusion_preds $stage1_preds_file --genome_lib_dir $genome_lib_dir ";
     &process_cmd($cmd);  # generates $out_prefix.final and $out_prefix.filt
 
     # make abridged versions:
@@ -298,7 +297,7 @@ sub merge_neighboring_nonref_splice {
         do {
         
             my $top_fusion = shift @nonref_fusions;
-    
+            
             my @remaining_fusions;
             foreach my $f (@nonref_fusions) {
                 if (&fusions_within_range($top_fusion, $f, $AGGREGATE_NOVEL_JUNCTION_DIST)) {
@@ -530,64 +529,6 @@ sub score_fusion {
     $fusion->{score} = $score;
 }
 
-####
-sub assign_reads_parsimoniously {
-    my @fusions = @_;
-
-    ## Reads can be assigned uniquely to one fusion, given to that fusion with the highest preliminary score.
-    ## After reassignment, fusions are rescored.
-
-    my %read_allocated;
-
-    foreach my $fusion (@fusions) {
-
-        # examine junction reads first
-        my $junction_reads_string = $fusion->{junction_reads};
-        if ($junction_reads_string ne '.') {
-            my @j_reads = split(/,/, $junction_reads_string);
-            my @retained_j_reads;
-            foreach my $j_read (@j_reads) {
-                unless ($read_allocated{$j_read}) {
-                    push (@retained_j_reads, $j_read);
-                    $read_allocated{$j_read} = 1;
-                }
-            }
-            if (@retained_j_reads) {
-                $fusion->{J} = scalar(@retained_j_reads);
-                $fusion->{junction_reads} = join(",", @retained_j_reads);
-            }
-            else {
-                $fusion->{J} = 0;
-                $fusion->{junction_reads} = ".";
-            }
-        }
-    
-        ## now spanning frags
-        my $spanning_frags_string = $fusion->{spanning_frags};
-        if ($spanning_frags_string ne '.') {
-            my @s_frags = split(/,/, $spanning_frags_string);
-            my @retained_s_frags;
-            foreach my $s_frag (@s_frags) {
-                unless ($read_allocated{$s_frag}) {
-                    push (@retained_s_frags, $s_frag);
-                    $read_allocated{$s_frag} = 1;
-                }
-            }
-            if (@retained_s_frags) {
-                $fusion->{S} = scalar(@retained_s_frags);
-                $fusion->{spanning_frags} = join(",", @retained_s_frags);
-            }
-            else {
-                $fusion->{S} = 0;
-                $fusion->{spanning_frags} = '.';
-            }
-        }
-
-        &score_fusion($fusion);
-    }
-
-    return;
-}
 
 
 ####

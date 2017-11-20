@@ -39,7 +39,7 @@ Removes chimeric reads that have the following properties:
 #
 #    --annotated_junctions|J <string>     annotated junctions file, chimeric reads mapped to genes
 #
-#    -M <int>                             min pct of multimapping reads that should map to 2 genes
+#    --min_pct_MM_nonspecific|M <int>     min pct of multimapping reads that should map to 2 genes
 #                                         (avoids multimapping reads that lack specificity)
 #                                           value must be between [1,100]
 #
@@ -62,7 +62,7 @@ my $filt_file;
 &GetOptions ( 'h' => \$help_flag,
               
               'annotated_junction|J=s' => \$chimeric_junction_file,
-              'M=i' => \$min_pct_multimapping_to_genes,
+              'min_pct_MM_nonspecific|M=i' => \$min_pct_multimapping_to_genes,
               'filt_file=s' => \$filt_file,
               'd' => \$DEBUG,
     );
