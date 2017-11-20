@@ -380,14 +380,14 @@ sub get_chimeric_reads_to_genes {
             $seen{$PE_read_map_token} = 1;
         }
         
-        my $left_gene_json = $x[14];
+        my $left_gene_json = $x[$#x-1];
         my @A_hits;
         if ($left_gene_json ne '.') {
             my $A_hits_aref = $JSON_DECODER->decode($left_gene_json);
             @A_hits = @$A_hits_aref;
         }
-
-        my $right_gene_json = $x[15];
+        
+        my $right_gene_json = $x[$#x];
         my @B_hits;
         if ($right_gene_json ne '.') {
             my $B_hits_aref = $JSON_DECODER->decode($right_gene_json);

@@ -139,7 +139,7 @@ sub compute_pct_alns_mapping_to_gene_pairs {
     
     foreach my $line (@lines) {
         my @x = split(/\t/, $line);
-        if ($x[14] =~ /gene_id/ && $x[15] =~ /gene_id/) {
+        if ($x[$#x-1] =~ /gene_id/ && $x[$#x] =~ /gene_id/) {
             $num_mapped_to_paired_genes++;
         }
     }
@@ -157,16 +157,30 @@ sub contains_selfie_match {
         chomp $line;
         my @x = split(/\t/, $line);
         
-        my $json_left = $x[14];
-        my $json_right = $x[15];
-
+        my $json_left = $x[$#x-1];
+        my $json_right = $x[$#x];
+        
         if ($json_left eq '.' || $json_right eq '.') {
             next;
         }
 
-        my $left_genes_aref = $JSON_DECODER->decode($json_left);
-        my $right_genes_aref = $JSON_DECODER->decode($json_right);
+        my ($left_genes_aref, $right_genes_aref);
 
+        eval {
+            $left_genes_aref = $JSON_DECODER->decode($json_left);
+        };
+        if ($@) {
+            confess "Error trying to decode json string:\n$json_left\n$@";
+        }
+         
+        eval {
+            $right_genes_aref = $JSON_DECODER->decode($json_right);
+        };
+        if ($@) {
+            confess "Error decoding json string:\n$json_right\n$@";
+        }
+        
+        
         foreach my $left_gene_struct (@$left_genes_aref) {
 
             my $left_gene_id = $left_gene_struct->{gene_id};
