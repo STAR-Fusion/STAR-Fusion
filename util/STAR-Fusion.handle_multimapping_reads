@@ -23,6 +23,7 @@ my $chimeric_junction_file;
 my $help_flag;
 my $min_pct_multimapping_to_genes = 50;
 my $MIN_MM_HOMOLOGY_CONGRUENCE = 50;
+my $MAX_PCT_LOCUS_OVERLAP = 50;
 
 my $genome_lib_dir;
 
@@ -69,7 +70,7 @@ my $filt_file;
 
 &GetOptions ( 'h' => \$help_flag,
               
-              'annotated_junction|J=s' => \$chimeric_junction_file,
+              'annotated_junctions|J=s' => \$chimeric_junction_file,
               'min_pct_MM_nonspecific|M=i' => \$min_pct_multimapping_to_genes,
               'filt_file=s' => \$filt_file,
               'genome_lib_dir=s' => \$genome_lib_dir,
@@ -234,8 +235,11 @@ sub contains_selfie_or_homology_match {
                 elsif (my $homology_hit = &examine_seq_similarity($left_gene_id, $right_gene_id)) {
                     return("blast_pair: $left_gene_id vs. $right_gene_id : $homology_hit");
                 }
-                elsif ($GENE_OVERLAP_CHECKER->are_genes_overlapping($left_gene_id, $right_gene_id)) {
-                    return("gene overlap on the genome: $left_gene_id, $right_gene_id");
+                else {
+                    my $pct_overlap_shorter_len = $GENE_OVERLAP_CHECKER->pct_overlap_shorter_length($left_gene_id, $right_gene_id);
+                    if ($pct_overlap_shorter_len > $MAX_PCT_LOCUS_OVERLAP) {
+                        return("genes overlap on the genome ($pct_overlap_shorter_len of shorter len): $left_gene_id, $right_gene_id");
+                    }
                 }
             }
         }
@@ -334,7 +338,7 @@ sub compute_gene_homology_congruence {
             $num_comparisons++;
             if (&examine_seq_similarity($gene_i, $gene_j)
                 ||
-                $GENE_OVERLAP_CHECKER->are_genes_overlapping($gene_i, $gene_j)
+                $GENE_OVERLAP_CHECKER->pct_overlap_shorter_length($gene_i, $gene_j) > $MAX_PCT_LOCUS_OVERLAP
                 
                 ) {
                 $num_homologies_detected++;

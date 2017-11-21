@@ -9,7 +9,7 @@ use Process_cmd;
 use File::Basename;
 
 
-my $usage = "\n\n\tusage: $0 samples.txt num_parallel\n\n";
+my $usage = "\n\n\tusage: $0 samples.txt num_parallel [starF options passthru]\n\n";
 
 if (! $ENV{CTAT_GENOME_LIB}) {
     die "Error, no env var set for CTAT_GENOME_LIB";
@@ -17,6 +17,9 @@ if (! $ENV{CTAT_GENOME_LIB}) {
 
 my $samples_file = $ARGV[0] or die $usage;
 my $num_parallel = $ARGV[1] or die $usage;
+
+shift @ARGV;
+shift @ARGV;
 
 main: {
 
@@ -44,6 +47,8 @@ main: {
         }
         $cmd .= " -O $sample_name.starF";
 
+        $cmd .= " @ARGV ";
+        
         print $ofh "$cmd\n";
         
 
