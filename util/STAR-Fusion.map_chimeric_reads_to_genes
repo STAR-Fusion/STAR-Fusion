@@ -561,6 +561,7 @@ sub build_interval_tree {
             lend => $lend,
             rend => $rend,
             orient => $orient,
+            token => $token,
             
         };
                 

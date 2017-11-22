@@ -131,6 +131,7 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #
 #    --require_LDAS 0|1                    require long double anchor support for split reads
 #                                           when no spanning frags are found (default: 1)
+#                                           (if --min_junction_reads 0, then --require_LDAS is auto set to 0)           
 #
 #    --max_promiscuity <int>               maximum number of partners allowed for a given fusion. Default: $MAX_PROMISCUITY
 #
@@ -302,7 +303,10 @@ else {
 }
 
 
-
+if ($MIN_JUNCTION_READS == 0) {
+    print STDERR "-note, --min_junction_reads is set to zero, so forcing --require_LDAS 0\n";
+    $REQUIRE_LDAS = 0;
+}
 
 
 
