@@ -7,19 +7,23 @@ use FindBin;
 use lib ("$FindBin::Bin/../PerlLib");
 use Process_cmd;
 use File::Basename;
+use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
-
-my $usage = "\n\n\tusage: $0 samples.txt num_parallel [starF options passthru]\n\n";
+my $usage = "\n\n\tusage: $0 samples.txt num_parallel [starF options passthru] [--skip_remove]\n\n";
 
 if (! $ENV{CTAT_GENOME_LIB}) {
     die "Error, no env var set for CTAT_GENOME_LIB";
 }
+
+my $skip_remove;
+&GetOptions ( 'skip_remove' => \$skip_remove);
 
 my $samples_file = $ARGV[0] or die $usage;
 my $num_parallel = $ARGV[1] or die $usage;
 
 shift @ARGV;
 shift @ARGV;
+
 
 main: {
 
@@ -59,13 +63,15 @@ main: {
 
     my $parafly_cmd = "ParaFly -c $cmds_file -CPU $num_parallel -vv";
     &process_cmd($parafly_cmd);
+
+
+    unless ($skip_remove) {
         
+        # unload the genome from memory
+        $cmd = "$star_fusion_prog  --STAR_Remove ";
+        &process_cmd($cmd);
+    }
     
-    # unload the genome from memory
-    $cmd = "$star_fusion_prog  --STAR_Remove ";
-    &process_cmd($cmd);
-
-
     print STDERR "-done.\n\n";
     exit(0);
 }

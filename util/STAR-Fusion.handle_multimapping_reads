@@ -190,6 +190,10 @@ sub compute_pct_alns_mapping_to_gene_pairs {
 sub contains_selfie_or_homology_match {
     my (@lines) = @_;
 
+    # if parts i,j of a chimeric read effectively match the same gene
+    # then we discard that read.
+
+    
     foreach my $line (@lines) {
         chomp $line;
         my @x = split(/\t/, $line);
@@ -236,8 +240,14 @@ sub contains_selfie_or_homology_match {
                     return("blast_pair: $left_gene_id vs. $right_gene_id : $homology_hit");
                 }
                 else {
+                    # maybe not the same gene id, but both parts are effectively matching the same genomic locus (aka gene).
                     my $pct_overlap_shorter_len = $GENE_OVERLAP_CHECKER->pct_overlap_shorter_length($left_gene_id, $right_gene_id);
+                    # using restrictive overlap criteria because the candidate fusion genes A,B may be adjacent and overlap
+                    # but overlap only minimally.
+                    # Here, we differentiate between overlaps between different 'genes' where they're really the same gene or isoforms
+                    # but annotated with different gene identifiers, vs. neighboring and overlapping genes
                     if ($pct_overlap_shorter_len > $MAX_PCT_LOCUS_OVERLAP) {
+                        # effectively the same gene but were assigned different gene identifiers for some reason.
                         return("genes overlap on the genome ($pct_overlap_shorter_len of shorter len): $left_gene_id, $right_gene_id");
                     }
                 }
@@ -252,6 +262,14 @@ sub contains_selfie_or_homology_match {
 sub compute_pct_homology_congruence {
     my (@lines) = @_;
 
+
+    # given chimeric read parts i,j of each read
+    # and all the mapping positions for that read, yielding {i1, i2, ..., in} and {j1, j2, ..., jn}
+    # examine consistency of the i1..in mappings
+    # and the consistency of the j1..jn mappings
+    # such that they either align to paralogs or derive from the same genomic locus. 
+
+    
     my %left_genes;
     my %right_genes;
     
@@ -338,7 +356,7 @@ sub compute_gene_homology_congruence {
             $num_comparisons++;
             if (&examine_seq_similarity($gene_i, $gene_j)
                 ||
-                $GENE_OVERLAP_CHECKER->pct_overlap_shorter_length($gene_i, $gene_j) > $MAX_PCT_LOCUS_OVERLAP
+                $GENE_OVERLAP_CHECKER->are_genes_overlapping($gene_i, $gene_j)
                 
                 ) {
                 $num_homologies_detected++;
