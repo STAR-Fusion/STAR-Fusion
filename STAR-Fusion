@@ -509,6 +509,10 @@ main: {
         if ($EXAMINE_CODING_EFFECT) {
             $FI_cmd .= " --examine_coding_effect ";
         }
+
+        # pass on multithreading settings
+        $FI_cmd .= " --CPU $CPU ";
+        
                 
         $pipeliner->add_commands(new Command($FI_cmd, "_fi_${FUSIONINSPECTOR_MODE}_" . length($FI_cmd) . ".ok"));
         
