@@ -1,0 +1,393 @@
+#!/usr/bin/env perl
+
+# contributed by Brian Haas, Broad Institute, 2015
+
+use strict;
+use warnings;
+use Carp;
+use Cwd;
+use FindBin;
+use lib ("$FindBin::Bin/../PerlLib");
+use Data::Dumper;
+use Set::IntervalTree;
+use JSON::XS;
+use TiedHash;
+use Gene_overlap_check;
+
+use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
+
+my $UTILDIR = "$FindBin::Bin/util";
+
+## Options
+my $chimeric_junction_file;
+my $help_flag;
+my $min_pct_multimapping_to_genes = 50;
+my $MIN_MM_HOMOLOGY_CONGRUENCE = 50;
+my $MAX_PCT_LOCUS_OVERLAP = 50;
+
+my $genome_lib_dir;
+
+my $LONG_ANCHOR_SIZE = 25;
+
+my $usage = <<__EOUSAGE__;
+
+
+##################################################################################################
+
+Removes chimeric reads that have the following properties:
+
+    -both chim ends hit the same gene (selfie)
+    -less than -M percent of the mappings hit any 2 genes (indication of non-specific mappings)
+
+###################################################################################################
+#
+#  Required:
+#
+#    --annotated_junctions|J <string>     annotated junctions file, chimeric reads mapped to genes
+#
+#    --genome_lib_dir <string>            CTAT genome lib dir
+#
+#    --filt_file <string>                 file to write the problematic reads to (those removed).
+#                                         The primary output (passing reads) is to stdout.
+#
+# Optional:
+#
+#    --min_pct_MM_nonspecific|M <int>     min pct of multimapping reads that should map to 2 genes
+#                                         (avoids multimapping reads that lack specificity)
+#                                           value must be between [1,100] (default: $min_pct_multimapping_to_genes)
+#    
+###################################################################################################
+
+
+__EOUSAGE__
+
+    ;
+
+
+my $DEBUG;
+
+my $filt_file;
+
+&GetOptions ( 'h' => \$help_flag,
+              
+              'annotated_junctions|J=s' => \$chimeric_junction_file,
+              'min_pct_MM_nonspecific|M=i' => \$min_pct_multimapping_to_genes,
+              'filt_file=s' => \$filt_file,
+              'genome_lib_dir=s' => \$genome_lib_dir,
+              'd' => \$DEBUG,
+    );
+
+
+if ($help_flag) {
+    die $usage;
+}
+unless ($chimeric_junction_file && $genome_lib_dir && $filt_file && $genome_lib_dir) {
+    die $usage;
+}
+
+unless ($min_pct_multimapping_to_genes >= 1 && $min_pct_multimapping_to_genes <= 100) {
+    die $usage;
+}
+
+my $BLAST_PAIRS_IDX;
+my $blast_pairs_idx_file = "$genome_lib_dir/blast_pairs.idx";
+if (-s $blast_pairs_idx_file) {
+    $BLAST_PAIRS_IDX = new TiedHash( { use => $blast_pairs_idx_file } );
+}
+else {
+    die "Error: cannot locate $blast_pairs_idx_file";
+}
+
+my %BLAST_CACHE;
+
+my $GENE_OVERLAP_CHECKER = new Gene_overlap_check("$genome_lib_dir/ref_annot.gtf.gene_spans");
+
+
+
+my $JSON_DECODER = JSON::XS->new();
+
+main: {
+    
+
+    my %data;
+
+    {
+        open(my $fh, $chimeric_junction_file) or die "Error, cannot open file: $chimeric_junction_file";
+        while (<$fh>) {
+            my $line = $_;
+            chomp;
+            my @x = split(/\t/);
+            my $read_name = $x[9];
+            
+            push (@{$data{$read_name}}, $line);
+        }
+        close $fh;
+    }
+
+    open(my $ofh_filt, ">$filt_file") or die "Error, cannot write to $filt_file";
+    
+    
+    foreach my $read_name (keys %data) {
+        my @lines = @{$data{$read_name}};
+
+        my $pct_paired_gene_mappings = &compute_pct_alns_mapping_to_gene_pairs(@lines);
+
+        my @filter_reasons;
+        if ($pct_paired_gene_mappings <= $min_pct_multimapping_to_genes) {
+            push (@filter_reasons, "only Pct (" . sprintf("%.2f", $pct_paired_gene_mappings) . "%) of alignments had paired gene anchors");
+        }
+
+        elsif (my $selfie = &contains_selfie_or_homology_match(@lines)) {
+            push (@filter_reasons, "Contains selfie or homology match ($selfie).");
+        }
+        
+        
+        
+        else {
+            my ($left_homology_congruence, $right_homology_congruence) = &compute_pct_homology_congruence(@lines);
+
+            if ($left_homology_congruence < $MIN_MM_HOMOLOGY_CONGRUENCE
+                ||
+                $right_homology_congruence < $MIN_MM_HOMOLOGY_CONGRUENCE) {
+
+                push (@filter_reasons, "Fails mulitmapper homology congruence (Left: $left_homology_congruence, Right: $right_homology_congruence)");
+            }
+        }
+         
+        if (@filter_reasons) {
+            print $ofh_filt "#" . join("; ", @filter_reasons) . "\n";
+            print $ofh_filt join("", @lines) . "\n";
+        }
+        else {
+            print join("", @lines);
+        }
+    }
+
+
+    exit(0);
+    
+}
+
+####
+sub compute_pct_alns_mapping_to_gene_pairs {
+    my (@lines) = @_;
+
+    my $num_mapped_to_paired_genes = 0;
+    
+    foreach my $line (@lines) {
+        my @x = split(/\t/, $line);
+        if ($x[$#x-1] =~ /gene_id/ && $x[$#x] =~ /gene_id/) {
+            $num_mapped_to_paired_genes++;
+        }
+    }
+
+    my $pct = $num_mapped_to_paired_genes / scalar(@lines) * 100;
+
+    return($pct);
+}
+
+####
+sub contains_selfie_or_homology_match {
+    my (@lines) = @_;
+
+    # if parts i,j of a chimeric read effectively match the same gene
+    # then we discard that read.
+
+    
+    foreach my $line (@lines) {
+        chomp $line;
+        my @x = split(/\t/, $line);
+        
+        my $json_left = $x[$#x-1];
+        my $json_right = $x[$#x];
+        
+        if ($json_left eq '.' || $json_right eq '.') {
+            next;
+        }
+
+        my ($left_genes_aref, $right_genes_aref);
+
+        eval {
+            $left_genes_aref = $JSON_DECODER->decode($json_left);
+        };
+        if ($@) {
+            confess "Error trying to decode json string:\n$json_left\n$@";
+        }
+         
+        eval {
+            $right_genes_aref = $JSON_DECODER->decode($json_right);
+        };
+        if ($@) {
+            confess "Error decoding json string:\n$json_right\n$@";
+        }
+        
+        
+        foreach my $left_gene_struct (@$left_genes_aref) {
+
+            my $left_gene_id = $left_gene_struct->{gene_id};
+
+            $left_gene_id =~ s/\^.*$//;
+            
+            foreach my $right_gene_struct (@$right_genes_aref) {
+                
+                my $right_gene_id = $right_gene_struct->{gene_id};
+                $right_gene_id =~ s/\^.*$//;
+
+                if ($left_gene_id eq $right_gene_id) {
+                    return($left_gene_id);
+                }
+                elsif (my $homology_hit = &examine_seq_similarity($left_gene_id, $right_gene_id)) {
+                    return("blast_pair: $left_gene_id vs. $right_gene_id : $homology_hit");
+                }
+                else {
+                    # maybe not the same gene id, but both parts are effectively matching the same genomic locus (aka gene).
+                    my $pct_overlap_shorter_len = $GENE_OVERLAP_CHECKER->pct_overlap_shorter_length($left_gene_id, $right_gene_id);
+                    # using restrictive overlap criteria because the candidate fusion genes A,B may be adjacent and overlap
+                    # but overlap only minimally.
+                    # Here, we differentiate between overlaps between different 'genes' where they're really the same gene or isoforms
+                    # but annotated with different gene identifiers, vs. neighboring and overlapping genes
+                    if ($pct_overlap_shorter_len > $MAX_PCT_LOCUS_OVERLAP) {
+                        # effectively the same gene but were assigned different gene identifiers for some reason.
+                        return("genes overlap on the genome ($pct_overlap_shorter_len of shorter len): $left_gene_id, $right_gene_id");
+                    }
+                }
+            }
+        }
+    }
+    
+    return(undef);
+}
+
+####
+sub compute_pct_homology_congruence {
+    my (@lines) = @_;
+
+
+    # given chimeric read parts i,j of each read
+    # and all the mapping positions for that read, yielding {i1, i2, ..., in} and {j1, j2, ..., jn}
+    # examine consistency of the i1..in mappings
+    # and the consistency of the j1..jn mappings
+    # such that they either align to paralogs or derive from the same genomic locus. 
+
+    
+    my %left_genes;
+    my %right_genes;
+    
+    foreach my $line (@lines) {
+        chomp $line;
+        my @x = split(/\t/, $line);
+        
+        my $json_left = $x[$#x-1];
+        my $json_right = $x[$#x];
+        
+
+        my ($left_genes_aref, $right_genes_aref);
+
+        if ($json_left ne ".") {
+            eval {
+                $left_genes_aref = $JSON_DECODER->decode($json_left);
+            };
+            if ($@) {
+                confess "Error trying to decode json string:\n$json_left\n$@";
+            }
+        }
+
+        if ($json_right ne ".") {
+            eval {
+                $right_genes_aref = $JSON_DECODER->decode($json_right);
+            };
+            if ($@) {
+                confess "Error decoding json string:\n$json_right\n$@";
+            }
+        }
+
+
+        if ($left_genes_aref) {
+            foreach my $left_gene_struct (@$left_genes_aref) {
+                
+                my $left_gene_id = $left_gene_struct->{gene_id};
+                
+                $left_gene_id =~ s/\^.*$//;
+                $left_genes{$left_gene_id} = 1;
+            }   
+        }
+
+        if ($right_genes_aref) {
+            foreach my $right_gene_struct (@$right_genes_aref) {
+                
+                my $right_gene_id = $right_gene_struct->{gene_id};
+                $right_gene_id =~ s/\^.*$//;
+                
+                $right_genes{$right_gene_id} = 1;
+            }
+        }
+    }
+
+    my @left_gene_symbs = keys %left_genes;
+    my @right_gene_symbs = keys %right_genes;
+
+    my $left_gene_MM_hom_congruence = &compute_gene_homology_congruence(@left_gene_symbs);
+
+    my $right_gene_MM_hom_congruence = &compute_gene_homology_congruence(@right_gene_symbs);
+
+    return($left_gene_MM_hom_congruence, $right_gene_MM_hom_congruence);
+        
+}
+
+
+####
+sub compute_gene_homology_congruence {
+    my (@gene_symbols) = @_;
+
+    if (scalar (@gene_symbols) < 2) { return(100); } # free pass
+    
+    my $num_comparisons = 0;
+    my $num_homologies_detected = 0;
+    
+    for (my $i = 0; $i < $#gene_symbols; $i++) {
+
+        my $gene_i = $gene_symbols[$i];
+            
+        
+        for (my $j = $i + 1; $j <= $#gene_symbols; $j++) {
+
+            my $gene_j = $gene_symbols[$j];
+
+            $num_comparisons++;
+            if (&examine_seq_similarity($gene_i, $gene_j)
+                ||
+                $GENE_OVERLAP_CHECKER->are_genes_overlapping($gene_i, $gene_j)
+                
+                ) {
+                $num_homologies_detected++;
+            }
+        }
+    }
+
+    my $MM_homology_congruence = $num_homologies_detected/$num_comparisons * 100; # make percentage
+    
+    return($MM_homology_congruence);
+}
+
+
+####
+sub examine_seq_similarity {
+    my ($geneA, $geneB) = @_;
+
+    #print STDERR "-examining seq similarity between $geneA and $geneB\n";
+
+    my @blast_hits;
+
+    # use pre-computed blast pair data
+    if (my $hit = $BLAST_PAIRS_IDX->get_value("$geneA--$geneB")) {
+        return($hit);
+    }
+    elsif ($hit = $BLAST_PAIRS_IDX->get_value("$geneB--$geneA")) {
+        return($hit);
+    }
+    else {
+        return();
+    }
+}
+
+                

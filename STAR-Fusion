@@ -29,12 +29,14 @@ my $help_flag;
 my $MIN_NOVEL_JUNCTION_SUPPORT = 3;
 my $MIN_ALT_PCT_JUNCTION = 10.0;
 my $AGGREGATE_NOVEL_JUNCTION_DIST = 5;
-my $Evalue = 1e-3;
 my $tmpdir = "/tmp";
 my $verbose_level = 2;
 my $MIN_JUNCTION_READS = 1;
 my $MIN_SUM_FRAGS = 2;
-my $MAX_PROMISCUITY = 3;  # perhaps a poor choice of words, but still a best fit IMHO.
+
+my $MAX_PROMISCUITY = 10;
+my $MIN_PCT_DOM_PROM = 20;
+
 my $genome_lib_dir = $ENV{CTAT_GENOME_LIB};
 my $CPU = 4; 
 my $REQUIRE_LDAS = 1;
@@ -43,11 +45,24 @@ my $BBMERGE_flag = 0;
 
 my $STAR_MAX_MATE_DIST = 100000;
 
+my $MIN_PCT_MM_NONSPECIFIC = 50;
+
+my $logo='
+############################################################################################
+#
+#      _________________________ __________         ___________           .__
+#     /   _____/\__    ___/  _  \\\______   \        \_   _____/_ __  _____|__| ____   ____
+#     \_____  \   |    | /  /_\  \|       _/  ______ |    __)|  |  \/  ___/  |/  _ \ /    \
+#     /        \  |    |/    |    \    |   \ /_____/ |     \ |  |  /\___ \|  (  <_> )   |  \
+#    /_______  /  |____|\____|__  /____|_  /         \___  / |____//____  >__|\____/|___|  /
+#            \/                 \/       \/              \/             \/               \/ 
+#
+#
+############################################################################################';
 
 my $usage = <<__EOUSAGE__;
 
-
-###################################################################################
+$logo
 #
 #  Required:
 #
@@ -64,13 +79,81 @@ my $usage = <<__EOUSAGE__;
 #
 #    --genome_lib_dir <string>             directory containing genome lib (see http://STAR-Fusion.github.io)
 #                                          (required to specify, unless env var CTAT_GENOME_LIB is set to it)
+#                                          Easiest - get plug-n-play version from: 
+#                                            < https://data.broadinstitute.org/Trinity/CTAT_RESOURCE_LIB/ > 
 #
 #  Optional:
 #
+#    --CPU <int>                           number of threads for running STAR (default: $CPU)
+#
 #    --output_dir|O <string>               output directory  (default: $output_dir) 
 #
+#    --show_full_usage_info                provide full usage info.
+#
+#
+#######################
+#
+#   Quick guide to running:
+#
+#       STAR-Fusion --left_fq reads_1.fq  --right_fq reads_2.fq --genome_lib_dir /path/to/ctat_genome_lib_build_dir
+#
+############################################################################################
+
+__EOUSAGE__
+
+    ;
+
+
+my $extended_usage_info = <<__EXTENDED_USAGE__
+#
+# Initial handling of reads:
+#    
 #    --bbmerge                             to handle overlapping fusion reads, use bbmerge to first assemble the reads.
-#   
+#
+# STAR program configurations:
+#    
+#    --STAR_max_mate_dist <int>            maximum distance between mates  (also used for the maximum intron length value)  default:  $STAR_MAX_MATE_DIST
+#
+#    --STAR_PATH <string>                  /path/to/STAR  (default: uses STAR found in PATH setting).
+#
+# Chimeric read filtering parameters:
+#
+#  
+#    --min_pct_MM_nonspecific|M <int>     min pct of multimapping reads that should map to 2 genes
+#                                         (avoids multimapping reads that lack specificity)
+#                                           value must be between [1,100] (default: $MIN_PCT_MM_NONSPECIFIC)
+#    
+# Fusion transcript filtering:
+#
+#    --min_junction_reads <int>            minimum number of junction-spanning reads required. Default: $MIN_JUNCTION_READS
+#
+#    --min_sum_frags <int>                 minimum fusion support = ( # junction_reads + # spanning_frags ) Default: $MIN_SUM_FRAGS
+#
+#    --require_LDAS 0|1                    require long double anchor support for split reads
+#                                           when no spanning frags are found (default: 1)
+#                                           (if --min_junction_reads 0, then --require_LDAS is auto set to 0)           
+#
+#    --max_promiscuity <int>               maximum number of partners allowed for a given fusion. Default: $MAX_PROMISCUITY
+#
+#    --min_pct_dom_promiscuity <int>       for promiscuous fusions, those with less than this support of the dominant scoring pair
+#                                          are filtered prior to applying the max_promiscuity filter.
+#                                          (default: $MIN_PCT_DOM_PROM)
+#
+#    --aggregate_novel_junction_dist <int>  default: $AGGREGATE_NOVEL_JUNCTION_DIST (non-ref junctions within $AGGREGATE_NOVEL_JUNCTION_DIST 
+#                                           are merged into single calls)
+#    
+#    --min_novel_junction_support <int>    default: $MIN_NOVEL_JUNCTION_SUPPORT  (minimum of $MIN_NOVEL_JUNCTION_SUPPORT 
+#                                          junction reads required if breakpoint
+#                                                        lacks involvement of only reference junctions)
+#
+#    --min_alt_pct_junction <float>        default: $MIN_ALT_PCT_JUNCTION  ($MIN_ALT_PCT_JUNCTION % of the dominant isoform 
+#                                          junction support)
+#
+#    --no_filter                           do not filter predictions. (stops execution prior to the filtering stage).
+#
+#    
+# Downstream analysis of fusion candidates: 
+#
 #    --annotate                            annotate fusions based on known cancer fusions and those found in normal tissues
 #
 #    --examine_coding_effect               explore impact of fusions on coding sequences
@@ -81,42 +164,11 @@ my $usage = <<__EOUSAGE__;
 #                                               'inspect' - considers only StarFusion-identified fusion reads in context of identified fusions (fast)
 #                                               'validate' - examines all reads, recovers evidence, computes fusion allele fractions (slow) 
 #
-#    --denovo_reconstruct                  attempt to reconstruct fusion transcripts using de novo assembly (requires --FusionInspector)
-#
-#    --CPU <int>                           number of threads for running STAR (default: $CPU)
-#
-#    --min_junction_reads <int>            minimum number of junction-spanning reads required. Default: $MIN_JUNCTION_READS
-#
-#    --min_sum_frags <int>                 minimum fusion support = ( # junction_reads + # spanning_frags ) Default: $MIN_SUM_FRAGS
-#
-#    --require_LDAS 0|1                    require long double anchor support for split reads
-#                                           when no spanning frags are found (default: 1)
-#
-#    --max_promiscuity <int>               maximum number of partners allowed for a given fusion. Default: $MAX_PROMISCUITY
-#
-#
-#    --min_novel_junction_support <int>    default: $MIN_NOVEL_JUNCTION_SUPPORT  (minimum of $MIN_NOVEL_JUNCTION_SUPPORT junction reads required if breakpoint
-#                                                        lacks involvement of only reference junctions)
-#
-#    --min_alt_pct_junction <float>        default: $MIN_ALT_PCT_JUNCTION  ($MIN_ALT_PCT_JUNCTION % of the dominant isoform junction support)
-#
-#    --aggregate_novel_junction_dist <int>  default: $AGGREGATE_NOVEL_JUNCTION_DIST (non-ref junctions within $AGGREGATE_NOVEL_JUNCTION_DIST are merged into single calls)
-#
-#    -E <float>                            E-value threshold for blast searches (default: 0.001)
-#
-#    --tmpdir <string>                     file for temporary files (default: /tmp)
-#
-#    --verbose_level <int>                 verbosity (default: $verbose_level, max=2)
-#
-#    --no_filter                           do not filter predictions.
-# 
-#    --STAR_max_mate_dist <int>            maximum distance between mates  (also used for the maximum intron length value)  default:  $STAR_MAX_MATE_DIST
+#    --denovo_reconstruct                  attempt to reconstruct fusion transcripts using Trinity de novo assembly (requires --FusionInspector)
 #
 #    --version                             report version ($VERSION)
 #
-#  STAR program configurations:
-#
-#    --STAR_PATH <string>                  /path/to/STAR  (default: uses STAR found in PATH setting).
+# STAR shared memory parameters (see STAR-Fusion usage documentation for details):
 #
 #    --STAR_use_shared_memory              use shared memory among multiple processes for the STAR alignment step
 #                                           # note, when this option is used, twopass mode is disabled, as it's incompatible w/ shared mem.
@@ -126,11 +178,16 @@ my $usage = <<__EOUSAGE__;
 #
 #    --STAR_Remove                         removes genome from shared RAM and exits.
 #
+# Remaining misc. options:
+#
+#    --tmpdir <string>                     file for temporary files (default: /tmp)
+#
+#    --verbose_level <int>                 verbosity (default: $verbose_level, max=2)
 #
 ###################################################################################
 
 
-__EOUSAGE__
+__EXTENDED_USAGE__
 
     ;
 
@@ -157,6 +214,8 @@ my $DEVEL_STAR;
 my $STAR_LOAD_AND_EXIT;
 my $STAR_REMOVE;
 
+my $SHOW_FULL_USAGE_INFO;
+
 &GetOptions ( 'help|h' => \$help_flag,
               
               'left_fq=s' => \$left_fq_filename,
@@ -167,7 +226,8 @@ my $STAR_REMOVE;
               'min_junction_reads=i' => \$MIN_JUNCTION_READS,
               'min_sum_frags=i' => \$MIN_SUM_FRAGS,
               'max_promiscuity=i' => \$MAX_PROMISCUITY,
-              
+              'min_pct_dom_promiscuity=i' => \$MIN_PCT_DOM_PROM,
+                            
               'require_LDAS=i' => \$REQUIRE_LDAS,
               
               'min_novel_junction_support=i' => \$MIN_NOVEL_JUNCTION_SUPPORT,
@@ -175,7 +235,6 @@ my $STAR_REMOVE;
               'aggregate_novel_junction_dist=i' => \$AGGREGATE_NOVEL_JUNCTION_DIST,
               'output_dir|O=s' => \$output_dir,
               
-              'E=f' => \$Evalue,
               'tmpdir=s' => \$tmpdir,
               'verbose_level=i' => \$verbose_level,
 
@@ -205,14 +264,22 @@ my $STAR_REMOVE;
               
               'bbmerge' => \$BBMERGE_flag,
     
-
+              
               'DEVEL_STAR' => \$DEVEL_STAR,
+    
+              'show_full_usage_info' => \$SHOW_FULL_USAGE_INFO,
+              
     );
 
 
 if ($help_flag) {
     die $usage;
 }
+if ($SHOW_FULL_USAGE_INFO) {
+    die "$usage$extended_usage_info";
+}
+    
+
 
 if ($REPORT_VERSION) {
     print "\n\nSTAR-Fusion version: $VERSION\n\n";
@@ -236,7 +303,10 @@ else {
 }
 
 
-
+if ($MIN_JUNCTION_READS == 0) {
+    print STDERR "-note, --min_junction_reads is set to zero, so forcing --require_LDAS 0\n";
+    $REQUIRE_LDAS = 0;
+}
 
 
 
@@ -262,6 +332,10 @@ if (@ARGV) {
     die "Error, don't understand arguments: [@ARGV] ";
 }
 
+unless ($genome_lib_dir) {
+    # neither env var or the --genome_lib_dir param is set.
+    die $usage;
+}
 
 unless (-d $genome_lib_dir) {
     die "Error, cannot locate genome_lib_dir: $genome_lib_dir";
@@ -355,44 +429,60 @@ main: {
         }
         
     }
+
+
+
+    ########################################
+    ## Map chimeric reads to genome features
     
-    ## predict fusions
-    
-    my $cmd = "$UTILDIR/STAR-Fusion.predict "
-        . " -J $chimeric_out_junctions_file "
+    my $cmd = "$UTILDIR/STAR-Fusion.map_chimeric_reads_to_genes "
         . " --genome_lib_dir $genome_lib_dir "
-        . " --min_junction_reads $MIN_JUNCTION_READS "
-        . " --min_sum_frags $MIN_SUM_FRAGS "
-        . " --min_novel_junction_support $MIN_NOVEL_JUNCTION_SUPPORT "
+        . " -J $chimeric_out_junctions_file "
+        . " > $preliminary_outdir/star-fusion.junction_breakpts_to_genes.txt";
+
+    $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/$out_prefix.map_chim_to_genes.ok"));
+
+
+    #############################################
+    ## Filter out non-specific multimapping reads
+
+    $cmd = "$UTILDIR/STAR-Fusion.handle_multimapping_reads "
+        . " -J $preliminary_outdir/star-fusion.junction_breakpts_to_genes.txt "
+        . " --genome_lib_dir $genome_lib_dir "
+        . " -M $MIN_PCT_MM_NONSPECIFIC "
+        . " --filt_file $preliminary_outdir/star-fusion.junction_breakpts_to_genes.txt.fail "
+        . " > $preliminary_outdir/star-fusion.junction_breakpts_to_genes.txt.pass ";
+
+    $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/$out_prefix.handle_multimappers.ok"));
+
+    
+    ###################################
+    ## predict preliminary fusion pairs
+    
+    $cmd = "$UTILDIR/STAR-Fusion.predict "
+        . " -J $preliminary_outdir/star-fusion.junction_breakpts_to_genes.txt.pass "
         . " -O $preliminary_outdir/$out_prefix ";
     
     $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/$out_prefix.STAR-Fusion.predict.ok"));
     
     my $predicted_fusions_file = "$preliminary_outdir/$out_prefix.fusion_candidates.preliminary";
     
-    ## add breakpoint / splice junction info
-
-    my $predicted_fusions_with_splice_info = "$predicted_fusions_file.wSpliceInfo";
-
-    $cmd = "$UTILDIR/append_breakpoint_junction_info.pl $predicted_fusions_file $genome_lib_dir > $predicted_fusions_with_splice_info";
-
-    $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/predicted_fusions_with_splice_info.ok"));
-
-    my $prelim_fusion_file = $predicted_fusions_with_splice_info;
+    
+    my $prelim_fusion_file = $predicted_fusions_file;
     
     unless ($no_filter) {
            
         ## filter fusions
         
         $cmd = "$UTILDIR/STAR-Fusion.filter "
-            . " --fusion_preds $predicted_fusions_with_splice_info "
+            . " --fusion_preds $prelim_fusion_file "
             . " -J $chimeric_out_junctions_file "
-            . " -E $Evalue "
             . " --tmpdir $tmpdir "
             . " --min_junction_reads $MIN_JUNCTION_READS "
             . " --min_sum_frags $MIN_SUM_FRAGS "
             . " --require_LDAS $REQUIRE_LDAS "
             . " --max_promiscuity $MAX_PROMISCUITY "
+            . " --min_pct_dom_promiscuity $MIN_PCT_DOM_PROM "
             . " --min_novel_junction_support $MIN_NOVEL_JUNCTION_SUPPORT "
             . " --min_alt_pct_junction $MIN_ALT_PCT_JUNCTION "
             . " --aggregate_novel_junction_dist $AGGREGATE_NOVEL_JUNCTION_DIST "
@@ -414,7 +504,19 @@ main: {
 
         $prelim_fusion_file = "$prelim_fusion_file.FFPM";
     }
+    
+    ## add breakpoint / splice junction info
 
+    my $predicted_fusions_with_splice_info = "$predicted_fusions_file.wSpliceInfo";
+
+    $cmd = "$UTILDIR/append_breakpoint_junction_info.pl $prelim_fusion_file $genome_lib_dir > $predicted_fusions_with_splice_info";
+
+    $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/predicted_fusions_with_splice_info.ok"));
+
+    $prelim_fusion_file = $predicted_fusions_with_splice_info;
+
+    
+    
     # generate final fusion prediction output files:
     my $final_output_fusions = "$out_prefix.fusion_predictions.tsv";
     $pipeliner->add_commands(new Command("cp $prelim_fusion_file $final_output_fusions", "$checkpoints_dir/cp_final.ok"));
@@ -458,11 +560,11 @@ main: {
     if ($no_filter) {
          
         print STDERR "\n\n *** Note: --no_filtering in effect, so outputs have not been filtered for likely false positives.\n";
-        print STDERR "\n\tSee output: $predicted_fusions_with_splice_info\n\n";
+        print STDERR "\n\tSee output: $prelim_fusion_file\n\n";
     }
     else {
         
-        print STDERR "\n\n\t* STAR-Fusion complete.  See output: $out_prefix.fusion_candidates.final (or .abridged version)\n\n\n";
+        print STDERR "\n\n\t* STAR-Fusion complete.  See output: $out_prefix.fusion_candidates.tsv (or .abridged.tsv version)\n\n\n";
     }
     
     

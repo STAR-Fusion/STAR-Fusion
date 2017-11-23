@@ -9,11 +9,11 @@ kickstart:
 
 
 standard:
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir --STAR_use_shared_memory 
 
 
 standard_bbmerge:
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_bbmerge_outdir --bbmerge
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_bbmerge_outdir --bbmerge --STAR_use_shared_memory 
 
 
 all: standard \
@@ -31,6 +31,7 @@ all: standard \
      standard_bbmerge_FI_inspect \
      standard_bbmerge_FI_validate
 
+	../STAR-Fusion --STAR_Remove
 
 #####################################################
 #### Kickstart, starting from chimeric junctions file
@@ -46,41 +47,41 @@ kickstart_coding_effect: kickstart_annotate
 
 
 kickstart_FI_inspect: kickstart_coding_effect
-	../STAR-Fusion -J __kickstart_data/Chimeric.out.junction --genome_lib_dir ${CTAT_GENOME_LIB}  --examine_coding_effect --annotate --FusionInspector inspect --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_kickstarted_outdir
+	../STAR-Fusion -J __kickstart_data/Chimeric.out.junction --genome_lib_dir ${CTAT_GENOME_LIB}  --examine_coding_effect --annotate --FusionInspector inspect --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_kickstarted_outdir 
 
 
 ###################################
 #### Full mode, starting from reads
 
 standard_denovo_reconstruct: standard
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --denovo_reconstruct --FusionInspector validate --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --denovo_reconstruct --FusionInspector validate --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir  --STAR_use_shared_memory 
 
 standard_annotate: standard
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --FusionInspector validate --annotate --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --FusionInspector validate --annotate --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir  --STAR_use_shared_memory 
 
 standard_coding_effect: standard_annotate
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --FusionInspector validate --annotate --examine_coding_effect --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --FusionInspector validate --annotate --examine_coding_effect --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir  --STAR_use_shared_memory 
 
 
 ##################################
 #### Single-end reads instead of pairs
 
 standard_SE:
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --FusionInspector inspect --annotate --examine_coding_effect --left_fq ${left_fq} -O star_fusion_SE_outdir
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --FusionInspector inspect --annotate --examine_coding_effect --left_fq ${left_fq} -O star_fusion_SE_outdir  --STAR_use_shared_memory 
 
 kickstart_SE:
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB} -J __kickstart_data/Chimeric.out.junction  --FusionInspector inspect --annotate --examine_coding_effect --left_fq ${left_fq} -O star_fusion_SE_outdir_kickstart
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB} -J __kickstart_data/Chimeric.out.junction  --FusionInspector inspect --annotate --examine_coding_effect --left_fq ${left_fq} -O star_fusion_SE_outdir_kickstart  --STAR_use_shared_memory 
 
 
 ##############################
 ### bbmerge
 
 standard_bbmerge_FI_inspect: standard_bbmerge
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_bbmerge_outdir --bbmerge --FusionInspector inspect --annotate --examine_coding_effect 
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_bbmerge_outdir --bbmerge --FusionInspector inspect --annotate --examine_coding_effect  --STAR_use_shared_memory 
 
 
 standard_bbmerge_FI_validate: standard_bbmerge
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_bbmerge_outdir --bbmerge --FusionInspector validate --annotate --examine_coding_effect 
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_bbmerge_outdir --bbmerge --FusionInspector validate --annotate --examine_coding_effect  --STAR_use_shared_memory 
 
 
 
