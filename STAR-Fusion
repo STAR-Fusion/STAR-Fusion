@@ -32,7 +32,8 @@ my $AGGREGATE_NOVEL_JUNCTION_DIST = 5;
 my $tmpdir = "/tmp";
 my $verbose_level = 2;
 my $MIN_JUNCTION_READS = 1;
-my $MIN_SUM_FRAGS = 2;
+my $MIN_SUM_FRAGS = 2; # requires at least one junction read, else see min_spanning_frags_only below.
+my $MIN_SPANNING_FRAGS_ONLY = 1000000; # effectively turning off setting for now
 
 my $MAX_PROMISCUITY = 10;
 my $MIN_PCT_DOM_PROM = 20;
@@ -131,7 +132,7 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #
 #    --require_LDAS 0|1                    require long double anchor support for split reads
 #                                           when no spanning frags are found (default: 1)
-#                                           (if --min_junction_reads 0, then --require_LDAS is auto set to 0)           
+#                                           
 #
 #    --max_promiscuity <int>               maximum number of partners allowed for a given fusion. Default: $MAX_PROMISCUITY
 #
@@ -145,6 +146,9 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #    --min_novel_junction_support <int>    default: $MIN_NOVEL_JUNCTION_SUPPORT  (minimum of $MIN_NOVEL_JUNCTION_SUPPORT 
 #                                          junction reads required if breakpoint
 #                                                        lacks involvement of only reference junctions)
+#
+#    --min_spanning_frags_only <int>        minimum number of rna-seq fragments required as fusion evidence if
+#                                          there are no junction reads (default: $MIN_SPANNING_FRAGS_ONLY)
 #
 #    --min_alt_pct_junction <float>        default: $MIN_ALT_PCT_JUNCTION  ($MIN_ALT_PCT_JUNCTION % of the dominant isoform 
 #                                          junction support)
@@ -227,7 +231,8 @@ my $SHOW_FULL_USAGE_INFO;
               'min_sum_frags=i' => \$MIN_SUM_FRAGS,
               'max_promiscuity=i' => \$MAX_PROMISCUITY,
               'min_pct_dom_promiscuity=i' => \$MIN_PCT_DOM_PROM,
-                            
+              'min_spanning_frags_only=i' => \$MIN_SPANNING_FRAGS_ONLY,
+              
               'require_LDAS=i' => \$REQUIRE_LDAS,
               
               'min_novel_junction_support=i' => \$MIN_NOVEL_JUNCTION_SUPPORT,
@@ -300,12 +305,6 @@ else {
     unless ($STAR_PROG =~ /\w/) {
         die "Error, cannot locate STAR program in the PATH setting";
     }
-}
-
-
-if ($MIN_JUNCTION_READS == 0) {
-    print STDERR "-note, --min_junction_reads is set to zero, so forcing --require_LDAS 0\n";
-    $REQUIRE_LDAS = 0;
 }
 
 
@@ -486,6 +485,7 @@ main: {
             . " --min_novel_junction_support $MIN_NOVEL_JUNCTION_SUPPORT "
             . " --min_alt_pct_junction $MIN_ALT_PCT_JUNCTION "
             . " --aggregate_novel_junction_dist $AGGREGATE_NOVEL_JUNCTION_DIST "
+            . " --min_spanning_frags_only $MIN_SPANNING_FRAGS_ONLY "
             . " --genome_lib_dir $genome_lib_dir "
             . " --out_prefix $preliminary_outdir/$out_prefix";
         
