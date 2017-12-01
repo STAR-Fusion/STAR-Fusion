@@ -572,32 +572,36 @@ main: {
     if ($FUSIONINSPECTOR_MODE) {
         
         my $FI_outdir = "$output_dir/FusionInspector-${FUSIONINSPECTOR_MODE}";
-
+        
         my $FI_cmd = "";
+        $FI_cmd = "$BASEDIR/FusionInspector/FusionInspector --fusions $abridged_final_output "
+                . " --out_prefix finspector "
+                . " --min_junction_reads $MIN_JUNCTION_READS "
+                . " --min_novel_junction_support $MIN_NOVEL_JUNCTION_SUPPORT "
+                . " --min_spanning_frags_only $MIN_SPANNING_FRAGS_ONLY "
+                . " --prep_for_IGV "
+                . " --max_promiscuity $MAX_PROMISCUITY "
+                . " --out_dir $FI_outdir "
+                . " --genome_lib_dir $genome_lib_dir "
+                .  " --CPU $CPU ";
         
         if ($FUSIONINSPECTOR_MODE eq 'inspect') {
             ## use the extracted fusion evidence reads
             my $FI_left_fq = "$out_prefix.fusion_evidence_reads_1.fq";
-            $FI_cmd = "$BASEDIR/FusionInspector/FusionInspector --fusions $abridged_final_output "
-                . " --out_prefix finspector --min_junction_reads $MIN_JUNCTION_READS --min_novel_junction_support $MIN_NOVEL_JUNCTION_SUPPORT "
-                . " --prep_for_IGV --max_promiscuity $MAX_PROMISCUITY --out_dir $FI_outdir "
-                . " --genome_lib_dir $genome_lib_dir --only_fusion_reads --fusion_contigs_only "
-                . " --left_fq $FI_left_fq";
+        
+            $FI_cmd .= " --only_fusion_reads "
+                    .  "--fusion_contigs_only "
+                    .  " --left_fq $FI_left_fq";
+            
             if ($right_fq_filename) {
                 my $FI_right_fq = "$out_prefix.fusion_evidence_reads_2.fq";
                 $FI_cmd .= " --right_fq $FI_right_fq ";
             }
-            
-            $pipeliner->add_commands(new Command($cmd, "_fi_inspect.ok"));
         }
         else {
             # validate mode
             # use all original reads.
-            $FI_cmd = "$BASEDIR/FusionInspector/FusionInspector --fusions $abridged_final_output "
-                . " --out_prefix finspector --min_junction_reads $MIN_JUNCTION_READS --min_novel_junction_support $MIN_NOVEL_JUNCTION_SUPPORT "
-                . " --prep_for_IGV --max_promiscuity $MAX_PROMISCUITY --out_dir $FI_outdir "
-                . " --genome_lib_dir $genome_lib_dir "
-                . " --left_fq $left_fq_filename";
+            $FI_cmd .=  " --left_fq $left_fq_filename";
             if ($right_fq_filename) {
                 $FI_cmd .= " --right_fq $right_fq_filename ";
             }
@@ -613,10 +617,6 @@ main: {
             $FI_cmd .= " --examine_coding_effect ";
         }
 
-        # pass on multithreading settings
-        $FI_cmd .= " --CPU $CPU ";
-        
-                
         $pipeliner->add_commands(new Command($FI_cmd, "_fi_${FUSIONINSPECTOR_MODE}_" . length($FI_cmd) . ".ok"));
         
         
