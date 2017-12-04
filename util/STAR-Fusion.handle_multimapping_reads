@@ -524,7 +524,7 @@ sub any_coordsets_overlap {
 
             my ($align_lend, $align_rend) = @$align_coordset;
 
-            if ($genome_lend < $align_rend && $genome_rend > $genome_lend) {
+            if ($genome_lend < $align_rend && $genome_rend > $align_lend) {
 
                 return("align[$align_lend-$align_rend] overlaps seqSimRegion[$genome_lend-$genome_rend]");
             }
