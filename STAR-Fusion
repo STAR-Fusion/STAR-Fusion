@@ -32,7 +32,7 @@ my $AGGREGATE_NOVEL_JUNCTION_DIST = 5;
 my $tmpdir = "/tmp";
 my $verbose_level = 2;
 
-my $MIN_JUNCTION_READS = 0;
+my $MIN_JUNCTION_READS = 1;
 my $MIN_SUM_FRAGS = 2; # requires at least one junction read, else see min_spanning_frags_only below.
 my $MIN_SPANNING_FRAGS_ONLY = 5;
 
