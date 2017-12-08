@@ -349,29 +349,32 @@ sub get_chimeric_reads_to_genes {
         #column 12: CIGAR of the rst segment
         #column 13: rst base of the second segment
         #column 14: CIGAR of the second segment
-
-        #column 15: left gene mapping info in JSON
-        #column 16: right gene mapping info in JSON
+        
+        #column n-2: read group
+        
+        #column n-1: left gene mapping info in JSON
+        #column n: right gene mapping info in JSON
         
         
         my $junction_type = $x[6];
                 
         my $read_name = $x[9];
+
+        my $read_group = $x[$#x-2];
+        $read_name = "\&${read_group}\@${read_name}"; # encoding read group info into the read name
         
         my ($chrA, $coordA, $orientA) = ($x[0], $x[1], $x[2]);
         $coordA = ($orientA eq '+') ? --$coordA : ++$coordA;
         
         my ($rst_A, $cigar_A) = ($x[10], $x[11]);
         
-
         my ($chrB, $coordB, $orientB) = ($x[3], $x[4], $x[5]);
         $coordB = ($orientB eq '+') ? ++$coordB : --$coordB;
         
         my ($rst_B, $cigar_B) = ($x[12], $x[13]);
 
         my $PE_read_map_token = join("$;", $chrA, $rst_A, $cigar_A ,$chrB, $rst_B, $cigar_B);
-        
-        
+                
         if ($seen{$PE_read_map_token}) { 
             # rmdups
             next; 

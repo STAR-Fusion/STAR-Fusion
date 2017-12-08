@@ -74,6 +74,12 @@ $logo
 #
 #      --right_fq <string>                   right.fq file  (actually optional, but highly recommended)
 #
+#  Or
+#
+#      --samples_file <string>               file containing list of targeted samples
+#                                            (with format:
+#                                                sample_name(tab)/path/to/left.fq(tab)/path/to/right.fq
+#                                             and for single-end reads, exclude the 2nd read path. )
 #  Or use output from earlier STAR run:
 #
 #      --chimeric_junction|J <string>        Chimeric.out.junction file
@@ -202,6 +208,9 @@ my $no_filter = 0;
 
 my $left_fq_filename = "";
 my $right_fq_filename = "";
+
+my $samples_file = "";
+
 my $chimeric_out_junctions_file = "";
 
 my $REPORT_VERSION = 0;
@@ -225,7 +234,8 @@ my $SHOW_FULL_USAGE_INFO;
               
               'left_fq=s' => \$left_fq_filename,
               'right_fq=s' => \$right_fq_filename,
-              
+              'samples_file=s' => \$samples_file,
+                            
               'chimeric_junction|J=s' => \$chimeric_out_junctions_file,
 
               'min_junction_reads=i' => \$MIN_JUNCTION_READS,
@@ -318,8 +328,8 @@ if ($FUSIONINSPECTOR_MODE) {
 }
 
 if ($EXTRACT_FUSION_READS) {
-    unless ($left_fq_filename) {
-        die "Error, need --left_fq (and --right_fq for PE reads) set with --FusionInspector or --extract_fusion_reads ";
+    unless ($left_fq_filename || $samples_file) {
+        die "Error, need --left_fq (and --right_fq for PE reads) or --samples_file enabled with --FusionInspector or --extract_fusion_reads ";
     }
 }
 
@@ -341,7 +351,7 @@ unless (-d $genome_lib_dir) {
     die "Error, cannot locate genome_lib_dir: $genome_lib_dir";
 }
 
-if ($BBMERGE_flag && ! $right_fq_filename) {
+if ($BBMERGE_flag && !($right_fq_filename || $samples_file) ) {
     die "Error, can only use --bbmerge if paired-end reads are used ";
 }
 
@@ -364,7 +374,7 @@ elsif ($STAR_REMOVE) {
 }
 
 
-unless ( ($left_fq_filename || $chimeric_out_junctions_file) && $genome_lib_dir) {
+unless ( ($left_fq_filename || $samples_file || $chimeric_out_junctions_file) && $genome_lib_dir) {
     die $usage;
 }
 
@@ -373,13 +383,23 @@ $output_dir = &ensure_full_path($output_dir);
 $left_fq_filename = &ensure_full_path($left_fq_filename) if $left_fq_filename;
 $right_fq_filename = &ensure_full_path($right_fq_filename) if $right_fq_filename;
 $chimeric_out_junctions_file = &ensure_full_path($chimeric_out_junctions_file) if $chimeric_out_junctions_file;
-
+$samples_file = &ensure_full_path($samples_file) if $samples_file;
 
 my $checkpoints_dir = "$output_dir/_starF_checkpoints";
 
 
+if ($samples_file && $left_fq_filename) {
+    die "Error, specify --samples_file or --left_fq but not both.  These are mutually exclusive options";
+}
+
+my $read_group_ids = "";
+
 main: {
-            
+
+    if ($samples_file) {
+        ($read_group_ids, $left_fq_filename, $right_fq_filename) = &parse_samples_file($samples_file);
+    }
+        
     unless (-d $output_dir) {
         &process_cmd("mkdir -p $output_dir");
     }
@@ -412,12 +432,12 @@ main: {
             die "Error, cannot locate star index at $star_index_dir";
         }
         
-        &run_STAR($pipeliner, $left_fq_filename, $right_fq_filename, "std");
-    
+        &run_STAR($pipeliner, $left_fq_filename, $right_fq_filename, "std", $read_group_ids);
+        
         if ($BBMERGE_flag) {
-            my $bbmerge_fq = &run_BBMerge($pipeliner, $left_fq_filename, $right_fq_filename);
+            my $bbmerge_fq = &run_BBMerge($pipeliner, $left_fq_filename, $right_fq_filename, $read_group_ids);
 
-            &run_STAR($pipeliner, $bbmerge_fq, "", "bbmerge");
+            &run_STAR($pipeliner, $bbmerge_fq, "", "bbmerge", $read_group_ids);
             
             $pipeliner->add_commands(Command->new("bash -c \"set -eou pipefail; cat std.Chimeric.out.junction bbmerge.Chimeric.out.junction | sed s/merged-// > $chimeric_out_junctions_file\" ",
                                                   "$checkpoints_dir/combine_chimeric_junction_files.ok"));
@@ -452,9 +472,9 @@ main: {
         . " -M $MIN_PCT_MM_NONSPECIFIC "
         . " --filt_file $preliminary_outdir/star-fusion.junction_breakpts_to_genes.txt.fail "
         . " > $preliminary_outdir/star-fusion.junction_breakpts_to_genes.txt.pass ";
-
+    
     $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/$out_prefix.handle_multimappers.ok"));
-
+    
     
     ###################################
     ## predict preliminary fusion pairs
@@ -549,9 +569,15 @@ main: {
     }
     
     if ($EXTRACT_FUSION_READS) {
-        my $cmd = "$UTILDIR/get_FUSION_EVIDENCE_fastqs.pl --fusions $out_prefix.fusion_predictions.tsv --output_prefix $out_prefix --left_fq $left_fq_filename";
-        if ($right_fq_filename) {
-            $cmd .= " --right_fq $right_fq_filename";
+        my $cmd = "$UTILDIR/get_FUSION_EVIDENCE_fastqs.pl --fusions $out_prefix.fusion_predictions.tsv --output_prefix $out_prefix ";
+        if ($samples_file) {
+            $cmd .= " --samples_file $samples_file ";
+        }
+        else {
+            $cmd .= " --left_fq $left_fq_filename";
+            if ($right_fq_filename) {
+                $cmd .= " --right_fq $right_fq_filename";
+            }
         }
         $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/extract_fusion_reads.ok"));
     }
@@ -655,7 +681,7 @@ sub missing_required_program_installed {
 
 ####
 sub run_STAR {
-    my ($pipeliner, $left_fq_filename, $right_fq_filename, $output_prefix) = @_;
+    my ($pipeliner, $left_fq_filename, $right_fq_filename, $output_prefix, $read_group_ids) = @_;
     
     ## run STAR to align reads:
     my $cmd = "$STAR_PROG --genomeDir $star_index_dir "
@@ -673,8 +699,13 @@ sub run_STAR {
         . " --outSAMunmapped Within "
         . " --outSAMtype BAM SortedByCoordinate ";
 
-
-
+    if ($read_group_ids) {
+        $cmd .= " --outSAMattrRGline $read_group_ids ";
+    }
+    else {
+        $cmd .= " --outSAMattrRGline ID:GRPundef ";
+    }
+    
     if ($DEVEL_STAR) {
         $cmd .= " --chimMultimapScoreRange 10 --chimMultimapNmax 50 --chimNonchimScoreDropMin 10 ";
     }
@@ -719,16 +750,78 @@ sub run_STAR {
 
 ####
 sub run_BBMerge {
-    my ($pipeliner, $left_fq_filename, $right_fq_filename) = @_;
+    my ($pipeliner, $left_fq_filename, $right_fq_filename, $read_group_ids) = @_;
 
-    my $cmd = "$PLUGINSDIR/bbmap/bbmerge.sh in1=$left_fq_filename in2=$right_fq_filename out=bbmerged.fq";
+    my @left_fq_files = split(/,/, $left_fq_filename);
+    my @right_fq_files = split(/,/, $right_fq_filename);
+    my @read_groups = split(/ , /, $read_group_ids);
 
-    $pipeliner->add_commands(Command->new($cmd, "$checkpoints_dir/bbmerge.ok"));
+    my @bbmerged_files;
+    
+    while (@left_fq_files) {
 
-    # adjust the fq record names so we know these are the merged records later on.
-    $pipeliner->add_commands(Command->new("$UTILDIR/make_merged_prefix_fq.pl bbmerged.fq > bbmerged.adj.fq", "$checkpoints_dir/bbmerge.add_merged_token.ok"));
+        my $left_fq_filename = shift @left_fq_files;
+        my $right_fq_filename = shift @right_fq_files;
+        
 
-    return("bbmerged.adj.fq");
+        unless ($right_fq_filename) {
+            confess "Error, need right fq filename corresponding to left fq file: $left_fq_filename";
+        }
+        my $read_group = shift @read_groups;
+        if ($read_group) {
+            $read_group =~ s/^ID://;
+        }
+        else {
+            $read_group = "singlesample";
+        }
+        
+        my $cmd = "$PLUGINSDIR/bbmap/bbmerge.sh in1=$left_fq_filename in2=$right_fq_filename out=$read_group.bbmerge.fq";
+
+        $pipeliner->add_commands(Command->new($cmd, "$checkpoints_dir/$read_group.bbmerge.ok"));
+        
+        # adjust the fq record names so we know these are the merged records later on.
+        #$pipeliner->add_commands(Command->new("$UTILDIR/make_merged_prefix_fq.pl bbmerged.fq > bbmerged.adj.fq", "$checkpoints_dir/bbmerge.add_merged_token.ok"));
+
+        push (@bbmerged_files, "$read_group.bbmerge.fq");
+    }
+    
+    my $bbmerged_fq_files = join(",", @bbmerged_files);
+    
+    return($bbmerged_fq_files);
 }
 
     
+####
+sub parse_samples_file {
+    my ($samples_file) = @_;
+    
+    my @read_groups;
+    my @left_read_files;
+    my @right_read_files;
+
+    open(my $fh, "$samples_file") or die "Error, cannot open file: $samples_file";
+    while (<$fh>) {
+        chomp;
+        my ($sample_name, $left_path, $right_path) = split(/\t/);
+        unless (-s $left_path) {
+            die "Error, cannot find non-emtpy file: $left_path";
+        }
+        push (@read_groups, "ID:$sample_name");
+        push (@left_read_files, $left_path);
+        
+        if ($right_path) {
+            unless (-s $right_path) {
+                die "Error, cannot find non-empty file: $right_path";
+            }
+            push (@right_read_files, $right_path);
+        }
+
+    }
+
+    my $read_groups_str = join(" , ", @read_groups);
+    my $left_reads_str = join(",", @left_read_files);
+    my $right_reads_str = join(",", @right_read_files);
+
+    return($read_groups_str, $left_reads_str, $right_reads_str);
+}
+
