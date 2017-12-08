@@ -107,14 +107,16 @@ main: {
     }
 
 
+    my $sample_names = "";;
+    
     if ($samples_file) {
-        ($left_fq, $right_fq) = &parse_samples_file($samples_file);
+        ($sample_names, $left_fq, $right_fq) = &parse_samples_file($samples_file);
     }
     
-    &write_fastq_files($left_fq, "$output_prefix.fusion_evidence_reads_1.fq", \%core_frag_name_to_fusion_name);
+    &write_fastq_files($left_fq, "$output_prefix.fusion_evidence_reads_1.fq", \%core_frag_name_to_fusion_name, $sample_names);
     
     if ($right_fq) {
-        &write_fastq_files($right_fq, "$output_prefix.fusion_evidence_reads_2.fq", \%core_frag_name_to_fusion_name);
+        &write_fastq_files($right_fq, "$output_prefix.fusion_evidence_reads_2.fq", \%core_frag_name_to_fusion_name, $sample_names);
     }
     
     print STDERR "\nDone.\n\n";
@@ -126,11 +128,16 @@ main: {
 
 ####
 sub write_fastq_files {
-    my ($input_fastq_files, $output_fastq_file, $core_frag_name_to_fusion_name_href) = @_;
+    my ($input_fastq_files, $output_fastq_file, $core_frag_name_to_fusion_name_href, $sample_names) = @_;
 
+
+    my @samples = split(/,/, $sample_names);
+    
     open (my $ofh, ">$output_fastq_file") or die "Error, cannot write to $output_fastq_file";
     
     foreach my $input_fastq_file (split(/,/, $input_fastq_files)) {
+
+        my $sample_name = shift @samples;
         
         my $fastq_reader = new Fastq_reader($input_fastq_file);
         
@@ -145,6 +152,11 @@ sub write_fastq_files {
                 chomp $record_text;
                 my @lines = split(/\n/, $record_text);
                 my ($_1, $_2, $_3, $_4) = @lines;
+
+                if ($sample_name) {
+                    # encode it in the read name:
+                    $_1 =~ s/^\@/\@\&${sample_name}\@/;
+                }
                 $_3 = "+$fusion_name"; # encode the fusion name in the 3rd line, which is otherwise useless anyway
                 print $ofh join("\n", ($_1, $_2, $_3, $_4)) . "\n";
             }
@@ -191,6 +203,7 @@ sub parse_core_frag_names {
 sub parse_samples_file {
     my ($samples_file) = @_;
 
+    my @sample_names;
     my @left_fqs;
     my @right_fqs;
     
@@ -200,15 +213,19 @@ sub parse_samples_file {
         my @x = split(/\t/);
         my ($sample_name, $left_fq, $right_fq) = @x;
 
+        push (@sample_names, $sample_name);
+        
         push (@left_fqs, $left_fq);
+        
         if ($right_fq) {
             push (@right_fqs, $right_fq);
         }
     }
 
+    my $sample_names_txt = join(",", @sample_names);
     my $left_fq_files = join(",", @left_fqs);
     my $right_fq_files = join(",", @right_fqs);
 
 
-    return($left_fq_files, $right_fq_files);
+    return($sample_names_txt, $left_fq_files, $right_fq_files);
 }
