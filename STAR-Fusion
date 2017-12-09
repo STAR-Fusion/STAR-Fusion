@@ -627,12 +627,19 @@ main: {
         else {
             # validate mode
             # use all original reads.
-            $FI_cmd .=  " --left_fq $left_fq_filename";
-            if ($right_fq_filename) {
-                $FI_cmd .= " --right_fq $right_fq_filename ";
+
+            if ($samples_file) {
+                $FI_cmd .= " --samples_file $samples_file ";
+            }
+            else {
+                
+                $FI_cmd .=  " --left_fq $left_fq_filename";
+                if ($right_fq_filename) {
+                    $FI_cmd .= " --right_fq $right_fq_filename ";
+                }
             }
         }
-
+        
         if ($DENOVO_RECONSTRUCT) {
             $FI_cmd .= " --include_Trinity ";
         }
@@ -807,13 +814,13 @@ sub parse_samples_file {
             die "Error, cannot find non-emtpy file: $left_path";
         }
         push (@read_groups, "ID:$sample_name");
-        push (@left_read_files, $left_path);
+        push (@left_read_files, &ensure_full_path($left_path));
         
         if ($right_path) {
             unless (-s $right_path) {
                 die "Error, cannot find non-empty file: $right_path";
             }
-            push (@right_read_files, $right_path);
+            push (@right_read_files, &ensure_full_path($right_path));
         }
 
     }

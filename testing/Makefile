@@ -63,6 +63,13 @@ standard_coding_effect: standard_annotate
 	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --FusionInspector validate --annotate --examine_coding_effect --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir  --STAR_use_shared_memory 
 
 
+####################
+## use samples file:
+
+samples_PE:
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB} --samples_file data/samples.txt  -O star_fusion_samplesPE_outdir  --STAR_use_shared_memory 
+
+
 ##################################
 #### Single-end reads instead of pairs
 
@@ -97,4 +104,4 @@ clean:
 	rm -rf ./star_fusion_SE_outdir_kickstart
 	rm -rf ./star_fusion_bbmerge_outdir
 	(rm -rf ./test_docker_outdir) || sudo rm -rf ./test_docker_outdir
-
+	rm -rf ./star_fusion_samplesPE_outdir
