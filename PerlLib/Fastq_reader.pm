@@ -2,6 +2,7 @@ package Fastq_reader;
 
 use strict;
 use warnings;
+use PerlIO::gzip;
 
 sub new {
     my ($packagename, $fastqFile) = @_;
@@ -22,7 +23,7 @@ sub new {
 	}
 	else {
 		if ( $fastqFile =~ /\.gz$/ ) {
-		    open ($filehandle, "gunzip -c $fastqFile | ") or die "Error: Couldn't open compressed $fastqFile\n";
+		    open ($filehandle, "<:gzip", "$fastqFile") or die "Error: Couldn't open compressed $fastqFile\n";
         }
         elsif ($fastqFile =~ /\.bz2$/) {
             open ($filehandle, "bunzip2 -c $fastqFile | ") or die "Error, couldn't open compressed $fastqFile $!";

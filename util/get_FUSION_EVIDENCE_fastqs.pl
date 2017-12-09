@@ -7,6 +7,7 @@ use lib ("$FindBin::Bin/../PerlLib");
 use Fastq_reader;
 use Process_cmd;
 use DelimParser;
+use Carp;
 use Data::Dumper;
 
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);  
@@ -81,6 +82,8 @@ main: {
         
         foreach my $junction_read (split(/,/, $junction_reads_list_txt)) {
 
+            if ($junction_read eq '.') { next; }
+            
             $junction_read =~ s/^\&[^\@]+\@//; # remove any sample encoding here.
             
             my $pair_end = "";
@@ -99,6 +102,8 @@ main: {
         
         my $spanning_frag_list_txt = $row->{SpanningFrags};
         foreach my $spanning_frag (split(/,/, $spanning_frag_list_txt)) {
+
+            if ($spanning_frag eq '.') { next; }
             
             $spanning_frag =~ s/^\&[^\@]+\@//; # remove any sample encoding here.
             my $updated_frag_name = "$fusion_name|S|$spanning_frag";
@@ -134,9 +139,12 @@ sub write_fastq_files {
     my @samples = split(/,/, $sample_names);
     
     open (my $ofh, ">$output_fastq_file") or die "Error, cannot write to $output_fastq_file";
+
+    my %reads_to_capture = %{$core_frag_name_to_fusion_name_href};
+    
     
     foreach my $input_fastq_file (split(/,/, $input_fastq_files)) {
-
+        print STDERR "-searching fq file: $input_fastq_file\n";
         my $sample_name = shift @samples;
         
         my $fastq_reader = new Fastq_reader($input_fastq_file);
@@ -144,9 +152,11 @@ sub write_fastq_files {
         while (my $fq_record = $fastq_reader->next()) {
             
             my $core_read_name = $fq_record->get_core_read_name();
-            #print "[$core_read_name]\n";
+            #print STDERR "[$core_read_name]\n";
             
             if (my $fusion_name = $core_frag_name_to_fusion_name_href->{$core_read_name}) {
+
+                delete $reads_to_capture{$core_read_name} if exists $reads_to_capture{$core_read_name};
                 
                 my $record_text = $fq_record->get_fastq_record();
                 chomp $record_text;
@@ -164,8 +174,12 @@ sub write_fastq_files {
         
         
     }
-    
+
     print STDERR "\nDone writing to $output_fastq_file\n\n";
+
+    if (%reads_to_capture) {
+        confess "Error, failed to capture fusion evidence reads: " . Dumper(\%reads_to_capture);
+    }
     
     return;
 }

@@ -70,6 +70,19 @@ samples_PE:
 	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB} --samples_file data/samples.txt  -O star_fusion_samplesPE_outdir  --STAR_use_shared_memory 
 
 
+samplesPE_FI: samples_PE_FI_inspect samples_PE_FI_validate
+
+
+samples_PE_FI_inspect: samples_PE
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB} --samples_file data/samples.txt  -O star_fusion_samplesPE_outdir  --STAR_use_shared_memory --FusionInspector inspect
+
+samples_PE_FI_validate: samples_PE
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB} --samples_file data/samples.txt  -O star_fusion_samplesPE_outdir  --STAR_use_shared_memory --FusionInspector validate
+
+
+
+
+
 ##################################
 #### Single-end reads instead of pairs
 

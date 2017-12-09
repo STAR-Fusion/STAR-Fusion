@@ -396,13 +396,21 @@ my $read_group_ids = "";
 
 main: {
 
-    if ($samples_file) {
-        ($read_group_ids, $left_fq_filename, $right_fq_filename) = &parse_samples_file($samples_file);
-    }
-        
+            
     unless (-d $output_dir) {
         &process_cmd("mkdir -p $output_dir");
     }
+
+    if ($samples_file) {
+        ($read_group_ids, $left_fq_filename, $right_fq_filename) = &parse_samples_file($samples_file);
+
+        # in case there are relative paths 
+        my $new_samples_file = "$output_dir/starF.target_samples.txt";
+        &write_new_samples_file($new_samples_file, $read_group_ids, $left_fq_filename, $right_fq_filename);
+        $samples_file = $new_samples_file;
+    }
+    
+
     
     chdir $output_dir or die "Error, cannot cd to $output_dir";
 
@@ -830,5 +838,34 @@ sub parse_samples_file {
     my $right_reads_str = join(",", @right_read_files);
 
     return($read_groups_str, $left_reads_str, $right_reads_str);
+}
+
+####
+sub write_new_samples_file {
+    my ($new_samples_file, $read_group_ids, $left_fq_filename, $right_fq_filename) = @_;
+
+    open(my $ofh, ">$new_samples_file") or die "Error, cannot write to $new_samples_file";
+
+    my @read_group_ids = split(/ , /, $read_group_ids);
+    my @left_fq_files = split(/,/, $left_fq_filename);
+    my @right_fq_files = split(/,/, $right_fq_filename);
+
+    while (@read_group_ids) {
+        my $read_group = shift @read_group_ids;
+        my $left_fq = shift @left_fq_files;
+        my $right_fq = shift @right_fq_files;
+        
+        $read_group =~ s/^ID://;
+        
+        my $outline = join("\t", $read_group, $left_fq);
+        if ($right_fq) {
+            $outline .= "\t$right_fq";
+        }
+        $outline .= "\n";
+        print $ofh $outline;
+    }
+    close $ofh;
+
+    return;
 }
 
