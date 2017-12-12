@@ -29,9 +29,12 @@ all: standard \
      kickstart_SE \
      standard_bbmerge \
      standard_bbmerge_FI_inspect \
-     standard_bbmerge_FI_validate
+     standard_bbmerge_FI_validate \
+     samples_PE \
+     samples_PE_FI_inspect \
+     samples_PE_FI_validate
 
-	../STAR-Fusion --STAR_Remove
+#	../STAR-Fusion --STAR_Remove
 
 #####################################################
 #### Kickstart, starting from chimeric junctions file
