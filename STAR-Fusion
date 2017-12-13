@@ -49,6 +49,9 @@ my $STAR_MAX_MATE_DIST = 100000;
 
 my $MIN_PCT_MM_NONSPECIFIC = 50;
 
+my $STAR_limitBAMsortRAM = "40G";
+
+
 my $logo='
 ############################################################################################
 #
@@ -121,6 +124,8 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 # STAR program configurations:
 #    
 #    --STAR_max_mate_dist <int>            maximum distance between mates  (also used for the maximum intron length value)  default:  $STAR_MAX_MATE_DIST
+#
+#    --STAR_limitBAMsortRAM <string>       num GB of RAM, default:  ${STAR_limitBAMsortRAM}
 #
 #    --STAR_PATH <string>                  /path/to/STAR  (default: uses STAR found in PATH setting).
 #
@@ -272,6 +277,9 @@ my $SHOW_FULL_USAGE_INFO;
               
               'STAR_MAX_MATE_DIST=i' => \$STAR_MAX_MATE_DIST,
 
+
+              'STAR_limitBAMsortRAM=s' => \$STAR_limitBAMsortRAM,
+              
               'STAR_PATH=s' => \$STAR_PROG,
               
               'extract_fusion_reads' => \$EXTRACT_FUSION_READS,
@@ -318,6 +326,13 @@ else {
     }
 }
 
+
+if ($STAR_limitBAMsortRAM =~ /^(\d+)G$/) {
+    $STAR_limitBAMsortRAM = $1 * (1024^3);
+}
+else {
+    die "Error, cannot parse G of RAM from: $STAR_limitBAMsortRAM ";
+}
 
 
 if ($FUSIONINSPECTOR_MODE) {
@@ -709,12 +724,11 @@ sub run_STAR {
         . " --alignIntronMax $STAR_MAX_MATE_DIST "
         . " --alignSJstitchMismatchNmax 5 -1 5 5 "  #which allows for up to 5 mismatches for non-canonical GC/AG, and AT/AC junctions, and any number of mismatches for canonical junctions (the default values 0 -1 0 0 replicate the old behavior (from AlexD)
         . " --runThreadN $CPU"
-        #. " --limitBAMsortRAM 31532137230 "
-        . " --limitBAMsortRAM 38885963394 "
+        . " --limitBAMsortRAM $STAR_limitBAMsortRAM "
         . " --outSAMstrandField intronMotif "
         . " --outSAMunmapped Within "
         . " --outSAMtype BAM SortedByCoordinate ";
-
+    
     if ($read_group_ids) {
         $cmd .= " --outSAMattrRGline $read_group_ids ";
     }
