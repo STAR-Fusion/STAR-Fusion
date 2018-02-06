@@ -328,7 +328,7 @@ else {
 
 
 if ($STAR_limitBAMsortRAM =~ /^(\d+)G$/) {
-    $STAR_limitBAMsortRAM = $1 * (1024^3);
+    $STAR_limitBAMsortRAM = $1 * (1024**3);
 }
 else {
     die "Error, cannot parse G of RAM from: $STAR_limitBAMsortRAM ";
