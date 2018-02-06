@@ -34,7 +34,7 @@ all: standard \
      samples_PE_FI_inspect \
      samples_PE_FI_validate
 
-#	../STAR-Fusion --STAR_Remove
+
 
 #####################################################
 #### Kickstart, starting from chimeric junctions file
@@ -121,3 +121,8 @@ clean:
 	rm -rf ./star_fusion_bbmerge_outdir
 	(rm -rf ./test_docker_outdir) || sudo rm -rf ./test_docker_outdir
 	rm -rf ./star_fusion_samplesPE_outdir
+
+
+purge:
+	../STAR-Fusion --STAR_Remove
+
