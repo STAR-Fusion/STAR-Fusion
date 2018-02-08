@@ -39,15 +39,15 @@ main: {
     
     # revert abam to ubam file
     my $cmd = "java -jar $PICARD_HOME/picard.jar RevertSam I=$abam_file O=$ubam SO=queryname REMOVE_ALIGNMENT_INFORMATION=true TMP_DIR=$tmpdir";
-    $pipeliner->add_commands(new Command($cmd, "$checkpoint_dir/$sample_name.reverted.ok"));
+    $pipeliner->add_commands(new Command($cmd, "$sample_name.reverted.ok"));
 
     # convert to fastq
     $cmd = "java -jar $PICARD_HOME/picard.jar SamToFastq I=$ubam FASTQ=${sample_name}_1.fastq SECOND_END_FASTQ=${sample_name}_2.fastq";
-    $pipeliner->add_commands(new Command($cmd, "$checkpoint_dir/$sample_name.fq_out.ok"));
+    $pipeliner->add_commands(new Command($cmd, "$sample_name.fq_out.ok"));
 
     # gzip fastq files
     $cmd = "gzip ${sample_name}_1.fastq ${sample_name}_2.fastq";
-    $pipeliner->add_commands(new Command($cmd, "$checkpoint_dir/$sample_name.gzipped_fq.ok"));
+    $pipeliner->add_commands(new Command($cmd, "$sample_name.gzipped_fq.ok"));
 
     $pipeliner->run();
 
