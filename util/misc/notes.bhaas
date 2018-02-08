@@ -8,3 +8,14 @@ aBam_to_uBam_to_fastq.cmds_generator.pl *.bam > cmds.txt
 
 
 
+#########
+# running samples in parallel:
+
+pair_up_fastq_files_1_2.pl  > samples.txt
+
+samples_file_to_starF_cmds.pl ../FASTQ/samples.txt  > starF.cmds
+
+~/GITHUB/ugetools/UGE_SUBMISSIONS/UGER_cmd_batch_processor.py --cmds_file starF.cmds --batch_size 1 --project_name regevlab --queue broad --job_name starF_ffpe --h_rt 10:00:00 --tracking_dir `pwd`/ugetrack.fq --memory 50
+
+
+
