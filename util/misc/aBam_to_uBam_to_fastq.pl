@@ -26,8 +26,8 @@ if (! -d $tmpdir) {
 
 main: {
 
-    my $pipeliner = new Pipeliner(-verbose=> 2);
-    $pipeliner->set_checkpoint_dir($checkpoint_dir);
+    my $pipeliner = new Pipeliner(-verbose=> 2,
+                                  -checkpoint_dir => $checkpoint_dir);
 
     my $sample_name = basename($abam_file);
     $sample_name =~ s/\.bam$//;
