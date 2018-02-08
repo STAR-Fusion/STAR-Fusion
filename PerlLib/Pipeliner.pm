@@ -3,6 +3,7 @@ package Pipeliner;
 use strict;
 use warnings;
 use Carp;
+use Cwd;
 
 ################################
 ## Verbose levels:
@@ -12,6 +13,42 @@ my $VERBOSE = 0;
 ################################
 
 
+####################
+## Static methods:
+####################
+
+####
+sub ensure_full_path {
+    my ($path, $ADD_GZ_FIFO_FLAG) = @_;
+
+    unless ($path =~ m|^/|) {
+        $path = cwd() . "/$path";
+    }
+
+    if ($ADD_GZ_FIFO_FLAG && $path =~ /\.gz$/) {
+        $path = "<(zcat $path)";
+    }
+    
+    return($path);
+}
+
+####
+sub process_cmd {
+    my ($cmd) = @_;
+
+    print STDERR "CMD: $cmd\n";
+    my $ret = system($cmd);
+    if ($ret) {
+        die "Error, CMD: $cmd died with ret $ret";
+    }
+    return;
+}
+
+
+################
+## Obj methods:
+################
+
 ####
 sub new {
     my $packagename = shift;
@@ -20,9 +57,20 @@ sub new {
     if ($params{-verbose}) {
         $VERBOSE = $params{-verbose};
     }
+    my $cmds_log = $params{-cmds_log};
+    unless ($cmds_log) {
+        $cmds_log = "pipeliner.$$.cmds";
+    }
+    
+    open (my $ofh, ">$cmds_log") or confess "Error, cannot write to $cmds_log";
+    
     
     my $self = { 
         cmd_objs => [],
+        checkpoint_dir => undef,
+
+        cmds_log_ofh => $ofh,
+        
     };
     
     bless ($self, $packagename);
@@ -39,6 +87,16 @@ sub add_commands {
         unless (ref($cmd) =~ /Command/) {
             confess "Error, need Command object as param";
         }
+
+        my $checkpoint_file = $cmd->get_checkpoint_file();
+        if ($checkpoint_file !~ m|^/|) {
+            if (my $checkpoint_dir = $self->get_checkpoint_dir()) {
+                $checkpoint_file = "$checkpoint_dir/$checkpoint_file";
+                $cmd->reset_checkpoint_file($checkpoint_file);
+            }
+        }
+        
+
         push (@{$self->{cmd_objs}}, $cmd);
     }
     
@@ -46,16 +104,45 @@ sub add_commands {
 
 }
 
+sub set_checkpoint_dir {
+    my $self = shift;
+    my ($checkpoint_dir) = @_;
+    if (! -d $checkpoint_dir) {
+        confess "Error, cannot locate checkpointdir: $checkpoint_dir";
+    }
+    $self->{checkpoint_dir} = $checkpoint_dir;
+}
+
+sub get_checkpoint_dir {
+    my $self = shift;
+    return($self->{checkpoint_dir});
+}
+
+sub has_commands {
+    my $self = shift;
+    if ($self->_get_commands()) {
+        return(1);
+    }
+    else {
+        return(0);
+    }
+}
+
 sub run {
     my $self = shift;
+
+    my $cmds_log_ofh = $self->{cmds_log_ofh};
 
     foreach my $cmd_obj ($self->_get_commands()) {
         
         my $cmdstr = $cmd_obj->get_cmdstr();
-        my $checkpoint_file = $cmd_obj->get_checkpoint_file();
+        print $cmds_log_ofh "$cmdstr\n";
+        
 
+        my $checkpoint_file = $cmd_obj->get_checkpoint_file();
+        
         if (-e $checkpoint_file) {
-            print STDERR "-- Skipping CMD: $cmdstr, checkpoint exists.\n" if $VERBOSE;
+            print STDERR "-- Skipping CMD: $cmdstr, checkpoint [$checkpoint_file] exists.\n" if $VERBOSE;
         }
         else {
             print STDERR "* Running CMD: $cmdstr\n" if $VERBOSE;
@@ -64,10 +151,11 @@ sub run {
             if (-e $tmp_stderr) {
                 unlink($tmp_stderr);
             }
+
             unless ($VERBOSE == 2) {
                 $cmdstr .= " 2>$tmp_stderr";
             }
-            
+
             my $ret = system($cmdstr);
             if ($ret) {
                 
@@ -76,7 +164,7 @@ sub run {
                     unlink($tmp_stderr);
                 }
                                 
-                confess "Error, cmd: $cmdstr died with ret $ret";
+                confess "Error, cmd: $cmdstr died with ret $ret $!";
             }
             else {
                 `touch $checkpoint_file`;
@@ -92,6 +180,11 @@ sub run {
         }
     }
 
+    
+    # reset in case reusing the pipeline obj
+    $self->{cmd_objs} = []; # reinit
+    
+
     return;
 }
 
@@ -100,6 +193,10 @@ sub _get_commands {
 
     return(@{$self->{cmd_objs}});
 }
+
+
+
+
 
 package Command;
 use strict;
@@ -136,6 +233,12 @@ sub get_checkpoint_file {
     return($self->{checkpoint_file});
 }
 
+####
+sub reset_checkpoint_file {
+    my $self = shift;
+    my $checkpoint_file = shift;
 
+    $self->{checkpoint_file} = $checkpoint_file;
+}
 
 1; #EOM
