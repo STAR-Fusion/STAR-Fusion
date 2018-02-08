@@ -1,0 +1,10 @@
+###########
+# bam to fq
+
+
+aBam_to_uBam_to_fastq.cmds_generator.pl *.bam > cmds.txt
+
+~/GITHUB/ugetools/UGE_SUBMISSIONS/UGER_cmd_batch_processor.py  --cmds_file cmds.txt --batch_size 1 --project_name regevlab --queue broad --job_name fqprep --bash_header_text "source /broad/software/scripts/useuse; reuse Java-1.8;" --h_rt 10:00:00 --tracking_dir `pwd`/ugetrack.fq --memory 10
+
+
+
