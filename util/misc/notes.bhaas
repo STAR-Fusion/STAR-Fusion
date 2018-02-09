@@ -18,4 +18,14 @@ samples_file_to_starF_cmds.pl ../FASTQ/samples.txt  > starF.cmds
 ~/GITHUB/ugetools/UGE_SUBMISSIONS/UGER_cmd_batch_processor.py --cmds_file starF.cmds --batch_size 1 --project_name regevlab --queue broad --job_name starF_ffpe --h_rt 10:00:00 --tracking_dir `pwd`/ugetrack.fq --memory 50
 
 
+# aggregate results:
+
+find . -regex ".*abridged.tsv" | tee files.list
+
+aggregate_predictions_add_sample_name.pl files.list  > preds.tsv
+
+# annotate results
+
+FusionAnnotator  --annotate preds.tsv --fusion_name_col 1 > preds.tsv.wAnnot
+
 
