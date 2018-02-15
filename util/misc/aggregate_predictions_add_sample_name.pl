@@ -7,9 +7,10 @@ use FindBin;
 use lib "$FindBin::Bin/../../PerlLib";
 use DelimParser;
 
-my $usage = "usage: $0 tsv_file_list_file.txt\n\n";
+my $usage = "usage: $0 tsv_file_list_file.txt [sample_name_idx=-2]\n\n";
 
 my $fi_files_list = $ARGV[0] or die $usage;
+my $sample_name_idx = $ARGV[1] || -2;
 
 main: {
 
@@ -22,7 +23,7 @@ main: {
         chomp;
         my $filename = $_;
         my @pts = split(/\//, $filename);
-        my $sample_name = $pts[-2];
+        my $sample_name = $pts[$sample_name_idx];
         
         unless (-s $filename) {
             print STDERR "\n\n\tooops... file $filename isn't there any more.\n\n";
