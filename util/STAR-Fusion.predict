@@ -361,8 +361,11 @@ sub get_chimeric_reads_to_genes {
         my $read_name = $x[9];
 
         my $read_group = $x[$#x-2];
-        $read_name = "\&${read_group}\@${read_name}"; # encoding read group info into the read name
-        
+        if ($read_group =~ /^\D/) {
+            # do this only if using the new STAR formatting
+            # if old star, this shows up as a cigar string that starts with a number
+            $read_name = "\&${read_group}\@${read_name}"; # encoding read group info into the read name
+        }
         my ($chrA, $coordA, $orientA) = ($x[0], $x[1], $x[2]);
         $coordA = ($orientA eq '+') ? --$coordA : ++$coordA;
         
