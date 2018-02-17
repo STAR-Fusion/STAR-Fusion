@@ -173,7 +173,8 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #    
 # Downstream analysis of fusion candidates: 
 #
-#    --annotate                            annotate fusions based on known cancer fusions and those found in normal tissues
+#    --no_annotation_filter                exclude filtering of fusion predictions based on annotations 
+#                                               (ie. by default, removing fusions found in normal (non-cancer) samples))
 #
 #    --examine_coding_effect               explore impact of fusions on coding sequences
 #
@@ -227,7 +228,7 @@ my $USE_SHARED_MEMORY = 0;
 my $EXTRACT_FUSION_READS = 0;
 my $FUSIONINSPECTOR_MODE = 0;
 my $DENOVO_RECONSTRUCT = 0;
-my $ANNOTATE = 0;
+my $NO_ANNOTATION_FILTER = 0;
 my $EXAMINE_CODING_EFFECT = 0;
 
 my $STAR_PROG;
@@ -262,10 +263,11 @@ my $SHOW_FULL_USAGE_INFO;
               'tmpdir=s' => \$tmpdir,
               'verbose_level=i' => \$verbose_level,
 
-              'annotate' => \$ANNOTATE,
               'examine_coding_effect' => \$EXAMINE_CODING_EFFECT,
-              
+
               'no_filter' => \$no_filter,
+              
+              'no_annotation_filter' => \$NO_ANNOTATION_FILTER,
     
               'genome_lib_dir=s' => \$genome_lib_dir,
               
@@ -369,6 +371,14 @@ unless ($genome_lib_dir) {
 unless (-d $genome_lib_dir) {
     die "Error, cannot locate genome_lib_dir: $genome_lib_dir";
 }
+
+## ensure that we can locate the AnnotFilterRule in the CTAT_GENOME_LIB
+my $annot_filt_module = "$genome_lib_dir/AnnotFilterRule.pm";
+unless (-s $annot_filt_module) {
+    die "Error, cannot locate required $annot_filt_module  ... be sure to use a more modern version of the companion CTAT_GENOME_LIB ";
+}
+
+
 
 if ($BBMERGE_flag && !($right_fq_filename || $samples_file) ) {
     die "Error, can only use --bbmerge if paired-end reads are used ";
@@ -562,13 +572,31 @@ main: {
     my $predicted_fusions_with_splice_info = "$predicted_fusions_file.wSpliceInfo";
 
     $cmd = "$UTILDIR/append_breakpoint_junction_info.pl $prelim_fusion_file $genome_lib_dir > $predicted_fusions_with_splice_info";
-
+    
     $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/predicted_fusions_with_splice_info.ok"));
 
-    $prelim_fusion_file = $predicted_fusions_with_splice_info;
+    
 
+
+    ## annotate fusions.
     
+    my $annotated_fusions_filename = "$predicted_fusions_with_splice_info.wAnnot";
+    $cmd = "$BASEDIR/FusionAnnotator/FusionAnnotator --genome_lib_dir $genome_lib_dir --annotate $predicted_fusions_with_splice_info > $annotated_fusions_filename";
+    $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/fusion_annotator.ok"));
     
+
+    # filter based on annotations
+    if ($NO_ANNOTATION_FILTER) {
+        $prelim_fusion_file = $annotated_fusions_filename;
+    }
+    else {
+        
+        $cmd = "$UTILDIR/filter_by_annotation_rules.pl $annotated_fusions_filename $genome_lib_dir";
+        $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/annot_filter.ok"));
+        $prelim_fusion_file = "$annotated_fusions_filename.pass";
+    }
+    
+        
     # generate final fusion prediction output files:
     my $final_output_fusions = "$out_prefix.fusion_predictions.tsv";
     $pipeliner->add_commands(new Command("cp $prelim_fusion_file $final_output_fusions", "$checkpoints_dir/cp_final.ok"));
@@ -577,18 +605,9 @@ main: {
     my $abridged_final_output = $final_output_fusions;
     $abridged_final_output =~ s/\.tsv$/.abridged.tsv/;
     $pipeliner->add_commands(new Command("$UTILDIR/column_exclusions.pl $final_output_fusions JunctionReads,SpanningFrags > $abridged_final_output", "$checkpoints_dir/abridged_final"));
-
-    
-    if ($ANNOTATE) {
-        ## annotate fusions.
-
-        my $annotated_fusions_filename = $abridged_final_output;
-        $annotated_fusions_filename =~ s/\.tsv$/.annotated.tsv/;
-        $cmd = "$BASEDIR/FusionAnnotator/FusionAnnotator --genome_lib_dir $genome_lib_dir --annotate $abridged_final_output > $annotated_fusions_filename";
-        $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/fusion_annotator.ok"));
-        $abridged_final_output = $annotated_fusions_filename;
-    }
-    
+        
+    $abridged_final_output = $annotated_fusions_filename;
+        
     if ($EXAMINE_CODING_EFFECT) {
         
         my $coding_eff_filename = $abridged_final_output;
@@ -674,9 +693,9 @@ main: {
         if ($DENOVO_RECONSTRUCT) {
             $FI_cmd .= " --include_Trinity ";
         }
-        if ($ANNOTATE) {
-            $FI_cmd .= " --annotate ";
-        }
+        
+        $FI_cmd .= " --annotate "; # just do it by default
+        
         if ($EXAMINE_CODING_EFFECT) {
             $FI_cmd .= " --examine_coding_effect ";
         }
