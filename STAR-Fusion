@@ -606,8 +606,6 @@ main: {
     $abridged_final_output =~ s/\.tsv$/.abridged.tsv/;
     $pipeliner->add_commands(new Command("$UTILDIR/column_exclusions.pl $final_output_fusions JunctionReads,SpanningFrags > $abridged_final_output", "$checkpoints_dir/abridged_final"));
         
-    $abridged_final_output = $annotated_fusions_filename;
-        
     if ($EXAMINE_CODING_EFFECT) {
         
         my $coding_eff_filename = $abridged_final_output;
