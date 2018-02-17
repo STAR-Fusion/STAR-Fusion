@@ -23,6 +23,8 @@ my $out_prefix = "star-fusion";
 my $chimeric_junction_file;
 my $help_flag;
 
+my $NO_REMOVE_DUPS;
+
 my $LONG_ANCHOR_SIZE = 25;
 
 my $usage = <<__EOUSAGE__;
@@ -38,6 +40,8 @@ my $usage = <<__EOUSAGE__;
 #
 #    --out_prefix|O <string>         output file prefix (default: $out_prefix)
 #    
+#    --no_remove_dups                do not remove duplicate reads
+#
 ###################################################################################
 
 
@@ -54,6 +58,8 @@ my $DEBUG;
               
               'out_prefix|O=s' => \$out_prefix,
 
+              'no_remove_dups' => \$NO_REMOVE_DUPS,
+              
               'd' => \$DEBUG,
     );
 
@@ -380,7 +386,9 @@ sub get_chimeric_reads_to_genes {
                 
         if ($seen{$PE_read_map_token}) { 
             # rmdups
-            next; 
+            unless ($NO_REMOVE_DUPS) {
+                next;
+            }
         }
         else {
             $seen{$PE_read_map_token} = 1;

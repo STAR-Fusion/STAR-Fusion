@@ -51,6 +51,8 @@ my $MIN_PCT_MM_NONSPECIFIC = 50;
 
 my $STAR_limitBAMsortRAM = "40G";
 
+my $NO_REMOVE_DUPS = 0;
+
 
 my $logo='
 ############################################################################################
@@ -167,6 +169,7 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #
 #    --no_filter                           do not filter predictions. (stops execution prior to the filtering stage).
 #
+#    --no_remove_dups                      do not remove duplicate reads
 #    
 # Downstream analysis of fusion candidates: 
 #
@@ -287,7 +290,8 @@ my $SHOW_FULL_USAGE_INFO;
               'denovo_reconstruct' => \$DENOVO_RECONSTRUCT,
               
               'bbmerge' => \$BBMERGE_flag,
-    
+
+              'no_remove_dups' => \$NO_REMOVE_DUPS,
               
               'DEVEL_STAR' => \$DEVEL_STAR,
     
@@ -505,6 +509,10 @@ main: {
     $cmd = "$UTILDIR/STAR-Fusion.predict "
         . " -J $preliminary_outdir/star-fusion.junction_breakpts_to_genes.txt.pass "
         . " -O $preliminary_outdir/$out_prefix ";
+
+    if ($NO_REMOVE_DUPS) {
+        $cmd .= " --no_remove_dups ";
+    }
     
     $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/$out_prefix.STAR-Fusion.predict.ok"));
     
@@ -673,6 +681,10 @@ main: {
             $FI_cmd .= " --examine_coding_effect ";
         }
 
+        if ($NO_REMOVE_DUPS) {
+            $FI_cmd .= " --no_remove_dups ";
+        }
+        
         $pipeliner->add_commands(new Command($FI_cmd, "_fi_${FUSIONINSPECTOR_MODE}_" . length($FI_cmd) . ".ok"));
         
         
