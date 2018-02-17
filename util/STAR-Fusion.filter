@@ -558,8 +558,10 @@ sub parse_read_mapping_counts {
         my $read_name = $x[9];
         my $read_group = $x[$#x];
 
-        $read_name = "\&${read_group}\@${read_name}"; # sample name encoding
-        
+        unless ($read_group =~ /^\d/) {
+            # backwards compatible w/ older STAR
+            $read_name = "\&${read_group}\@${read_name}"; # sample name encoding
+        }
         $read_counts{$read_name}++;
     }
     close $fh;
