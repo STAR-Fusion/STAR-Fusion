@@ -3,8 +3,10 @@
 use strict;
 use warnings;
 
-use lib ($ENV{EUK_MODULES});
+use FindBin;
+use lib ("$FindBin::Bin/../../PerlLib");
 use DelimParser;
+use List::MoreUtils qw(uniq);
 
 my $usage = "\n\n\tusage: $0 STAR-F.results  FI.results\n\n";
 
@@ -25,7 +27,7 @@ main: {
     foreach my $frag (sort keys %all_frags) {
         my @starF_fusions;
         if (exists $starF_reads_to_fusions{$frag}) {
-            @starF_fusions = @{$starF_reads_to_fusions{$frag}};
+            @starF_fusions = uniq @{$starF_reads_to_fusions{$frag}};
         }
         else {
             @starF_fusions = (".");
@@ -33,7 +35,7 @@ main: {
 
         my @FI_fusions;
         if (exists $FI_reads_to_fusions{$frag}) {
-            @FI_fusions = @{$FI_reads_to_fusions{$frag}};
+            @FI_fusions = uniq @{$FI_reads_to_fusions{$frag}};
         }
         else {
             @FI_fusions = (".");
