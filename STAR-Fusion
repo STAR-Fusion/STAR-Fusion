@@ -801,8 +801,10 @@ sub run_STAR {
     $pipeliner->add_commands(Command->new($cmd, "$checkpoints_dir/$output_prefix-star.ok"));
 
     # rename the STAR output files:
+
+    my $star_bam_file = ($STAR_SortedByCoordinate) ? "Aligned.sortedByCoord.out.bam" : "Aligned.out.bam";
     
-    $pipeliner->add_commands(Command->new("mv Aligned.sortedByCoord.out.bam $output_prefix.STAR.bam", 
+    $pipeliner->add_commands(Command->new("mv $star_bam_file $output_prefix.STAR.bam", 
                                           "$checkpoints_dir/renamed-$output_prefix-bam.ok"));
 
 
