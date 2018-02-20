@@ -49,6 +49,8 @@ my $STAR_MAX_MATE_DIST = 100000;
 
 my $MIN_PCT_MM_NONSPECIFIC = 50;
 
+
+my $STAR_SortedByCoordinate = 0;
 my $STAR_limitBAMsortRAM = "40G";
 
 my $NO_REMOVE_DUPS = 0;
@@ -127,7 +129,8 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #    
 #    --STAR_max_mate_dist <int>            maximum distance between mates  (also used for the maximum intron length value)  default:  $STAR_MAX_MATE_DIST
 #
-#    --STAR_limitBAMsortRAM <string>       num GB of RAM, default:  ${STAR_limitBAMsortRAM}
+#    --STAR_SortedByCoordinate             have STAR sort resulting bam file by coordinate
+#         --STAR_limitBAMsortRAM <string>       num GB of RAM, default:  ${STAR_limitBAMsortRAM}
 #
 #    --STAR_PATH <string>                  /path/to/STAR  (default: uses STAR found in PATH setting).
 #
@@ -282,7 +285,7 @@ my $SHOW_FULL_USAGE_INFO;
               
               'STAR_MAX_MATE_DIST=i' => \$STAR_MAX_MATE_DIST,
 
-
+              'STAR_SortedByCoordinate' => \$STAR_SortedByCoordinate,
               'STAR_limitBAMsortRAM=s' => \$STAR_limitBAMsortRAM,
               
               'STAR_PATH=s' => \$STAR_PROG,
@@ -753,10 +756,19 @@ sub run_STAR {
         . " --alignIntronMax $STAR_MAX_MATE_DIST "
         . " --alignSJstitchMismatchNmax 5 -1 5 5 "  #which allows for up to 5 mismatches for non-canonical GC/AG, and AT/AC junctions, and any number of mismatches for canonical junctions (the default values 0 -1 0 0 replicate the old behavior (from AlexD)
         . " --runThreadN $CPU"
-        . " --limitBAMsortRAM $STAR_limitBAMsortRAM "
         . " --outSAMstrandField intronMotif "
-        . " --outSAMunmapped Within "
-        . " --outSAMtype BAM SortedByCoordinate ";
+        . " --outSAMunmapped Within ";
+    
+    if ($STAR_SortedByCoordinate) {
+        
+        
+        $cmd .= " --limitBAMsortRAM $STAR_limitBAMsortRAM "
+            . " --outSAMtype BAM SortedByCoordinate ";
+        
+    }
+    else {
+        $cmd .= " --outSAMtype BAM Unsorted "; # default, don't spend time and RAM sorting the data as not required for fusion-finding
+    }
     
     if ($read_group_ids) {
         $cmd .= " --outSAMattrRGline $read_group_ids ";
