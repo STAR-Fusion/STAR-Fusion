@@ -32,6 +32,8 @@ my $AGGREGATE_NOVEL_JUNCTION_DIST = 5;
 my $tmpdir = "/tmp";
 my $verbose_level = 2;
 
+my $MIN_FFPM = 0.1;
+
 my $MIN_JUNCTION_READS = 1;
 my $MIN_SUM_FRAGS = 2; # requires at least one junction read, else see min_spanning_frags_only below.
 my $MIN_SPANNING_FRAGS_ONLY = 5;
@@ -143,6 +145,8 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #    
 # Fusion transcript filtering:
 #
+#    --no_filter                           do not filter predictions. (stops execution prior to the filtering stage).
+#
 #    --min_junction_reads <int>            minimum number of junction-spanning reads required. Default: $MIN_JUNCTION_READS
 #
 #    --min_sum_frags <int>                 minimum fusion support = ( # junction_reads + # spanning_frags ) Default: $MIN_SUM_FRAGS
@@ -170,7 +174,7 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #    --min_alt_pct_junction <float>        default: $MIN_ALT_PCT_JUNCTION  ($MIN_ALT_PCT_JUNCTION % of the dominant isoform 
 #                                          junction support)
 #
-#    --no_filter                           do not filter predictions. (stops execution prior to the filtering stage).
+#    --min_FFPM <float>                    minimum FFPM (fusion fragments per million rna-seq frags)  (default: $MIN_FFPM)
 #
 #    --no_remove_dups                      do not remove duplicate reads
 #    
@@ -268,6 +272,8 @@ my $SHOW_FULL_USAGE_INFO;
 
               'examine_coding_effect' => \$EXAMINE_CODING_EFFECT,
 
+              'min_FFPM=f' => \$MIN_FFPM,
+              
               'no_filter' => \$no_filter,
               
               'no_annotation_filter' => \$NO_ANNOTATION_FILTER,
@@ -598,7 +604,18 @@ main: {
         $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/annot_filter.ok"));
         $prelim_fusion_file = "$annotated_fusions_filename.pass";
     }
-    
+
+
+    if ($MIN_FFPM > 0 && $left_fq_filename) { 
+
+        # filter based on min FFPM value
+        
+        $cmd = "$UTILDIR/filter_by_min_FFPM.pl $prelim_fusion_file $MIN_FFPM";
+        $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/FFPM_filter.ok") );
+
+        $prelim_fusion_file = "$prelim_fusion_file.minFFPM.$MIN_FFPM.pass";
+    }
+        
         
     # generate final fusion prediction output files:
     my $final_output_fusions = "$out_prefix.fusion_predictions.tsv";
