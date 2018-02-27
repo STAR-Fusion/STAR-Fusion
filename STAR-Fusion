@@ -814,7 +814,7 @@ sub run_STAR {
     }
     
     if ($left_fq_filename =~ /\.gz$/) {
-        $cmd .= " --readFilesCommand zcat ";
+        $cmd .= " --readFilesCommand 'gunzip -c' ";
     }
     
     $pipeliner->add_commands(Command->new($cmd, "$checkpoints_dir/$output_prefix-star.ok"));
