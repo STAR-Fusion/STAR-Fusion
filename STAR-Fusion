@@ -354,7 +354,9 @@ if ($FUSIONINSPECTOR_MODE) {
     unless ($FUSIONINSPECTOR_MODE =~ /^(inspect|validate)$/) {
         die "Error, --FusionInspector option can be 'inspect' or 'validate', [$FUSIONINSPECTOR_MODE] not recognized ";
     }
-    $EXTRACT_FUSION_READS = 1; # just in case.
+    if ($FUSIONINSPECTOR_MODE =~ /inspect/) {
+        $EXTRACT_FUSION_READS = 1;
+    }
 }
 
 if ($EXTRACT_FUSION_READS) {
