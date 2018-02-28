@@ -1,0 +1,580 @@
+#!/usr/bin/env perl
+
+# contributed by Brian Haas, Broad Institute, 2015
+
+use strict;
+use warnings;
+use Carp;
+use Cwd;
+use FindBin;
+use lib ("$FindBin::Bin/../PerlLib");
+use File::Basename;
+use Data::Dumper;
+use Set::IntervalTree;
+use JSON::XS;
+
+use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
+
+my $UTILDIR = "$FindBin::Bin/util";
+
+## Options
+my $out_prefix = "star-fusion";
+my $chimeric_junction_file;
+my $help_flag;
+my $genome_lib_dir;
+
+
+my $LONG_ANCHOR_SIZE = 25;
+
+my $usage = <<__EOUSAGE__;
+
+###################################################################################
+#
+#  Required:
+#
+#    --chimeric_junction|J <string>     Chimeric.out.junction file
+#
+#    --genome_lib_dir <string>          path to genome lib dir 
+#
+###################################################################################
+
+
+__EOUSAGE__
+
+    ;
+
+
+my $DEBUG;
+
+&GetOptions ( 'h' => \$help_flag,
+              
+              'chimeric_junction|J=s' => \$chimeric_junction_file,
+              'genome_lib_dir=s' => \$genome_lib_dir,
+              
+              'd' => \$DEBUG,
+    );
+
+
+if ($help_flag) {
+    die $usage;
+}
+unless ($chimeric_junction_file && $genome_lib_dir) {
+    die $usage;
+}
+
+my $ref_GTF = "$genome_lib_dir/ref_annot.gtf";
+unless (-s $ref_GTF) {
+    die "Error, cannot locate reference annotation file: $ref_GTF";
+}
+
+my $ref_features_file = "$genome_lib_dir/ref_annot.gtf.mini.sortu";
+
+
+my %CHR_TO_INTERVAL_TREE;
+my %FEATURE_TOKEN_TO_STRUCT;
+
+
+my $JSON_ENCODER = JSON::XS->new();
+
+main: {
+
+    &build_interval_tree($ref_features_file);
+    
+    print STDERR "-parsing fusion evidence: $chimeric_junction_file\n";
+    &map_chimeric_reads_to_genes($chimeric_junction_file);
+    
+    exit(0);
+
+    
+}
+
+
+####
+sub parse_GTF_features {
+    my ($annot_gtf_text) = @_;
+
+    my @features;
+
+    my %seen; 
+    
+    my @lines = split(/\n/, $annot_gtf_text);
+    foreach my $line (@lines) {
+        
+        my @x = split(/\t/, $line);
+        
+        my $chr = $x[0];
+        my $feat_type = $x[2];
+        unless ($feat_type eq 'exon') { next; }
+
+        my $lend = $x[3];
+        my $rend = $x[4];
+        my $orient = $x[6];
+
+        my $info = $x[8];
+
+        my $gene_id = "NA";
+        my $trans_id = "NA";
+            
+        
+        if ($info =~ /gene_id (\S+);?/) {
+            $gene_id = $1;
+            $gene_id =~ s/[\"\']//g;
+        }
+            
+
+        my $token = join("^", $gene_id, $lend, $rend, $orient);
+        if ($seen{$token}) { next; }
+        $seen{$token} = 1;
+            
+        my $exon_struct = { 
+            
+            gene => $gene_id,
+            chr => $chr,
+            lend => $lend,
+            rend => $rend,
+            orient => $orient,
+            
+        };
+    
+        push (@features, $exon_struct);
+    }
+    
+    return (@features);
+}
+    
+
+####
+sub find_exon_junction_matches {
+    my ($chr, $coord, $orient, $left_or_right, $rst, $cigar) = @_;
+    
+        
+    # two options, depending on sense or antisense alignment (antisense orientation just a consequence of DS trans assembly)
+    
+    #          L                               R
+    #        ------> gt...................ag -------->              
+    #
+    #   |=================>              |==================>
+    #         gene A                            gene B
+    #
+    #        <------ ......................<---------
+    #           R                               L
+    # 
+    #  if left:
+    #      can be donor matching sense of geneA
+    #      can be acceptor matching antisense of geneB
+    #  if right:
+    #      can be acceptor for sense geneB
+    #      can be donor matching antisesnse of geneA
+    #
+    
+
+    
+    # require alignment segment to overlap an exon of an annotated gene, but breakpoint coordianate need not exist within the confines of an annotated exon.
+
+    my ($genome_coords_aref, $read_coords_aref) = &get_genome_coords_via_cigar($rst, $cigar);
+    
+    print STDERR "Genome coords for aln: $chr " . Dumper(\$genome_coords_aref) if $DEBUG;
+
+
+    my $anchor_length = &compute_anchor_length($read_coords_aref, $left_or_right, $orient);
+        
+    my @exon_hits;
+
+    foreach my $coordset (@$genome_coords_aref) {
+        my ($segment_lend, $segment_rend) = @$coordset;
+
+        
+        foreach my $exon (&get_overlapping_features($chr, $segment_lend, $segment_rend)) {
+            
+            my $exon_lend = $exon->{lend};
+            my $exon_rend = $exon->{rend};
+            my $exon_orient = $exon->{orient};
+            
+            my ($exon_end5, $exon_end3) = ($exon_orient eq '+') ? ($exon_lend, $exon_rend) : ($exon_rend, $exon_lend);
+            
+            # annotated exon overlaps transcript
+            
+            my $sense_or_antisense;
+            my $exon_coord;
+            my $align_coord;
+            
+            # sense alignment matching
+            if ($exon_orient eq $orient) {
+                
+                $sense_or_antisense = 'sense';
+                
+                if ($left_or_right eq 'left') {
+                    # examine donor sites
+                    $exon_coord = $exon_end3;
+                }
+                elsif ($left_or_right eq 'right') {
+                    # examine acceptor sites
+                    $exon_coord = $exon_end5;
+                }
+            }
+            
+            else {
+                # antisense orientation to gene
+                
+                $sense_or_antisense = 'antisense';
+                
+                if ($left_or_right eq 'left') {
+                    # examine donor sites
+                    $exon_coord = $exon_end5;
+                }
+                elsif ($left_or_right eq 'right') {
+                    $exon_coord = $exon_end3;
+                }    
+            }
+            
+            my $delta = abs($coord - $exon_coord);
+            
+            
+            push (@exon_hits, { delta => $delta,
+                                exon => $exon,
+                                
+                                gene_id => $exon->{gene},
+                                
+                                # below for debugging
+                                        pt_align => $coord,
+                                pt_exon => $exon_coord,
+                                sense_or_antisense => $sense_or_antisense,
+                                
+                                chr => $chr,
+                                
+                                anchor_length => $anchor_length,
+                                                                
+                                
+                  });
+            
+            
+        }
+        
+    }
+    
+    my @hits_ret;
+    
+    if (@exon_hits) {
+
+                
+        @exon_hits = sort {
+            
+                $a->{delta} <=> $b->{delta}
+            
+        } @exon_hits;
+        
+        print STDERR "\t\tExon hits:" .  Dumper(\@exon_hits) if $DEBUG;
+        
+        
+        # only best per gene
+        my %seen;
+        
+        foreach my $hit (@exon_hits) {
+            my $gene_id = $hit->{gene_id};
+            if (! $seen{$gene_id}) {
+                push (@hits_ret, $hit);
+                $seen{$gene_id} = 1;
+            }
+        }
+        
+    }
+    
+    return(@hits_ret);
+    
+}
+
+
+
+####
+sub get_overlapping_features {
+    my ($chr, $lend, $rend) = @_;
+        
+    if ($rend < $lend) {
+        print STDERR "Error, $chr:$lend-$rend coordinates out of order";
+        return();
+    }
+    
+    if ($lend == $rend) {
+        #print STDERR "Error, need pos width: $chr:$lend-$rend";
+        return();
+    }
+    
+    my $overlaps = $CHR_TO_INTERVAL_TREE{$chr}->fetch($lend, $rend);
+
+    my @overlapping_features;
+
+    foreach my $overlapping_feature (@$overlaps) {
+        my $struct = $FEATURE_TOKEN_TO_STRUCT{$overlapping_feature};
+        unless ($struct) { confess "Error, no struct returned for feature: $overlapping_feature "; }
+        push (@overlapping_features, $struct);
+    }
+    
+    return(@overlapping_features);
+    
+}
+
+
+####
+sub map_chimeric_reads_to_genes {
+    my ($junctions_file) = @_;
+    
+    print STDERR "-mapping reads to genes\n";
+
+    
+    if ($junctions_file =~ /\.gz$/) {
+        $junctions_file = "gunzip -c $junctions_file | ";
+    }
+
+    my $start_time = time();
+    my $counter = 0;
+    open (my $fh, $junctions_file) or die "Error, cannot open file $junctions_file";
+    while (<$fh>) {
+        $counter++;
+        if ($counter % 100 == 0) {
+            my $time = time();
+            my $seconds = $time - $start_time;
+            if ($seconds && $counter % 10000 == 0) {
+                my $rate = sprintf("%.2f", $counter / $seconds * 60);
+                print STDERR "\r[$counter], rate=$rate/min ";
+            }
+        }
+        chomp;
+        my $line = $_;
+        my @x = split(/\t/);
+        
+        # from star doc:
+        #The rst 9 columns give information about the chimeric junction:
+
+        #The format of this le is as follows. Every line contains one chimerically aligned read, e.g.:
+        #chr22 23632601 + chr9 133729450 + 1 0 0 SINATRA-0006:3:3:6387:56650 23632554 47M29S 133729451 47S29M40p76M
+        #The first 9 columns give information about the chimeric junction:
+
+        #column 1: chromosome of the donor
+        #column 2: rst base of the intron of the donor (1-based)
+        #column 3: strand of the donor
+        #column 4: chromosome of the acceptor
+        #column 5: rst base of the intron of the acceptor (1-based)
+        #column 6: strand of the acceptor
+        #column 7: junction type: -1=encompassing junction (between the mates), 1=GT/AG, 2=CT/AC
+        #column 8: repeat length to the left of the junction
+        #column 9: repeat length to the right of the junction
+        #Columns 10-14 describe the alignments of the two chimeric segments, it is SAM like. Alignments are given with respect to the (+) strand
+        #column 10: read name
+        #column 11: rst base of the rst segment (on the + strand)
+        #column 12: CIGAR of the rst segment
+        #column 13: rst base of the second segment
+        #column 14: CIGAR of the second segment
+
+        my $junction_type = $x[6];
+                
+        my $read_name = $x[9];
+        
+        my ($chrA, $coordA, $orientA) = ($x[0], $x[1], $x[2]);
+        $coordA = ($orientA eq '+') ? --$coordA : ++$coordA;
+        
+        my ($rst_A, $cigar_A) = ($x[10], $x[11]);
+        
+
+        my ($chrB, $coordB, $orientB) = ($x[3], $x[4], $x[5]);
+        $coordB = ($orientB eq '+') ? ++$coordB : --$coordB;
+        
+        my ($rst_B, $cigar_B) = ($x[12], $x[13]);
+
+        my @A_hits = &find_exon_junction_matches($chrA, $coordA, $orientA, 'left', $rst_A, $cigar_A);
+
+        my @B_hits = &find_exon_junction_matches($chrB, $coordB, $orientB, 'right', $rst_B, $cigar_B);
+        
+        if ($DEBUG) {
+            print STDERR "A: " . Dumper(\@A_hits);
+            print STDERR "B: " . Dumper(\@B_hits);
+        }
+        
+        # appending text as audit trail
+        if (@A_hits) {
+            my $A_hits_json = $JSON_ENCODER->encode(\@A_hits);
+            push (@x, $A_hits_json);
+        }
+        else {
+            push (@x, ".");
+        }
+        
+        if (@B_hits) {
+            my $B_hits_json = $JSON_ENCODER->encode(\@B_hits);
+            push (@x, $B_hits_json);
+        }
+        else {
+            push (@x, ".");
+        }
+    
+        print join("\t", @x) . "\n";
+    }
+        
+    return;
+    
+}
+
+
+    
+####
+sub get_genome_coords_via_cigar {
+    my ($rst, $cigar) = @_;
+
+    ## borrowing this code from my SAM_entry.pm
+
+    
+    my $genome_lend = $rst;
+
+    my $alignment = $cigar;
+
+    my $query_lend = 0;
+
+    my @genome_coords;
+    my @query_coords;
+
+
+    $genome_lend--; # move pointer just before first position.
+    
+    while ($alignment =~ /(\d+)([A-Zp])/g) {
+        my $len = $1;
+        my $code = $2;
+        
+        unless ($code =~ /^[MSDNIHp]$/) {
+            confess "Error, cannot parse cigar code [$code] ";
+        }
+        
+        # print "parsed $len,$code\n";
+        
+        if ($code eq 'M') { # aligned bases match or mismatch
+            
+            my $genome_rend = $genome_lend + $len;
+            my $query_rend = $query_lend + $len;
+            
+            push (@genome_coords, [$genome_lend+1, $genome_rend]);
+            push (@query_coords, [$query_lend+1, $query_rend]);
+            
+            # reset coord pointers
+            $genome_lend = $genome_rend;
+            $query_lend = $query_rend;
+            
+        }
+        elsif ($code eq 'D' || $code eq 'N' || $code eq 'p') { # insertion in the genome or gap in query (intron, perhaps)
+            $genome_lend += $len;
+            
+        }
+        
+        elsif ($code eq 'I'  # gap in genome or insertion in query 
+               ||
+               $code eq 'S' || $code eq 'H')  # masked region of query
+        { 
+            $query_lend += $len;
+            
+        }
+    }
+    
+    return(\@genome_coords, \@query_coords);
+}
+
+
+####
+sub compute_anchor_length {
+    my ($read_coords_aref, $left_or_right, $orient) = @_;
+
+    # determine length of terminal alignment segment up to the breakpoint.
+    my @read_coords = @$read_coords_aref;
+
+    my $term_segment;
+
+    if ($left_or_right eq 'left') {
+        if ($orient eq '+') {
+            $term_segment = $read_coords[$#read_coords];
+        }
+        else {
+            $term_segment = $read_coords[0];
+        }
+    }
+    else {
+        # right segment
+        if ($orient eq '+') {
+            $term_segment = $read_coords[0];
+        }
+        else {
+            $term_segment = $read_coords[$#read_coords];
+        }
+    }
+
+    my ($lend, $rend) = @$term_segment;
+    my $seg_length = $rend - $lend + 1;
+    
+    return($seg_length);
+
+}
+
+
+####
+sub build_interval_tree {
+    my ($gtf_feature_file) = @_;
+
+    print STDERR "-building interval tree based on $gtf_feature_file\n";
+    my $time_start = time();
+    my %seen;
+    
+    open(my $fh, $gtf_feature_file) or confess "Error, cannot open file: $gtf_feature_file";
+    
+    while(<$fh>) {
+        chomp;
+        my $line = $_;
+        my @x = split(/\t/, $line);
+        
+        my $chr = $x[0];
+        my $feat_type = $x[2];
+        unless ($feat_type eq 'exon') { next; }
+
+        my $lend = $x[3];
+        my $rend = $x[4];
+        my $orient = $x[6];
+
+        my $info = $x[8];
+
+        my $gene_id = "NA";
+        my $trans_id = "NA";
+            
+        
+        if ($info =~ /gene_id (\S+);?/) {
+            $gene_id = $1;
+            $gene_id =~ s/[\"\']//g;
+        }
+        
+
+        my $token = join("^", $gene_id, $lend, $rend, $orient);
+        if ($seen{$token}) { next; }
+        $seen{$token} = 1;
+
+        my $interval_tree = $CHR_TO_INTERVAL_TREE{$chr};
+        unless ($interval_tree) {
+            $interval_tree = $CHR_TO_INTERVAL_TREE{$chr} = Set::IntervalTree->new;
+        }
+                
+        my $exon_struct = { 
+            
+            gene => $gene_id,
+            chr => $chr,
+            lend => $lend,
+            rend => $rend,
+            orient => $orient,
+            token => $token,
+            
+        };
+                
+        $FEATURE_TOKEN_TO_STRUCT{$token} = $exon_struct;
+        
+        $interval_tree->insert($token, $lend, $rend);
+    }
+
+    my $time_end = time();
+    my $duration = sprintf("%.2f", ($time_end - $time_start) / 60);
+    
+    print STDERR "-done building interval tree ($duration min).\n";
+    
+    return;
+}
+

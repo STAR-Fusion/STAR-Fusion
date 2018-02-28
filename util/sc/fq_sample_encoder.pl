@@ -33,22 +33,44 @@ sub parse_samples_file {
 
     my @left_fq_array;
     my @right_fq_array;
+
+    my @missing_files;
     
-    open(my $fh, $samples_file) or die "Error, cannot open file: $samples_file";
+    open(my $fh, $samples_file) or die "Error, cannot open samples file: $samples_file";
     while (<$fh>) {
         chomp;
         my @x = split(/\t/);
-        my ($sample_name, $left_fq_file, $right_fq_file) = split(/\t/);
+        my ($sample_name, $left_fq_file, $right_fq_file) = split(/\s+/);
+        
+        my @fq_files;
+        my $missing_flag = 0;
 
-        push (@left_fq_array, [$sample_name, $left_fq_file]);
-
+        if (! -s $left_fq_file) {
+            push (@missing_files, $left_fq_file);
+            $missing_flag = 1;
+            $left_fq_file = undef;;
+        }
+        
         if ($right_fq_file) {
-            push (@right_fq_array, [$sample_name, $right_fq_file]);
+            
+            if (! -s $right_fq_file) {
+                push (@missing_files, $right_fq_file);
+                $missing_flag = 1;
+                $right_fq_file = undef;
+                $left_fq_file = undef;
+            }
         }
 
+        push (@left_fq_array, [$sample_name, $left_fq_file]) if $left_fq_file;
+        push (@right_fq_array, [$sample_name, $right_fq_file]) if $right_fq_file;
     }
     close $fh;
+    
 
+    if (@missing_files) {
+        print STDERR "ERROR, missing the folliwng files:\n" . join("\n", @missing_files) . "\n";
+    }
+    
     return(\@left_fq_array, \@right_fq_array);
 
 }
@@ -61,7 +83,8 @@ sub write_sample_encoded_fq {
 
     foreach my $sample_fq (@$fq_list_aref) {
         my ($sample_name, $fq_file) = @$sample_fq;
-
+        print STDERR "\t-processing file: $fq_file\n";
+        
         my $fq_reader = new Fastq_reader($fq_file);
 
         while (my $record = $fq_reader->next()) {

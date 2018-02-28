@@ -20,9 +20,22 @@ sub new {
 	if (ref $fastqFile eq 'IO::Handle') {
 		$filehandle = $fastqFile;
 	}
+	elsif((! -e $fastqFile) && $fastqFile=~/,/){
+		my @files = split /,/, $fastqFile;
+		if ( $fastqFile =~ /\.gz$/ ) { 
+		    open $filehandle, "cat @files |gunzip -c |" or die "Error: Couldn't open compressed @files $!\n";
+		}
+		elsif ($fastqFile =~ /\.bz2$/) {
+		    open $filehandle, "cat @files |bunzip2 -c |" or die "Error: Couldn't open compressed @files $!\n";
+		}
+		else{
+		    open $filehandle, "cat @files |" or die "Error: Couldn't open @files\n";
+		}
+    	}
 	else {
 		if ( $fastqFile =~ /\.gz$/ ) {
-		    open ($filehandle, "gunzip -c $fastqFile | ") or die "Error: Couldn't open compressed $fastqFile\n";
+		    ## TODO:  need to handle the failure case, since not picked up here as I thought it would!!
+            open ($filehandle, "gunzip -c $fastqFile | ") or die "Error: Couldn't open compressed $fastqFile\n";
         }
         elsif ($fastqFile =~ /\.bz2$/) {
             open ($filehandle, "bunzip2 -c $fastqFile | ") or die "Error, couldn't open compressed $fastqFile $!";

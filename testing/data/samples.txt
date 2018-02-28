@@ -1,0 +1,4 @@
+BT474f	data/BT474f_1.fq.gz	data/BT474f_2.fq.gz
+K562f	data/K562f_1.fq.gz	data/K562f_2.fq.gz
+MCF7f	data/MCF7f_1.fq.gz	data/MCF7f_2.fq.gz
+SKBR3f	data/SKBR3f_1.fq.gz	data/SKBR3f_2.fq.gz

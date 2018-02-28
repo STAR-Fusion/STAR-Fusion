@@ -1,0 +1,537 @@
+#!/usr/bin/env perl
+
+# contributed by Brian Haas, Broad Institute, 2015
+
+use strict;
+use warnings;
+use Carp;
+use Cwd;
+use FindBin;
+use lib ("$FindBin::Bin/../PerlLib", "$FindBin::Bin/include");
+use Data::Dumper;
+use Set::IntervalTree;
+use JSON::XS;
+use TiedHash;
+use Gene_overlap_check;
+require "cigar_parser.ph";
+
+
+use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
+
+my $UTILDIR = "$FindBin::Bin/util";
+
+## Options
+my $chimeric_junction_file;
+my $help_flag;
+my $min_pct_multimapping_to_genes = 50;
+my $MIN_MM_HOMOLOGY_CONGRUENCE = 50;
+my $MAX_PCT_LOCUS_OVERLAP = 50;
+
+my $genome_lib_dir;
+
+my $LONG_ANCHOR_SIZE = 25;
+
+my $usage = <<__EOUSAGE__;
+
+
+##################################################################################################
+
+Removes chimeric reads that have the following properties:
+
+    -both chim ends hit the same gene (selfie)
+    -less than -M percent of the mappings hit any 2 genes (indication of non-specific mappings)
+
+###################################################################################################
+#
+#  Required:
+#
+#    --annotated_junctions|J <string>     annotated junctions file, chimeric reads mapped to genes
+#
+#    --genome_lib_dir <string>            CTAT genome lib dir
+#
+#    --filt_file <string>                 file to write the problematic reads to (those removed).
+#                                         The primary output (passing reads) is to stdout.
+#
+# Optional:
+#
+#    --min_pct_MM_nonspecific|M <int>     min pct of multimapping reads that should map to 2 genes
+#                                         (avoids multimapping reads that lack specificity)
+#                                           value must be between [1,100] (default: $min_pct_multimapping_to_genes)
+#    
+###################################################################################################
+
+
+__EOUSAGE__
+
+    ;
+
+
+my $DEBUG;
+
+my $filt_file;
+
+&GetOptions ( 'h' => \$help_flag,
+              
+              'annotated_junctions|J=s' => \$chimeric_junction_file,
+              'min_pct_MM_nonspecific|M=i' => \$min_pct_multimapping_to_genes,
+              'filt_file=s' => \$filt_file,
+              'genome_lib_dir=s' => \$genome_lib_dir,
+              'd' => \$DEBUG,
+    );
+
+
+if ($help_flag) {
+    die $usage;
+}
+unless ($chimeric_junction_file && $genome_lib_dir && $filt_file && $genome_lib_dir) {
+    die $usage;
+}
+
+unless ($min_pct_multimapping_to_genes >= 1 && $min_pct_multimapping_to_genes <= 100) {
+    die $usage;
+}
+
+my $BLAST_PAIRS_IDX;
+my $blast_pairs_idx_file = "$genome_lib_dir/blast_pairs.idx";
+if (-s $blast_pairs_idx_file) {
+    $BLAST_PAIRS_IDX = new TiedHash( { use => $blast_pairs_idx_file } );
+}
+else {
+    die "Error: cannot locate $blast_pairs_idx_file";
+}
+
+my %BLAST_CACHE;
+
+my $GENE_OVERLAP_CHECKER = new Gene_overlap_check("$genome_lib_dir/ref_annot.gtf.gene_spans");
+
+
+my $BLAST_ALIGNS_IDX;
+my $blast_aligns_idx_file = "$genome_lib_dir/trans.blast.align_coords.align_coords.dbm";
+if (-s $blast_aligns_idx_file) {
+    $BLAST_ALIGNS_IDX = new TiedHash( { use => $blast_aligns_idx_file } );
+}
+else {
+    die "Error, cannot lcoate blast idx file: $blast_aligns_idx_file";
+}
+
+
+
+my $JSON_DECODER = JSON::XS->new();
+
+main: {
+    
+
+    my %data;
+
+    {
+        print STDERR "-parsing $chimeric_junction_file, organizing read mapping info.\n";
+        open(my $fh, $chimeric_junction_file) or die "Error, cannot open file: $chimeric_junction_file";
+        while (<$fh>) {
+            my $line = $_;
+            chomp;
+            my @x = split(/\t/);
+            my $read_name = $x[9];
+            
+            push (@{$data{$read_name}}, $line);
+        }
+        close $fh;
+    }
+
+    open(my $ofh_filt, ">$filt_file") or die "Error, cannot write to $filt_file";
+    
+    
+    foreach my $read_name (keys %data) {
+        my @lines = @{$data{$read_name}};
+
+        my $pct_paired_gene_mappings = &compute_pct_alns_mapping_to_gene_pairs(@lines);
+
+        my @filter_reasons;
+        if ($pct_paired_gene_mappings <= $min_pct_multimapping_to_genes) {
+            push (@filter_reasons, "only Pct (" . sprintf("%.2f", $pct_paired_gene_mappings) . "%) of alignments had paired gene anchors");
+        }
+
+        elsif (my $selfie = &contains_selfie_or_homology_match(@lines)) {
+            push (@filter_reasons, "Contains selfie or homology match ($selfie).");
+        }
+        
+        
+        
+        else {
+            my ($left_homology_congruence, $right_homology_congruence) = &compute_pct_homology_congruence(@lines);
+
+            if ($left_homology_congruence < $MIN_MM_HOMOLOGY_CONGRUENCE
+                ||
+                $right_homology_congruence < $MIN_MM_HOMOLOGY_CONGRUENCE) {
+
+                push (@filter_reasons, "Fails mulitmapper homology congruence (Left: $left_homology_congruence, Right: $right_homology_congruence)");
+            }
+        }
+         
+        if (@filter_reasons) {
+            print $ofh_filt "#" . join("; ", @filter_reasons) . "\n";
+            print $ofh_filt join("", @lines) . "\n";
+        }
+        else {
+            print join("", @lines);
+        }
+    }
+
+
+    exit(0);
+    
+}
+
+####
+sub compute_pct_alns_mapping_to_gene_pairs {
+    my (@lines) = @_;
+
+    my $num_mapped_to_paired_genes = 0;
+    
+    foreach my $line (@lines) {
+        my @x = split(/\t/, $line);
+        if ($x[$#x-1] =~ /gene_id/ && $x[$#x] =~ /gene_id/) {
+            $num_mapped_to_paired_genes++;
+        }
+    }
+
+    my $pct = $num_mapped_to_paired_genes / scalar(@lines) * 100;
+
+    return($pct);
+}
+
+####
+sub contains_selfie_or_homology_match {
+    my (@lines) = @_;
+    
+    # if parts i,j of a chimeric read effectively match the same gene
+    # then we discard that read.
+    
+
+    # from star doc:
+    #The rst 9 columns give information about the chimeric junction:
+
+    #The format of this le is as follows. Every line contains one chimerically aligned read, e.g.:
+    #chr22 23632601 + chr9 133729450 + 1 0 0 SINATRA-0006:3:3:6387:56650 23632554 47M29S 133729451 47S29M40p76M
+    #The first 9 columns give information about the chimeric junction:
+
+    #column 1: chromosome of the donor
+    #column 2: rst base of the intron of the donor (1-based)
+    #column 3: strand of the donor
+    #column 4: chromosome of the acceptor
+    #column 5: rst base of the intron of the acceptor (1-based)
+    #column 6: strand of the acceptor
+    #column 7: junction type: -1=encompassing junction (between the mates), 1=GT/AG, 2=CT/AC
+    #column 8: repeat length to the left of the junction
+    #column 9: repeat length to the right of the junction
+    #Columns 10-14 describe the alignments of the two chimeric segments, it is SAM like. Alignments are given with respect to the (+) strand
+    #column 10: read name
+    #column 11: rst base of the rst segment (on the + strand)
+    #column 12: CIGAR of the rst segment
+    #column 13: rst base of the second segment
+    #column 14: CIGAR of the second segment
+    
+    
+    foreach my $line (@lines) {
+        
+        chomp $line;
+        my @x = split(/\t/, $line);
+        
+        my $json_left = $x[$#x-1];
+        my $json_right = $x[$#x];
+        
+        if ($json_left eq '.' || $json_right eq '.') {
+            next;
+        }
+
+        my ($left_genes_aref, $right_genes_aref);
+
+        eval {
+            $left_genes_aref = $JSON_DECODER->decode($json_left);
+        };
+        if ($@) {
+            confess "Error trying to decode json string:\n$json_left\n$@";
+        }
+         
+        eval {
+            $right_genes_aref = $JSON_DECODER->decode($json_right);
+        };
+        if ($@) {
+            confess "Error decoding json string:\n$json_right\n$@";
+        }
+        
+        my ($rst_A, $cigar_A) = ($x[10], $x[11]);
+        my ($rst_B, $cigar_B) = ($x[12], $x[13]);
+
+        
+        my ($genome_coords_A_aref, $read_coords_A_aref) = &get_genome_coords_via_cigar($rst_A, $cigar_A);
+        my ($genome_coords_B_aref, $read_coords_B_aref) = &get_genome_coords_via_cigar($rst_B, $cigar_B);
+        
+        
+        
+        foreach my $left_gene_struct (@$left_genes_aref) {
+
+            my $left_gene_id = $left_gene_struct->{gene_id};
+
+            $left_gene_id =~ s/\^.*$//;
+            
+            foreach my $right_gene_struct (@$right_genes_aref) {
+                
+                my $right_gene_id = $right_gene_struct->{gene_id};
+                $right_gene_id =~ s/\^.*$//;
+
+                if ($left_gene_id eq $right_gene_id) {
+                    return($left_gene_id);
+                }
+                
+                if (my $homology_hit = &examine_seq_similarity($left_gene_id, $right_gene_id)) {
+                    return("blast_pair: $left_gene_id vs. $right_gene_id : $homology_hit");
+                }
+                
+                
+                # maybe not the same gene id, but both parts are effectively matching the same genomic locus (aka gene).
+                my $pct_overlap_shorter_len = $GENE_OVERLAP_CHECKER->pct_overlap_shorter_length($left_gene_id, $right_gene_id);
+                # using restrictive overlap criteria because the candidate fusion genes A,B may be adjacent and overlap
+                # but overlap only minimally.
+                # Here, we differentiate between overlaps between different 'genes' where they're really the same gene or isoforms
+                # but annotated with different gene identifiers, vs. neighboring and overlapping genes
+                if ($pct_overlap_shorter_len > $MAX_PCT_LOCUS_OVERLAP) {
+                    # effectively the same gene but were assigned different gene identifiers for some reason.
+                    return("genes overlap on the genome ($pct_overlap_shorter_len of shorter len): $left_gene_id, $right_gene_id");
+                }
+
+                ## check if the reads align in regions that are seq-similar between the two genes but not necessarily
+                ## indicators of gene homology  ( could be repeats or other )
+
+                if (my $align_found = &check_read_alignment_to_seq_similar_region($left_gene_id, $genome_coords_A_aref,
+                                                                $right_gene_id, $genome_coords_B_aref) ) {
+                    return("alignment in seq-similar region between genes: $align_found");
+                }
+            }
+        }
+    }
+    
+    return(undef);
+}
+
+####
+sub compute_pct_homology_congruence {
+    my (@lines) = @_;
+
+
+    # given chimeric read parts i,j of each read
+    # and all the mapping positions for that read, yielding {i1, i2, ..., in} and {j1, j2, ..., jn}
+    # examine consistency of the i1..in mappings
+    # and the consistency of the j1..jn mappings
+    # such that they either align to paralogs or derive from the same genomic locus. 
+
+    
+    my %left_genes;
+    my %right_genes;
+    
+    foreach my $line (@lines) {
+        chomp $line;
+        my @x = split(/\t/, $line);
+        
+        my $json_left = $x[$#x-1];
+        my $json_right = $x[$#x];
+        
+
+        my ($left_genes_aref, $right_genes_aref);
+
+        if ($json_left ne ".") {
+            eval {
+                $left_genes_aref = $JSON_DECODER->decode($json_left);
+            };
+            if ($@) {
+                confess "Error trying to decode json string:\n$json_left\n$@";
+            }
+        }
+
+        if ($json_right ne ".") {
+            eval {
+                $right_genes_aref = $JSON_DECODER->decode($json_right);
+            };
+            if ($@) {
+                confess "Error decoding json string:\n$json_right\n$@";
+            }
+        }
+
+
+        if ($left_genes_aref) {
+            foreach my $left_gene_struct (@$left_genes_aref) {
+                
+                my $left_gene_id = $left_gene_struct->{gene_id};
+                
+                $left_gene_id =~ s/\^.*$//;
+                $left_genes{$left_gene_id} = 1;
+            }   
+        }
+
+        if ($right_genes_aref) {
+            foreach my $right_gene_struct (@$right_genes_aref) {
+                
+                my $right_gene_id = $right_gene_struct->{gene_id};
+                $right_gene_id =~ s/\^.*$//;
+                
+                $right_genes{$right_gene_id} = 1;
+            }
+        }
+    }
+
+    my @left_gene_symbs = keys %left_genes;
+    my @right_gene_symbs = keys %right_genes;
+
+    my $left_gene_MM_hom_congruence = &compute_gene_homology_congruence(@left_gene_symbs);
+
+    my $right_gene_MM_hom_congruence = &compute_gene_homology_congruence(@right_gene_symbs);
+
+    return($left_gene_MM_hom_congruence, $right_gene_MM_hom_congruence);
+        
+}
+
+
+####
+sub compute_gene_homology_congruence {
+    my (@gene_symbols) = @_;
+
+    if (scalar (@gene_symbols) < 2) { return(100); } # free pass
+    
+    my $num_comparisons = 0;
+    my $num_homologies_detected = 0;
+    
+    for (my $i = 0; $i < $#gene_symbols; $i++) {
+
+        my $gene_i = $gene_symbols[$i];
+            
+        
+        for (my $j = $i + 1; $j <= $#gene_symbols; $j++) {
+
+            my $gene_j = $gene_symbols[$j];
+
+            $num_comparisons++;
+            if (&examine_seq_similarity($gene_i, $gene_j)
+                ||
+                $GENE_OVERLAP_CHECKER->are_genes_overlapping($gene_i, $gene_j)
+                
+                ) {
+                $num_homologies_detected++;
+            }
+        }
+    }
+
+    my $MM_homology_congruence = $num_homologies_detected/$num_comparisons * 100; # make percentage
+    
+    return($MM_homology_congruence);
+}
+
+
+####
+sub examine_seq_similarity {
+    my ($geneA, $geneB) = @_;
+
+    #print STDERR "-examining seq similarity between $geneA and $geneB\n";
+
+    my @blast_hits;
+
+    # use pre-computed blast pair data
+    if (my $hit = $BLAST_PAIRS_IDX->get_value("$geneA--$geneB")) {
+        return($hit);
+    }
+    elsif ($hit = $BLAST_PAIRS_IDX->get_value("$geneB--$geneA")) {
+        return($hit);
+    }
+    else {
+        return();
+    }
+}
+
+####
+sub check_read_alignment_to_seq_similar_region {
+    my ($left_gene_id, $genome_coords_A_aref,                         
+        $right_gene_id, $genome_coords_B_aref) = @_;
+
+    if ($left_gene_id gt $right_gene_id) {
+        # swap info, match ordering in alignment dbm
+        ($left_gene_id, $genome_coords_A_aref,
+         $right_gene_id, $genome_coords_B_aref) = ($right_gene_id, $genome_coords_B_aref,
+                                                   $left_gene_id, $genome_coords_A_aref);
+
+    }
+
+    my $gene_pair = "$left_gene_id--$right_gene_id";
+
+    my $blast_pair_info = $BLAST_ALIGNS_IDX->get_value($gene_pair);
+
+    unless ($blast_pair_info) {
+        return(undef);
+    }
+
+    my $blast_align_info_struct = $JSON_DECODER->decode($blast_pair_info);
+
+    # structure of align struct above.
+    #
+    #$VAR1 = {
+    #    'coords_B' => [
+    #        [
+    #         '62609099',
+    #         '62609276'
+    #        ]
+    #        ],
+    #        'gene_A' => 'RNU2-23P',
+    #        'coords_A' => [
+    #            [
+    #             '64915060',
+    #             '64915241'
+    #            ]
+    #        ],
+    #            'gene_B' => 'WDR74'
+    #};
+
+    
+    #print Dumper($blast_align_info_struct);
+
+    unless ($blast_align_info_struct->{gene_A} eq $left_gene_id
+            &&
+            $blast_align_info_struct->{gene_B} eq $right_gene_id) {
+        confess "Error, gene info and align struct not matching up.  "
+            . " Left gene: $left_gene_id, Right gene: $right_gene_id,"
+            . " and align struct: " . Dumper($blast_align_info_struct);
+    }
+
+    my $align_coords_A_aref = $blast_align_info_struct->{coords_A};
+    my $align_coords_B_aref = $blast_align_info_struct->{coords_B};
+
+    if (my $overlap_text = &any_coordsets_overlap($genome_coords_A_aref, $align_coords_A_aref)) {
+        return("$left_gene_id/$right_gene_id seq_similar overlap on $left_gene_id: $overlap_text");
+    }
+    if (my $overlap_text = &any_coordsets_overlap($genome_coords_B_aref, $align_coords_B_aref)) {
+        return("$left_gene_id/$right_gene_id seq_similar overlap on $right_gene_id: $overlap_text");
+    }
+
+    
+    
+}
+
+####
+sub any_coordsets_overlap {
+    my ($genome_coords_aref, $align_coords_aref) = @_;
+
+    foreach my $genome_coordset (@$genome_coords_aref) {
+        
+        my ($genome_lend, $genome_rend) = @$genome_coordset;
+        
+        foreach my $align_coordset (@$align_coords_aref) {
+
+            my ($align_lend, $align_rend) = @$align_coordset;
+
+            if ($genome_lend < $align_rend && $genome_rend > $align_lend) {
+
+                return("align[$align_lend-$align_rend] overlaps seqSimRegion[$genome_lend-$genome_rend]");
+            }
+        }
+    }
+
+    return undef;
+}
+
+

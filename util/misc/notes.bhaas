@@ -1,0 +1,31 @@
+###########
+# bam to fq
+
+
+aBam_to_uBam_to_fastq.cmds_generator.pl *.bam > cmds.txt
+
+~/GITHUB/ugetools/UGE_SUBMISSIONS/UGER_cmd_batch_processor.py  --cmds_file cmds.txt --batch_size 1 --project_name regevlab --queue broad --job_name fqprep --bash_header_text "source /broad/software/scripts/useuse; reuse Java-1.8;" --h_rt 10:00:00 --tracking_dir `pwd`/ugetrack.fq --memory 10
+
+
+
+#########
+# running samples in parallel:
+
+~/GITHUB/CTAT_FUSIONS/STAR-Fusion/util/misc/pair_up_fastq_files_1_2.pl  > samples.txt
+
+~/GITHUB/CTAT_FUSIONS/STAR-Fusion/util/misc/samples_file_to_starF_cmds.pl samples.txt  > starF.cmds
+
+~/GITHUB/ugetools/UGE_SUBMISSIONS/UGER_cmd_batch_processor.py --cmds_file starF.cmds --batch_size 1 --project_name regevlab --queue broad --job_name starF_$$ --h_rt 10:00:00 --tracking_dir `pwd`/ugetrack.fq --memory 50
+
+
+# aggregate results:
+
+find . -regex ".*abridged.tsv" | tee files.list
+
+~/GITHUB/CTAT_FUSIONS/STAR-Fusion/util/misc/aggregate_predictions_add_sample_name.pl files.list  > preds.tsv
+
+# annotate results
+
+FusionAnnotator  --annotate preds.tsv --fusion_name_col 1 > preds.tsv.wAnnot
+
+

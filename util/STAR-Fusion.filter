@@ -13,16 +13,19 @@ use File::Basename;
 use Pipeliner;
 use DelimParser;
 
-my $Evalue = 1e-3;
 my $tmpdir = "/tmp";
 
 my $MIN_NOVEL_JUNCTION_SUPPORT = 3;
 my $MIN_ALT_PCT_JUNCTION = 10;
 my $AGGREGATE_NOVEL_JUNCTION_DIST = 5;
 
-my $MIN_JUNCTION_READS = 1;
+my $MIN_JUNCTION_READS = 0;
 my $MIN_SUM_FRAGS = 2;
-my $MAX_PROMISCUITY = 3;  # perhaps a poor choice of words, but still a best fit IMHO.
+my $MIN_SPANNING_FRAGS_ONLY = 5;
+
+my $MAX_PROMISCUITY = 10;
+my $MIN_PCT_DOM_PROM = 20;
+
 my $REQUIRE_LDAS = 1;
 
 my $usage = <<__EOUSAGE__;
@@ -35,23 +38,24 @@ my $usage = <<__EOUSAGE__;
 #                                 Required formatting is:  
 #                                 geneA--geneB (tab) junction_read_count (tab) spanning_read_count (tab) ... rest
 #
+#  --chimeric_junction|J <string>        Chimeric.out.junction file
+#
 #  --out_prefix <string>          prefix for output filename (will tack on .final and .final.abridged)
 #
 #  --genome_lib_dir <string>      genome lib directory for FusionFilter
 #
 # Optional: 
 #
-#  -E <float>                     E-value threshold for blast searches (default: $Evalue)
-#
 #  --tmpdir <string>              file for temporary files (default: $tmpdir)
 #
-#    --min_junction_reads <int>            minimum number of junction-spanning reads required. Default: $MIN_JUNCTION_READS
+#  --min_junction_reads <int>            minimum number of junction-spanning reads required. Default: $MIN_JUNCTION_READS
 #
-#    --max_promiscuity <int>               maximum number of partners allowed for a given fusion. Default: $MAX_PROMISCUITY
+#  --min_sum_frags <int>                 minimum fusion support = ( # junction_reads + # spanning_frags ) Default: $MIN_SUM_FRAGS
 #
-#    --min_sum_frags <int>                 minimum fusion support = ( # junction_reads + # spanning_frags ) Default: $MIN_SUM_FRAGS
+#  --min_spanning_frags_only <int>        minimum number of rna-seq fragments required as fusion evidence if
+#                                          there are no junction reads (default: $MIN_SPANNING_FRAGS_ONLY)
 #
-#    --require_LDAS 0|1                    require long double anchor support for split reads                 
+#  --require_LDAS 0|1                    require long double anchor support for split reads                 
 #                                           when no spanning frags are found (default: 1)                   
 #
 #
@@ -59,6 +63,12 @@ my $usage = <<__EOUSAGE__;
 #                                                        lacks involvement of only reference junctions)
 #
 #  --min_alt_pct_junction <float>        default: $MIN_ALT_PCT_JUNCTION  ($MIN_ALT_PCT_JUNCTION % of the dominant isoform junction support)
+#
+#  --max_promiscuity <int>               maximum number of partners allowed for a given fusion. Default: $MAX_PROMISCUITY
+#
+#  --min_pct_dom_promiscuity <int>       for promiscuous fusions, those with less than this support of the dominant scoring pair
+#                                        are filtered prior to applying the max_promiscuity filter.
+#                                        (default: $MIN_PCT_DOM_PROM)
 #
 #  --aggregate_novel_junction_dist <int>  default: $AGGREGATE_NOVEL_JUNCTION_DIST (non-ref junctions within $AGGREGATE_NOVEL_JUNCTION_DIST are merged into single calls)
 #
@@ -74,14 +84,16 @@ my $help_flag;
 my $fusion_preds_file;
 my $out_prefix;
 my $genome_lib_dir;
+my $chimeric_out_junctions_file;
+
 
 &GetOptions ( 'h' => \$help_flag, 
               
               'fusion_preds=s' => \$fusion_preds_file,
+              'chimeric_junction|J=s' => \$chimeric_out_junctions_file,
                             
               'out_prefix=s' => \$out_prefix,
 
-              'E=f' => \$Evalue,
               'tmpdir=s' => \$tmpdir,
               
               'min_novel_junction_support=i' => \$MIN_NOVEL_JUNCTION_SUPPORT,
@@ -90,11 +102,13 @@ my $genome_lib_dir;
 
               'min_junction_reads=i' => \$MIN_JUNCTION_READS,
               'min_sum_frags=i' => \$MIN_SUM_FRAGS,
-
+              'min_spanning_frags_only=i' => \$MIN_SPANNING_FRAGS_ONLY,
+              
               'require_LDAS=i' => \$REQUIRE_LDAS,
               
               'max_promiscuity=i' => \$MAX_PROMISCUITY,
-        
+              'min_pct_dom_promiscuity=i' => \$MIN_PCT_DOM_PROM,
+              
               'genome_lib_dir=s' => \$genome_lib_dir,
               
               
@@ -110,7 +124,7 @@ if ($help_flag) {
     die $usage;
 }
 
-unless ($fusion_preds_file && $genome_lib_dir && $out_prefix) {
+unless ($fusion_preds_file && $genome_lib_dir && $out_prefix && $chimeric_out_junctions_file) {
     die $usage;
 }
 
@@ -154,9 +168,7 @@ main: {
         my $spanning_frags = $row->{SpanningFrags};
         my $long_double_anchor_support = $row->{LargeAnchorSupport};
         
-        my $score = $J*4 + $S;
-        
-        
+                
         #TODO: use keys that match the column headers for sanity sake
         my $fusion = { fusion_name => $fusion_name,
                        
@@ -176,11 +188,13 @@ main: {
                        
                        ldas => $long_double_anchor_support,
 
-                       score => $score, 
+                       score => undef, # assigned below
                        
                        row => $row,
         };
-    
+
+        &score_fusion($fusion);
+        
         push (@fusions, $fusion); 
     }
 
@@ -193,8 +207,18 @@ main: {
     
     @fusions = &merge_neighboring_nonref_splice(\@fusions, $filter_tab_writer);
 
+    @fusions = reverse sort {$a->{score} <=> $b->{score} } @fusions;
 
-    @fusions = &remove_fusions_with_insufficient_support(\@fusions, $filter_tab_writer, $MIN_JUNCTION_READS, $MIN_SUM_FRAGS);
+
+    my %read_mapping_counts = &parse_read_mapping_counts($chimeric_out_junctions_file);
+    
+    &penalize_nondominant_fusion_multimap_reads(\@fusions, \%read_mapping_counts, $intermediates_out_prefix);
+
+    @fusions = reverse sort {$a->{score} <=> $b->{score} } @fusions;
+    
+    @fusions = &remove_fusions_with_insufficient_support(\@fusions, $filter_tab_writer, 
+                                                         $MIN_JUNCTION_READS, $MIN_SUM_FRAGS,
+                                                         $MIN_SPANNING_FRAGS_ONLY);
     
     @fusions = &remove_minor_nonref_isoforms(\@fusions, $filter_tab_writer);
 
@@ -236,7 +260,7 @@ main: {
     close $stage1_ofh;
     
     ## Run the blast and promiscuity filter
-    my $cmd = "$FindBin::Bin/../FusionFilter/blast_and_promiscuity_filter.pl --out_prefix $intermediates_out_prefix -E $Evalue --max_promiscuity $MAX_PROMISCUITY --fusion_preds $stage1_preds_file --genome_lib_dir $genome_lib_dir ";
+    my $cmd = "$FindBin::Bin/../FusionFilter/blast_and_promiscuity_filter.pl --out_prefix $intermediates_out_prefix --max_promiscuity $MAX_PROMISCUITY --min_pct_dom_promiscuity $MIN_PCT_DOM_PROM  --fusion_preds $stage1_preds_file --genome_lib_dir $genome_lib_dir ";
     &process_cmd($cmd);  # generates $out_prefix.final and $out_prefix.filt
 
     # make abridged versions:
@@ -245,7 +269,7 @@ main: {
     rename("$intermediates_out_prefix.final", "$intermediates_out_prefix.filtered");
         
     # rename final output file:
-    &process_cmd("ln -s $intermediates_out_prefix.filtered $out_prefix.fusion_candidates.preliminary.filtered");
+    &process_cmd("ln -sf $intermediates_out_prefix.filtered $out_prefix.fusion_candidates.preliminary.filtered");
     
     
     exit(0);
@@ -281,7 +305,7 @@ sub merge_neighboring_nonref_splice {
         do {
         
             my $top_fusion = shift @nonref_fusions;
-    
+            
             my @remaining_fusions;
             foreach my $f (@nonref_fusions) {
                 if (&fusions_within_range($top_fusion, $f, $AGGREGATE_NOVEL_JUNCTION_DIST)) {
@@ -389,11 +413,9 @@ sub merge_fusions {
 
     $fusion_keep->{junction_reads} = join(",", @new_junc_read_list) || ".";
     $fusion_keep->{spanning_frags} = join(",", @new_span_frag_list) || ".";
-
     
-    $fusion_keep->{score} = 4 * $new_count_junc_reads + $new_count_span_frags;
+    &score_fusion($fusion_keep);
     
-
     return($fusion_keep);
 }
 
@@ -450,7 +472,7 @@ sub remove_minor_nonref_isoforms {
             
 ####
 sub remove_fusions_with_insufficient_support {
-    my ($fusions_aref, $filter_tab_writer, $min_J, $min_sum) = @_;
+    my ($fusions_aref, $filter_tab_writer, $min_J, $min_sum, $min_spanning_frags_only) = @_;
 
     my @ret_fusions;
 
@@ -486,7 +508,13 @@ sub remove_fusions_with_insufficient_support {
             $filter_tab_writer->write_row(\%row);
             next;
         }
-                
+
+        if ($fusion->{J} == 0 && $fusion->{S} < $min_spanning_frags_only) {
+            $row{Note} = "FILTERED DUE TO only spanning reads and num spanning frags $fusion->{S} < $min_spanning_frags_only";
+            $filter_tab_writer->write_row(\%row);
+            next;
+        }
+        
         if ($fusion->{S} == 0 && $REQUIRE_LDAS && $fusion->{ldas} !~ /YES/i) {
             $row{Note} = "FILTERED DUE TO no spanning reads and no long double anchor support at breakpoint";
             $filter_tab_writer->write_row(\%row);
@@ -501,5 +529,110 @@ sub remove_fusions_with_insufficient_support {
     }
 
     return(@ret_fusions);
+}
+
+####
+sub score_fusion {
+    my ($fusion) = @_;
+
+    my $J = $fusion->{J};
+    my $S = $fusion->{S};
+    
+    my $score = $J*4 + $S;
+
+    $fusion->{score} = $score;
+}
+
+
+
+####
+sub parse_read_mapping_counts {
+    my ($chimeric_junctions_file) = @_;
+
+    my %read_counts;
+    
+    open(my $fh, $chimeric_junctions_file) or die "Error, cannot open file $chimeric_junctions_file";
+    while (<$fh>) {
+        chomp;
+        my @x = split(/\t/);
+        my $read_name = $x[9];
+        my $read_group = $x[$#x];
+
+        unless ($read_group =~ /^\d/) {
+            # backwards compatible w/ older STAR
+            $read_name = "\&${read_group}\@${read_name}"; # sample name encoding
+        }
+        $read_counts{$read_name}++;
+    }
+    close $fh;
+    
+    return(%read_counts);
+    
+}
+
+sub penalize_nondominant_fusion_multimap_reads {
+    my ($fusions_aref, $read_mapping_counts_href, $outfile_prefix) = @_;
+
+    open(my $ofh, ">$outfile_prefix.scores_adjusted_for_multimapping") or die "Error, cannot write to file: $outfile_prefix.scores_adjusted_for_multimapping";
+        
+    my %seen_reads;
+
+    foreach my $fusion (@$fusions_aref) {
+                
+        my ($fusion_name, $orig_J, $orig_S) = ($fusion->{fusion_name}, $fusion->{J}, $fusion->{S});
+        
+        ## penalize multimapping reads
+        my $junction_reads_string = $fusion->{junction_reads};
+        if ($junction_reads_string ne '.') {
+            #print STDERR "-junction reads: $junction_reads_string\n";
+            my $new_J_count = 0;
+            my @J_reads = split(/,/, $junction_reads_string);
+            foreach my $J_read (@J_reads) {
+                my $mapping_count = $read_mapping_counts_href->{$J_read};
+                unless ($mapping_count) {
+                    confess "Error, missing mapping count for junction read: [$J_read] ";
+                }
+                if ( (! $seen_reads{$J_read}) || $seen_reads{$J_read} ne $fusion_name) {
+                    $new_J_count += 1;
+                    $seen_reads{$J_read} = $fusion_name;
+                }
+                else {
+                    #print STDERR "-discounting J read for $fusion_name\n";
+                    $new_J_count +=  1/$mapping_count;
+                }
+            }
+            $fusion->{J} = int($new_J_count + 0.5);
+        }
+        
+        my $spanning_frags_string = $fusion->{spanning_frags};
+        if ($spanning_frags_string ne '.') {
+            #print STDERR "-spanning frags string: $spanning_frags_string\n";
+            my $new_S_count = 0;
+            my @S_frags = split(/,/, $spanning_frags_string);
+            foreach my $S_frag (@S_frags) {
+                my $mapping_count = $read_mapping_counts_href->{$S_frag};
+                unless ($mapping_count) {
+                    confess "Error, missing mapping count for spanning frag: [$S_frag] ";
+                }
+                if ( (! $seen_reads{$S_frag}) || $seen_reads{$S_frag} ne $fusion_name) {
+                    $new_S_count += 1;
+                    $seen_reads{$S_frag} = $fusion_name;
+                }
+                else {
+                    #print STDERR "-discounting S read for $fusion_name\n";
+                    $new_S_count += 1/$mapping_count;
+                }
+            }
+            $fusion->{S} = int($new_S_count + 0.5);
+        }
+        
+        &score_fusion($fusion);
+
+        print $ofh join("\t", $fusion_name, "($orig_J,$orig_S)", "->", "($fusion->{J},$fusion->{S})") . "\n";
+    }
+
+    close $ofh;
+    
+    return;
 }
 
