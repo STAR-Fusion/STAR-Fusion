@@ -82,25 +82,6 @@ RUN wget https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.3.3.1/bowti
     rm *.zip && \
     rm -r bowtie2-2.3.3.1-linux-x86_64
 
-
-
-
-###############
-## STAR-Fusion:
-WORKDIR $SRC
-ENV STAR_FUSION_VERSION=1.3.1
-
-RUN apt-get install -y git
-
-RUN git clone --recursive https://github.com/STAR-Fusion/STAR-Fusion.git && \
-     cd STAR-Fusion && \
-     git checkout fb4777c && \
-     make
-
-ENV STAR_FUSION_HOME $SRC/STAR-Fusion
-
-## FusionInspector and FusionAnnotator are bundled with STAR-Fusion
-
 ########
 # GMAP
 WORKDIR $SRC
@@ -125,7 +106,27 @@ RUN wget https://github.com/COMBINE-lab/salmon/releases/download/v0.9.1/Salmon-0
 
 
 
+###############
+## STAR-Fusion:
+WORKDIR $SRC
+ENV STAR_FUSION_VERSION=1.3.1
+
+RUN apt-get install -y git
+
+RUN git clone --recursive https://github.com/STAR-Fusion/STAR-Fusion.git && \
+     cd STAR-Fusion && \
+     git checkout e1e0c37 && \
+     make
+
+ENV STAR_FUSION_HOME $SRC/STAR-Fusion
+
+## FusionInspector and FusionAnnotator are bundled with STAR-Fusion
 
 
+RUN apt-get update && apt-get install -y python-setuptools python-dev build-essential
+
+RUN easy_install pip
+
+RUN pip install numpy
 
 RUN apt-get clean
