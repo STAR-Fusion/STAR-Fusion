@@ -11,18 +11,18 @@ aBam_to_uBam_to_fastq.cmds_generator.pl *.bam > cmds.txt
 #########
 # running samples in parallel:
 
-pair_up_fastq_files_1_2.pl  > samples.txt
+~/GITHUB/CTAT_FUSIONS/STAR-Fusion/util/misc/pair_up_fastq_files_1_2.pl  > samples.txt
 
-samples_file_to_starF_cmds.pl ../FASTQ/samples.txt  > starF.cmds
+~/GITHUB/CTAT_FUSIONS/STAR-Fusion/util/misc/samples_file_to_starF_cmds.pl samples.txt  > starF.cmds
 
-~/GITHUB/ugetools/UGE_SUBMISSIONS/UGER_cmd_batch_processor.py --cmds_file starF.cmds --batch_size 1 --project_name regevlab --queue broad --job_name starF_ffpe --h_rt 10:00:00 --tracking_dir `pwd`/ugetrack.fq --memory 50
+~/GITHUB/ugetools/UGE_SUBMISSIONS/UGER_cmd_batch_processor.py --cmds_file starF.cmds --batch_size 1 --project_name regevlab --queue broad --job_name starF_$$ --h_rt 10:00:00 --tracking_dir `pwd`/ugetrack.fq --memory 50
 
 
 # aggregate results:
 
 find . -regex ".*abridged.tsv" | tee files.list
 
-aggregate_predictions_add_sample_name.pl files.list  > preds.tsv
+~/GITHUB/CTAT_FUSIONS/STAR-Fusion/util/misc/aggregate_predictions_add_sample_name.pl files.list  > preds.tsv
 
 # annotate results
 
