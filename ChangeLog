@@ -1,3 +1,17 @@
+STAR-Fusion Release v1.3.0
+
+	This is a major update and includes the following changes:
+
+	-overall structure of intermediate outputs makes it more straightforward to follow the fusion evidence and fusion prediction filtering and troubleshooting (to be well described in updated documentation soon).
+
+	-the human fusion annotation database was expanded to include some new resources, all described here:
+	https://github.com/FusionAnnotator/CTAT_HumanFusionLib/wiki
+
+	-the 'red herring' category of fusions (see above wiki) are now by default auto-filtered from the final output. You can turn off annotation-based filtering with: STAR-Fusion --no_annotation_filter
+
+	-fusions are automatically filtered out based on minimum fusion evidence requirements set based on the number of input reads. A minimum of 0.1 fusion fragments per million total fragments (FFPM) are required as a default (set with: STAR-Fusion --min_FFPM)
+
+
 STAR-Fusion Release v1.2.0
 	Added --bbmerge : runs STAR w/ paired-end reads but then also runs STAR using 'super-reads' assembled via the bbmerge software.  This helps in cases where fragments are short and/or the paired-end reads overlap.
 	Bugfixes related to inframe vs. frameshift detection wrt setting coding phases of exons.
