@@ -15,7 +15,7 @@ aBam_to_uBam_to_fastq.cmds_generator.pl *.bam > cmds.txt
 
 ~/GITHUB/CTAT_FUSIONS/STAR-Fusion/util/misc/samples_file_to_starF_cmds.pl samples.txt  > starF.cmds
 
-~/GITHUB/ugetools/UGE_SUBMISSIONS/UGER_cmd_batch_processor.py --cmds_file starF.cmds --batch_size 1 --project_name regevlab --queue broad --job_name starF_$$ --h_rt 10:00:00 --tracking_dir `pwd`/ugetrack.fq --memory 50
+~/GITHUB/ugetools/UGE_SUBMISSIONS/UGER_cmd_batch_processor.py --cmds_file starF.cmds --batch_size 1 --project_name regevlab --queue broad --job_name starF_$$ --h_rt 10:00:00 --tracking_dir `pwd`/ugetrack.fq --memory 50 --bash_header_text "source /broad/software/scripts/useuse; reuse Python-2.7;"
 
 
 # aggregate results:
