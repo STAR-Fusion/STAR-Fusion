@@ -130,3 +130,14 @@ RUN easy_install pip
 RUN pip install numpy
 
 RUN apt-get clean
+
+
+# blast
+WORKDIR $SRC
+RUN wget ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.5.0/ncbi-blast-2.5.0+-x64-linux.tar.gz && \
+    tar xvf ncbi-blast-2.5.0+-x64-linux.tar.gz && \
+        cp ncbi-blast-2.5.0+/bin/* $BIN && \
+            rm -r ncbi-blast-2.5.0+
+            
+
+RUN cpanm install PerlIO::gzip
