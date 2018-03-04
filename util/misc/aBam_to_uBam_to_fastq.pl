@@ -7,9 +7,10 @@ use FindBin;
 use lib ("$FindBin::Bin/../../PerlLib");
 use Pipeliner;
 
-my $usage = "usage: $0 aligned.bam\n\n";
+my $usage = "usage: $0 aligned.bam [already_uBam]\n\n";
 
 my $abam_file = $ARGV[0] or die $usage;
+my $already_ubam = $ARGV[1];
 
 my $PICARD_HOME = $ENV{PICARD_HOME} or die "Error, must have PICARD_HOME env var set to where picard.jar is installed";
 
@@ -31,18 +32,24 @@ main: {
 
     my $sample_name = basename($abam_file);
     $sample_name =~ s/\.bam$//;
-    
-    my $ubam = $abam_file;
-    $ubam =~ s/\.bam$/\.reverted.bam/ or die "Error, cannot update name of bam file to included reverted: $ubam";
 
+    my $ubam;
+    if ($already_ubam) {
+        $ubam = $abam_file;
+    }
+    else {
     
+        $ubam = $abam_file;
+        $ubam =~ s/\.bam$/\.reverted.bam/ or die "Error, cannot update name of bam file to included reverted: $ubam";
+                
+        # revert abam to ubam file
+        my $cmd = "java -jar $PICARD_HOME/picard.jar RevertSam I=$abam_file O=$ubam SO=queryname REMOVE_ALIGNMENT_INFORMATION=true TMP_DIR=$tmpdir";
+        $pipeliner->add_commands(new Command($cmd, "$sample_name.reverted.ok"));
+        
+    }
     
-    # revert abam to ubam file
-    my $cmd = "java -jar $PICARD_HOME/picard.jar RevertSam I=$abam_file O=$ubam SO=queryname REMOVE_ALIGNMENT_INFORMATION=true TMP_DIR=$tmpdir";
-    $pipeliner->add_commands(new Command($cmd, "$sample_name.reverted.ok"));
-
     # convert to fastq
-    $cmd = "java -jar $PICARD_HOME/picard.jar SamToFastq I=$ubam FASTQ=${sample_name}_1.fastq SECOND_END_FASTQ=${sample_name}_2.fastq";
+    my $cmd = "java -jar $PICARD_HOME/picard.jar SamToFastq I=$ubam VALIDATION_STRINGENCY=LENIENT FASTQ=${sample_name}_1.fastq SECOND_END_FASTQ=${sample_name}_2.fastq";
     $pipeliner->add_commands(new Command($cmd, "$sample_name.fq_out.ok"));
 
     # gzip fastq files
