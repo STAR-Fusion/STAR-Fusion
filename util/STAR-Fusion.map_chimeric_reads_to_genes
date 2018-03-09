@@ -298,7 +298,12 @@ sub get_overlapping_features {
         #print STDERR "Error, need pos width: $chr:$lend-$rend";
         return();
     }
-    
+
+    if (! exists $CHR_TO_INTERVAL_TREE{$chr}) {
+        # no features in the annotation file
+        return();
+    }
+        
     my $overlaps = $CHR_TO_INTERVAL_TREE{$chr}->fetch($lend, $rend);
 
     my @overlapping_features;
