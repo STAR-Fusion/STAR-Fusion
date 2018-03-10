@@ -8,4 +8,4 @@ clean:
 
 
 pull_tutorial_data:
-	git clone git@github.com:STAR-Fusion/STAR-Fusion-Tutorial.git
+	git clone https://github.com/STAR-Fusion/STAR-Fusion-Tutorial.git
