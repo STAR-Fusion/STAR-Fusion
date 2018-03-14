@@ -106,22 +106,6 @@ RUN wget https://github.com/COMBINE-lab/salmon/releases/download/v0.9.1/Salmon-0
 
 
 
-###############
-## STAR-Fusion:
-WORKDIR $SRC
-ENV STAR_FUSION_VERSION=1.3.1
-
-RUN apt-get install -y git
-
-RUN git clone --recursive https://github.com/STAR-Fusion/STAR-Fusion.git && \
-     cd STAR-Fusion && \
-     git checkout e1e0c37 && \
-     make
-
-ENV STAR_FUSION_HOME $SRC/STAR-Fusion
-
-## FusionInspector and FusionAnnotator are bundled with STAR-Fusion
-
 
 RUN apt-get update && apt-get install -y python-setuptools python-dev build-essential
 
@@ -141,3 +125,22 @@ RUN wget ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.5.0/ncbi-blast-2.
             
 
 RUN cpanm install PerlIO::gzip
+
+
+###############
+## STAR-Fusion:
+WORKDIR $SRC
+ENV STAR_FUSION_VERSION=1.3.1
+ENV STARF_CHECKOUT=8af5d8f
+
+RUN apt-get install -y git
+
+RUN git clone --recursive https://github.com/STAR-Fusion/STAR-Fusion.git && \
+     cd STAR-Fusion && \
+     git checkout $STARF_CHECKOUT && \
+     make
+
+ENV STAR_FUSION_HOME $SRC/STAR-Fusion
+
+## FusionInspector and FusionAnnotator are bundled with STAR-Fusion
+
