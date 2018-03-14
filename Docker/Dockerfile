@@ -131,12 +131,13 @@ RUN cpanm install PerlIO::gzip
 ## STAR-Fusion:
 WORKDIR $SRC
 ENV STAR_FUSION_VERSION=1.3.1
+ENV STARF_CHECKOUT=8af5d8f
 
 RUN apt-get install -y git
 
 RUN git clone --recursive https://github.com/STAR-Fusion/STAR-Fusion.git && \
      cd STAR-Fusion && \
-     git checkout c75a6dc && \
+     git checkout $STARF_CHECKOUT && \
      make
 
 ENV STAR_FUSION_HOME $SRC/STAR-Fusion
