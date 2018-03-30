@@ -119,7 +119,7 @@ sub set_checkpoint_dir {
     my $self = shift;
     my ($checkpoint_dir) = @_;
     if (! -d $checkpoint_dir) {
-        confess "Error, cannot locate checkpointdir: $checkpoint_dir ... you must create this first.";
+        mkdir($checkpoint_dir) or die "Error, cannot mkdir $checkpoint_dir";
     }
     $self->{checkpoint_dir} = $checkpoint_dir;
 }
@@ -158,7 +158,7 @@ sub run {
         else {
             print STDERR "* Running CMD: $cmdstr\n" if $VERBOSE;
             
-            my $tmp_stderr = "tmp.$$.stderr";
+            my $tmp_stderr = "tmp.$$." . time() . ".stderr";
             if (-e $tmp_stderr) {
                 unlink($tmp_stderr);
             }
@@ -169,9 +169,12 @@ sub run {
 
             my $ret = system($cmdstr);
             if ($ret) {
-                
+                                
                 if (-e $tmp_stderr) {
-                    system("cat $tmp_stderr");
+                    my $errmsg = `cat $tmp_stderr`;
+                    if ($errmsg =~ /\w/) {
+                        print STDERR "\n\nError encountered::  <!----\n$errmsg\n--->\n\n";
+                    }
                     unlink($tmp_stderr);
                 }
                                 
