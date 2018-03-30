@@ -772,7 +772,6 @@ sub run_STAR {
     
     ## run STAR to align reads:
     my $cmd = "$STAR_PROG --genomeDir $star_index_dir "
-        . " --readFilesIn $left_fq_filename $right_fq_filename "
         . " --outReadsUnmapped None "
         . " --chimSegmentMin 12 "
         . " --chimJunctionOverhangMin 12 "
@@ -794,22 +793,39 @@ sub run_STAR {
     else {
         $cmd .= " --outSAMtype BAM Unsorted "; # default, don't spend time and RAM sorting the data as not required for fusion-finding
     }
-    
-    if ($read_group_ids) {
-        $cmd .= " --outSAMattrRGline $read_group_ids ";
+
+    my $reads = "$left_fq_filename $right_fq_filename";
+    if (length($reads) > 1000) {
+        my $star_params_file = "star_params." . time() . ".$$.txt";
+        open(my $ofh, ">$star_params_file") or die "Error, cannot write to file: $star_params_file";
+        print $ofh "readFilesIn $reads\n";
+        if ($read_group_ids) {
+            print $ofh "outSAMattrRGline $read_group_ids\n";
+        }
+        else {
+            print $ofh "outSAMattrRGline ID:GRPundef\n";
+        }
+        close $ofh;
+        
+        $cmd .= " --parametersFiles $star_params_file ";
     }
     else {
-        $cmd .= " --outSAMattrRGline ID:GRPundef ";
+        $cmd .= " --readFilesIn $reads ";
+        if ($read_group_ids) {
+            $cmd .= " --outSAMattrRGline $read_group_ids ";
+        }
+        else {
+            $cmd .= " --outSAMattrRGline ID:GRPundef ";
+        }
     }
-    
+        
     if ($DEVEL_STAR) {
         $cmd .= " --chimMultimapScoreRange 10 --chimMultimapNmax 50 --chimNonchimScoreDropMin 10 ";
     }
     else {
         $cmd .= " --chimSegmentReadGapMax 3 ";
     }
-    
-    
+        
     if ($USE_SHARED_MEMORY) {
         $cmd .= " --genomeLoad LoadAndKeep ";
     }
