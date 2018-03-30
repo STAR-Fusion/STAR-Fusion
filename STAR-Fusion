@@ -806,6 +806,10 @@ sub run_STAR {
             print $ofh "outSAMattrRGline ID:GRPundef\n";
         }
         close $ofh;
+
+        unless ($reads =~ /^\//) {
+            confess "Error, reads do not appear to be specified by full paths: $reads";
+        }
         
         $cmd .= " --parametersFiles $star_params_file ";
     }
