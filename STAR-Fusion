@@ -807,10 +807,6 @@ sub run_STAR {
         }
         close $ofh;
 
-        unless ($reads =~ /^\//) {
-            confess "Error, reads do not appear to be specified by full paths: $reads";
-        }
-        
         $cmd .= " --parametersFiles $star_params_file ";
     }
     else {
@@ -859,8 +855,11 @@ sub run_STAR {
 
     $pipeliner->add_commands(Command->new("mv Chimeric.out.sam $output_prefix.Chimeric.out.sam", 
                                           "$checkpoints_dir/renamed-$output_prefix-csam.ok"));
-    
 
+
+    $pipeliner->run();
+
+    
     return;
 }
 
