@@ -144,3 +144,11 @@ ENV STAR_FUSION_HOME $SRC/STAR-Fusion
 
 ## FusionInspector and FusionAnnotator are bundled with STAR-Fusion
 
+
+## install hmmer for custom ctat genome lib construction
+WORKDIR $SRC
+RUN wget http://eddylab.org/software/hmmer3/3.1b2/hmmer-3.1b2-linux-intel-x86_64.tar.gz && \
+      tar zxvf hmmer-3.1b2-linux-intel-x86_64.tar.gz  && \
+      cd hmmer-3.1b2-linux-intel-x86_64 && \
+      cp binaries/* /usr/local/bin/
+
