@@ -572,7 +572,7 @@ sub build_interval_tree {
                 
         $FEATURE_TOKEN_TO_STRUCT{$token} = $exon_struct;
         
-        $interval_tree->insert($token, $lend, $rend);
+        $interval_tree->insert($token, $lend, $rend) if ($rend - $lend > 1);
     }
 
     my $time_end = time();
