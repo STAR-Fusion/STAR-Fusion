@@ -558,7 +558,7 @@ sub parse_read_mapping_counts {
         my $read_name = $x[9];
         my $read_group = $x[$#x];
 
-        unless ($read_group =~ /^\d/) {
+        if ($read_group =~ /^\D/ && $read_group ne "GRPundef") {
             # backwards compatible w/ older STAR
             $read_name = "\&${read_group}\@${read_name}"; # sample name encoding
         }

@@ -3,10 +3,13 @@
 use strict;
 use warnings;
 use FindBin;
+use Cwd;
 
 my $usage = "\n\n\tusage: $0 samples.txt\n\n";
 
 my $samples_file = $ARGV[0] or die $usage;
+
+my $workdir = cwd();
 
 main: {
 
@@ -15,7 +18,7 @@ main: {
         chomp;
         my ($sample_name, $left_fq, $right_fq) = split(/\s+/);
 
-        my $cmd = "$FindBin::Bin/../../STAR-Fusion --left_fq $left_fq --right_fq $right_fq --output_dir $sample_name --bbmerge";
+        my $cmd = "$FindBin::Bin/../../STAR-Fusion --left_fq $left_fq --right_fq $right_fq --output_dir $workdir/$sample_name --bbmerge";
 
         print "$cmd\n";
 

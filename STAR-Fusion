@@ -1,7 +1,5 @@
 #!/usr/bin/env perl
 
-# contributed by Brian Haas, Broad Institute, 2015
-
 use strict;
 use warnings;
 use Carp;
@@ -47,6 +45,18 @@ my $outTmpDir=undef;
 my $REQUIRE_LDAS = 1;
 
 my $BBMERGE_flag = 0;
+
+
+my $STAR_peOverlap = 0;
+my $STAR_peOverlapNbasesMin = 10; # minimum number of bases in the overlap
+my $STAR_peOverlapMMp = 0.1; # the max proportion of mismatches in the overlap
+
+
+my $STAR_chimMultiMap = 0;
+my $STAR_chimMultimapScoreRange = 10;
+my $STAR_chimMultimapNmax = 50; 
+my $STAR_chimNonchimScoreDropMin = 10;
+
 
 my $STAR_MAX_MATE_DIST = 100000;
 
@@ -124,9 +134,11 @@ __EOUSAGE__
 
 my $extended_usage_info = <<__EXTENDED_USAGE__
 #
-# Initial handling of reads:
+# Special handling of overlapping PE reads:
 #    
 #    --bbmerge                             to handle overlapping fusion reads, use bbmerge to first assemble the reads.
+#
+#     (also see --STAR_peOverlap option below)
 #
 # STAR program configurations:
 #    
@@ -137,6 +149,15 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #
 #    --STAR_PATH <string>                  /path/to/STAR  (default: uses STAR found in PATH setting).
 #
+#    --STAR_peOverlap                         have STAR stitch overlapping reads together.
+#          --STAR_peOverlapNbasesMin <int>    minimum number of bases in the overlap (default: $STAR_peOverlapNbasesMin)
+#          --STAR_peOverlapMMp <int>          the max proportion of mismatches in the overlap (default: $STAR_peOverlapMMp)
+#
+#    --STAR_chimMultiMap                           allow for multi-mapping chimeric reads
+#          --STAR_chimMultimapScoreRange <int>     the score range for multi-mapping chimeras below the best chimeric score. (default: $STAR_chimMultimapScoreRange)     
+#          --STAR_chimMultimapNmax <int>           maximum number of multi-alignments for the chimera (default: $STAR_chimMultimapNmax)
+#          --STAR_chimNonchimScoreDropMin <int>    to trigger chimeric detection, the drop in the best non-chimeric alignment score with respect to the read length has to be smaller than this value (default: $STAR_chimNonchimScoreDropMin)
+#    
 # Chimeric read filtering parameters:
 #
 #  
@@ -299,7 +320,17 @@ my $SHOW_FULL_USAGE_INFO;
               'STAR_limitBAMsortRAM=s' => \$STAR_limitBAMsortRAM,
               
               'STAR_PATH=s' => \$STAR_PROG,
-              
+
+              # other STAR settings
+              'STAR_peOverlap' => \$STAR_peOverlap,
+              'STAR_peOverlapNbasesMin=i' => \$STAR_peOverlapNbasesMin,
+              'STAR_peOverlapMMp=i' => \$STAR_peOverlapMMp,
+
+              'STAR_chimMultiMap' => \$STAR_chimMultiMap,
+              'STAR_chimMultimapScoreRange=i' => \$STAR_chimMultimapScoreRange,
+              'STAR_chimMultimapNmax=i' => \$STAR_chimMultimapNmax,
+              'STAR_chimNonchimScoreDropMin=i' => \$STAR_chimNonchimScoreDropMin,
+                            
               'extract_fusion_reads' => \$EXTRACT_FUSION_READS,
               'FusionInspector=s' => \$FUSIONINSPECTOR_MODE,
               'denovo_reconstruct' => \$DENOVO_RECONSTRUCT,
@@ -819,13 +850,14 @@ sub run_STAR {
         }
     }
         
-    if ($DEVEL_STAR) {
-        $cmd .= " --chimMultimapScoreRange 10 --chimMultimapNmax 50 --chimNonchimScoreDropMin 10 ";
+    if ($STAR_chimMultiMap) {
+        $cmd .= " --chimMultimapScoreRange $STAR_chimMultimapScoreRange --chimMultimapNmax $STAR_chimMultimapNmax --chimNonchimScoreDropMin $STAR_chimNonchimScoreDropMin ";
     }
-    else {
-        $cmd .= " --chimSegmentReadGapMax 3 ";
+
+    if ($STAR_peOverlap) {
+        $cmd .= " --peOverlapNbasesMin $STAR_peOverlapNbasesMin --peOverlapMMp $STAR_peOverlapMMp ";
     }
-        
+    
     if ($USE_SHARED_MEMORY) {
         $cmd .= " --genomeLoad LoadAndKeep ";
     }
@@ -853,8 +885,8 @@ sub run_STAR {
                                           "$checkpoints_dir/renamed-$output_prefix-cjunction.ok"));
 
 
-    $pipeliner->add_commands(Command->new("mv Chimeric.out.sam $output_prefix.Chimeric.out.sam", 
-                                          "$checkpoints_dir/renamed-$output_prefix-csam.ok"));
+    #$pipeliner->add_commands(Command->new("mv Chimeric.out.sam $output_prefix.Chimeric.out.sam", 
+    #                                      "$checkpoints_dir/renamed-$output_prefix-csam.ok"));
 
 
     $pipeliner->run();

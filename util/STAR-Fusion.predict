@@ -365,9 +365,9 @@ sub get_chimeric_reads_to_genes {
         my $junction_type = $x[6];
                 
         my $read_name = $x[9];
-
+        
         my $read_group = $x[$#x-2];
-        if ($read_group =~ /^\D/) {
+        if ($read_group =~ /^\D/ && $read_group ne "GRPundef") {
             # do this only if using the new STAR formatting
             # if old star, this shows up as a cigar string that starts with a number
             $read_name = "\&${read_group}\@${read_name}"; # encoding read group info into the read name
