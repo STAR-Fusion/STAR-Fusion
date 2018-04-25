@@ -52,9 +52,8 @@ my $STAR_peOverlapNbasesMin = 10; # minimum number of bases in the overlap
 my $STAR_peOverlapMMp = 0.1; # the max proportion of mismatches in the overlap
 
 
-my $STAR_chimMultiMap = 0;
 my $STAR_chimMultimapScoreRange = 10;
-my $STAR_chimMultimapNmax = 50; 
+my $STAR_chimMultimapNmax = 1; 
 my $STAR_chimNonchimScoreDropMin = 10;
 
 
@@ -153,7 +152,7 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #          --STAR_peOverlapNbasesMin <int>    minimum number of bases in the overlap (default: $STAR_peOverlapNbasesMin)
 #          --STAR_peOverlapMMp <int>          the max proportion of mismatches in the overlap (default: $STAR_peOverlapMMp)
 #
-#    --STAR_chimMultiMap                           allow for multi-mapping chimeric reads
+#       STAR chim multi-map opts:    
 #          --STAR_chimMultimapScoreRange <int>     the score range for multi-mapping chimeras below the best chimeric score. (default: $STAR_chimMultimapScoreRange)     
 #          --STAR_chimMultimapNmax <int>           maximum number of multi-alignments for the chimera (default: $STAR_chimMultimapNmax)
 #          --STAR_chimNonchimScoreDropMin <int>    to trigger chimeric detection, the drop in the best non-chimeric alignment score with respect to the read length has to be smaller than this value (default: $STAR_chimNonchimScoreDropMin)
@@ -326,7 +325,6 @@ my $SHOW_FULL_USAGE_INFO;
               'STAR_peOverlapNbasesMin=i' => \$STAR_peOverlapNbasesMin,
               'STAR_peOverlapMMp=i' => \$STAR_peOverlapMMp,
 
-              'STAR_chimMultiMap' => \$STAR_chimMultiMap,
               'STAR_chimMultimapScoreRange=i' => \$STAR_chimMultimapScoreRange,
               'STAR_chimMultimapNmax=i' => \$STAR_chimMultimapNmax,
               'STAR_chimNonchimScoreDropMin=i' => \$STAR_chimNonchimScoreDropMin,
@@ -850,9 +848,9 @@ sub run_STAR {
         }
     }
         
-    if ($STAR_chimMultiMap) {
-        $cmd .= " --chimMultimapScoreRange $STAR_chimMultimapScoreRange --chimMultimapNmax $STAR_chimMultimapNmax --chimNonchimScoreDropMin $STAR_chimNonchimScoreDropMin ";
-    }
+   
+    $cmd .= " --chimMultimapScoreRange $STAR_chimMultimapScoreRange --chimMultimapNmax $STAR_chimMultimapNmax --chimNonchimScoreDropMin $STAR_chimNonchimScoreDropMin ";
+    
 
     if ($STAR_peOverlap) {
         $cmd .= " --peOverlapNbasesMin $STAR_peOverlapNbasesMin --peOverlapMMp $STAR_peOverlapMMp ";

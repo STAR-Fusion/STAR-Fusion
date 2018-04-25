@@ -61,7 +61,7 @@ main: {
     close $fh;
     close $ofh;
 
-    my $parafly_cmd = "ParaFly -c $cmds_file -CPU $num_parallel -vv";
+    my $parafly_cmd = "ParaFly -c $cmds_file -CPU $num_parallel -vv -max_retry 1 ";
     &process_cmd($parafly_cmd);
 
 

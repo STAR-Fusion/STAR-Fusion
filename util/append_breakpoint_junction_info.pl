@@ -158,7 +158,7 @@ sub get_substr {
     my $rend = $start_pos + $length;
 
     my $cmd = "samtools faidx $genome_fasta $chr:$lend-$rend";
-    #print STDERR "CMD: $cmd\n";
+    print STDERR "CMD: $cmd\n";
     
     my $seq = `$cmd`;
 
