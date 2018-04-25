@@ -53,7 +53,7 @@ my $STAR_peOverlapMMp = 0.1; # the max proportion of mismatches in the overlap
 
 
 my $STAR_chimMultimapScoreRange = 10;
-my $STAR_chimMultimapNmax = 1; 
+my $STAR_chimMultimapNmax = 10; 
 my $STAR_chimNonchimScoreDropMin = 10;
 
 
