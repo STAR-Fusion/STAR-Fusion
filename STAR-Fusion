@@ -47,7 +47,6 @@ my $REQUIRE_LDAS = 1;
 my $BBMERGE_flag = 0;
 
 
-my $STAR_peOverlap = 0;
 my $STAR_peOverlapNbasesMin = 12; # minimum number of bases in the overlap
 my $STAR_peOverlapMMp = 0.1; # the max proportion of mismatches in the overlap
 
@@ -132,12 +131,12 @@ __EOUSAGE__
 
 
 my $extended_usage_info = <<__EXTENDED_USAGE__
-#
-# Special handling of overlapping PE reads:
 #    
-#    --bbmerge                             to handle overlapping fusion reads, use bbmerge to first assemble the reads.
-#
-#     (also see --STAR_peOverlap option below)
+#    --bbmerge                             Additionally use bbmerge to first assemble the reads.
+#                                          (note, as of STAR-Fusion v1.4, STAR includes functionality to do this internally.
+#                                                 Hence, the --bbmerge may be deprecated in future releases.  
+#                                                 See relevant --STAR_peOverlap* options below)
+#                                                 
 #
 # STAR program configurations:
 #    
@@ -148,11 +147,11 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #
 #    --STAR_PATH <string>                  /path/to/STAR  (default: uses STAR found in PATH setting).
 #
-#    --STAR_peOverlap                         have STAR stitch overlapping reads together.
+#   Stitching overlapping reads settings:    
 #          --STAR_peOverlapNbasesMin <int>    minimum number of bases in the overlap (default: $STAR_peOverlapNbasesMin)
 #          --STAR_peOverlapMMp <int>          the max proportion of mismatches in the overlap (default: $STAR_peOverlapMMp)
 #
-#       STAR chim multi-map opts:    
+#   STAR chim multi-map opts:    
 #          --STAR_chimMultimapScoreRange <int>     the score range for multi-mapping chimeras below the best chimeric score. (default: $STAR_chimMultimapScoreRange)     
 #          --STAR_chimMultimapNmax <int>           maximum number of multi-alignments for the chimera (default: $STAR_chimMultimapNmax)
 #          --STAR_chimNonchimScoreDropMin <int>    to trigger chimeric detection, the drop in the best non-chimeric alignment score with respect to the read length has to be smaller than this value (default: $STAR_chimNonchimScoreDropMin)
@@ -321,7 +320,6 @@ my $SHOW_FULL_USAGE_INFO;
               'STAR_PATH=s' => \$STAR_PROG,
 
               # other STAR settings
-              'STAR_peOverlap' => \$STAR_peOverlap,
               'STAR_peOverlapNbasesMin=i' => \$STAR_peOverlapNbasesMin,
               'STAR_peOverlapMMp=i' => \$STAR_peOverlapMMp,
 
@@ -848,13 +846,13 @@ sub run_STAR {
         }
     }
         
-   
+
+    # chim read multimapping settings
     $cmd .= " --chimMultimapScoreRange $STAR_chimMultimapScoreRange --chimMultimapNmax $STAR_chimMultimapNmax --chimNonchimScoreDropMin $STAR_chimNonchimScoreDropMin ";
     
-
-    if ($STAR_peOverlap) {
-        $cmd .= " --peOverlapNbasesMin $STAR_peOverlapNbasesMin --peOverlapMMp $STAR_peOverlapMMp ";
-    }
+    # merge overlapping reads
+    $cmd .= " --peOverlapNbasesMin $STAR_peOverlapNbasesMin --peOverlapMMp $STAR_peOverlapMMp ";
+    
     
     if ($USE_SHARED_MEMORY) {
         $cmd .= " --genomeLoad LoadAndKeep ";
