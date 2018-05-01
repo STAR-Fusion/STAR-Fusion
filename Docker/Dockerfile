@@ -5,8 +5,15 @@ MAINTAINER bhaas@broadinstitute.org
 RUN apt-get update && apt-get install -y gcc g++ perl python automake make \
                                        wget curl libdb-dev \
 				       bzip2 zlibc zlib1g zlib1g-dev  default-jre \
-				       unzip && \
+                       python-setuptools python-dev build-essential \
+				       unzip libbz2-dev  liblzma-dev && \
     apt-get clean
+
+
+RUN easy_install pip
+
+RUN pip install numpy
+
 
 RUN curl -L https://cpanmin.us | perl - App::cpanminus
 
@@ -21,33 +28,43 @@ RUN mkdir $DATA
 
 ## perl lib installations
 
+RUN cpanm install PerlIO::gzip
 RUN cpanm install Set::IntervalTree  # now included w/ STAR-Fusion
 RUN cpanm install DB_File
 RUN cpanm install URI::Escape
 RUN cpanm install Carp::Assert
 RUN cpanm install JSON::XS.pm
 
+
 ######################
 ## Tool installations:
 ######################
 
 
-##############
-## STAR
+# blast
+WORKDIR $SRC
+RUN wget ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.5.0/ncbi-blast-2.5.0+-x64-linux.tar.gz && \
+    tar xvf ncbi-blast-2.5.0+-x64-linux.tar.gz && \
+        cp ncbi-blast-2.5.0+/bin/* $BIN && \
+            rm -r ncbi-blast-2.5.0+
+            
 
-ENV STAR_VERSION=2.5.4b
 
-RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" &&\
-    wget -P $SRC $STAR_URL &&\
-    tar -xvf $SRC/${STAR_VERSION}.tar.gz -C $SRC && \
-    mv $SRC/STAR-${STAR_VERSION}/bin/Linux_x86_64_static/STAR /usr/local/bin
+## install hmmer for custom ctat genome lib construction
+WORKDIR $SRC
+RUN wget http://eddylab.org/software/hmmer3/3.1b2/hmmer-3.1b2-linux-intel-x86_64.tar.gz && \
+      tar zxvf hmmer-3.1b2-linux-intel-x86_64.tar.gz  && \
+      cd hmmer-3.1b2-linux-intel-x86_64 && \
+      cp binaries/* /usr/local/bin/
+
+
 
 
 
 ########
 # Samtools
 
-RUN apt-get install -y  libbz2-dev  liblzma-dev
+
  
 ENV SAMTOOLS_VERSION=1.7
 
@@ -62,7 +79,7 @@ RUN SAMTOOLS_URL="https://github.com/samtools/samtools/releases/download/${SAMTO
 ########
 # Trinity
 
-ENV TRINITY_VERSION=2.6.5
+ENV TRINITY_VERSION=2.6.6
 
 RUN TRINITY_URL="https://github.com/trinityrnaseq/trinityrnaseq/archive/Trinity-v${TRINITY_VERSION}.tar.gz" && \
    cd $SRC && \
@@ -82,15 +99,6 @@ RUN wget https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.3.3.1/bowti
     rm *.zip && \
     rm -r bowtie2-2.3.3.1-linux-x86_64
 
-########
-# GMAP
-WORKDIR $SRC
-RUN GMAP_URL="http://research-pub.gene.com/gmap/src/gmap-gsnap-2018-02-12.tar.gz" && \
-    wget $GMAP_URL && \
-    tar xvf gmap-gsnap-2018-02-12.tar.gz && \
-    cd gmap-2018-02-12 && ./configure && make && make install
-
-
 ## Jellyfish
 WORKDIR $SRC
 RUN wget https://github.com/gmarcais/Jellyfish/releases/download/v2.2.7/jellyfish-2.2.7.tar.gz && \
@@ -104,27 +112,6 @@ RUN wget https://github.com/COMBINE-lab/salmon/releases/download/v0.9.1/Salmon-0
     tar xvf Salmon-0.9.1_linux_x86_64.tar.gz && \
     ln -s $SRC/Salmon-latest_linux_x86_64/bin/salmon $BIN/.
 
-
-
-
-RUN apt-get update && apt-get install -y python-setuptools python-dev build-essential
-
-RUN easy_install pip
-
-RUN pip install numpy
-
-RUN apt-get clean
-
-
-# blast
-WORKDIR $SRC
-RUN wget ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.5.0/ncbi-blast-2.5.0+-x64-linux.tar.gz && \
-    tar xvf ncbi-blast-2.5.0+-x64-linux.tar.gz && \
-        cp ncbi-blast-2.5.0+/bin/* $BIN && \
-            rm -r ncbi-blast-2.5.0+
-            
-
-RUN cpanm install PerlIO::gzip
 
 
 ###############
@@ -145,10 +132,25 @@ ENV STAR_FUSION_HOME $SRC/STAR-Fusion
 ## FusionInspector and FusionAnnotator are bundled with STAR-Fusion
 
 
-## install hmmer for custom ctat genome lib construction
+##############
+## STAR
+
+ENV STAR_VERSION=2.6.0a
+# https://github.com/alexdobin/STAR/archive/2.6.0a.tar.gz
+RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" &&\
+    wget -P $SRC $STAR_URL &&\
+    tar -xvf $SRC/${STAR_VERSION}.tar.gz -C $SRC && \
+    mv $SRC/STAR-${STAR_VERSION}/bin/Linux_x86_64_static/STAR /usr/local/bin
+
+
+########
+# GMAP  (compile this last because this version unfortunately disrupts some headers in DL_LIBRARY_PATH)
+
+ENV GMAP_VERSION=2017-11-15
 WORKDIR $SRC
-RUN wget http://eddylab.org/software/hmmer3/3.1b2/hmmer-3.1b2-linux-intel-x86_64.tar.gz && \
-      tar zxvf hmmer-3.1b2-linux-intel-x86_64.tar.gz  && \
-      cd hmmer-3.1b2-linux-intel-x86_64 && \
-      cp binaries/* /usr/local/bin/
+RUN GMAP_URL="http://research-pub.gene.com/gmap/src/gmap-gsnap-$GMAP_VERSION.tar.gz" && \
+    wget $GMAP_URL && \
+    tar xvf gmap-gsnap-$GMAP_VERSION.tar.gz && \
+    cd gmap-$GMAP_VERSION && ./configure && make && make install
+
 
