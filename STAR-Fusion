@@ -15,6 +15,9 @@ use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 #my $VERSION = "1.3.2";
 my $VERSION = "__BLEEDING_EDGE__ Do not use - pull versioned release from: https://github.com/STAR-Fusion/STAR-Fusion/releases";
 
+my @MIN_STAR_MAJOR_MINOR_VERSION = (2, 6);
+
+
 my $BASEDIR = "$FindBin::Bin";
 my $UTILDIR = "$BASEDIR/util";
 my $PLUGINSDIR = "$BASEDIR/plugins";
@@ -371,6 +374,8 @@ else {
         die "Error, cannot locate STAR program in the PATH setting";
     }
 }
+
+&check_compatible_STAR_version($STAR_PROG, \@MIN_STAR_MAJOR_MINOR_VERSION);
 
 
 if ($STAR_limitBAMsortRAM =~ /^(\d+)G$/) {
@@ -999,3 +1004,34 @@ sub write_new_samples_file {
     return;
 }
 
+####
+sub check_compatible_STAR_version {
+    my ($star_prog, $min_star_major_minor_aref) = @_;
+
+    my $star_version_info = `$star_prog --version`;
+        
+    my $errmsg = "\n\n\tSorry, version [$star_version_info] is not supported. Please use at least STAR version " . join(".", @$min_star_major_minor_aref) . "\n";
+    $errmsg .= "\tTo upgrade, obtain the latest STAR here: https://github.com/alexdobin/STAR/releases\n\n";
+    
+    if ($star_version_info =~ /^STAR_(\d+)\.(\d+)\./) {
+        my $major_ver = $1;
+        my $minor_ver = $2;
+
+        if ($major_ver < $min_star_major_minor_aref->[0] 
+            || 
+            ($major_ver == $min_star_major_minor_aref->[0] && $minor_ver < $min_star_major_minor_aref->[1]) ) {
+            
+            print STDERR $errmsg;
+            exit(1);
+        }
+        else {
+            # all good. :-)
+        }
+    }
+    else {
+        print STDERR $errmsg;
+        exit(1);
+    }
+
+    return;
+}
