@@ -1,4 +1,11 @@
-STAR-Fusion Release v1.3.1
+STAR-Fusion Release v1.4.0
+	-works with multimapping fusion evidence. Default: --STAR_chimMultimapNmax 10
+	-automatically integrates overlapping mate merging for short frags or long rna-seq reads. (--bbmerge no longer required for FFPE, but still retaining the --bbmerge option for now).
+	-requires at least STAR version STAR_2.6
+	-minor bug fixes
+
+	
+	STAR-Fusion Release v1.3.1
 
 	This is a major update and includes the following changes:
 
