@@ -118,7 +118,7 @@ RUN wget https://github.com/COMBINE-lab/salmon/releases/download/v0.9.1/Salmon-0
 ## STAR-Fusion:
 WORKDIR $SRC
 ENV STAR_FUSION_VERSION=1.4.0
-ENV STARF_CHECKOUT=78d5310
+ENV STARF_CHECKOUT=e8071cbd051256ab838b64ec0253667b0ab91f16
 
 RUN apt-get install -y git
 
