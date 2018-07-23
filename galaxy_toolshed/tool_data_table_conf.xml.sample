@@ -1,0 +1,14 @@
+<tables>
+    <table name="ctat_genome_resource_libs" comment_char="#" allow_duplicate_entries="False">
+        <columns>value, name, path</columns>
+        <file path="tool-data/ctat_genome_resource_libs.loc" />
+    </table>
+    <table name="ctat_centrifuge_indexes" comment_char="#" allow_duplicate_entries="False">
+        <columns>value, name, path</columns>
+        <file path="tool-data/ctat_centrifuge_indexes.loc" />
+    </table>
+    <table name="ctat_lncrna_annotations" comment_char="#" allow_duplicate_entries="False">
+        <columns>value, name, path</columns>
+        <file path="tool-data/ctat_lncrna_annotations.loc" />
+    </table>
+</tables>

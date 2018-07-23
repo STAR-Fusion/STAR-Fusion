@@ -1,0 +1,15 @@
+# This file lists the locations of CTAT Genome Resource Libraries
+# Usually there will only be one library, but it is concievable 
+# that there could be multiple libraries.
+# This file format is as follows
+# (white space characters are TAB characters):
+#
+#<value>    <name>  <path>
+# value is a unique id
+# name is the display name
+# path is the directory where the genome resource lib files are stored
+#
+#ctat_genome_resource_libs.loc could look like:
+#
+#GRCh38_v27_CTAT_lib_Feb092018	CTAT_GenomeResourceLib_GRCh38_v27_CTAT_lib_Feb092018	/path/to/ctat/genome/resource/lib/directory
+#

@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<data_managers>
+    <data_manager tool_file="data_manager/add_ctat_resource_lib.xml" id="ctat_genome_resource_libs_data_manager"> 
+        <data_table name="ctat_genome_resource_libs">
+            <output>
+                <column name="value" />
+                    <!-- value is used to uniquely identify this entry in the table.
+                    -->
+                <column name="name" />
+                    <!-- name is used as the selector in the pull down lists for items in this table.
+                    -->
+                <column name="path" />
+                    <!-- path is the absolute path of the top level directory of the CTAT Genome Resource Library.
+                    -->
+                <!-- <column name="path" output_ref="out_file"> -->
+                    <!-- It is typical to move the data file, but because our tool gets the destination
+                    location from the user, we do not want to move the data from that location.
+                    The full path of the CTAT Resource library is returned in location. 
+                    So no need to change the value either.
+                    The files are so big we do not want to be making copies of them.
+                    They are created where we want them.
+                    -->
+                    <!-- <move type="file" relativize_symlinks="False"> -->
+                        <!--<source>${path}</source> -->
+                        <!--<target base="${GALAXY_DATA_MANAGER_DATA_PATH}">ctat_genome_lib_build_dir</target> -->
+                    <!--</move> -->
+                    <!--
+                    <value_translation>${GALAXY_DATA_MANAGER_DATA_PATH}/ctat_genome_lib_build_dir
+                    </value_translation>
+                    -->
+                    <!-- The location returned by the tool should already be an absolute path.
+                    <value_translation type="function">abspath</value_translation>
+                    -->
+                <!--</column> -->
+            </output>
+        </data_table>
+    </data_manager>
+</data_managers>
