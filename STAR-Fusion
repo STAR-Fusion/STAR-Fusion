@@ -15,7 +15,7 @@ use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 my $VERSION = "1.4.0";
 #my $VERSION = "__BLEEDING_EDGE__ Do not use - pull versioned release from: https://github.com/STAR-Fusion/STAR-Fusion/releases";
 
-my @MIN_STAR_MAJOR_MINOR_VERSION = (2, 6);
+my @MIN_STAR_MAJOR_MINOR_VERSION = (2, 6, 1);
 
 
 my $BASEDIR = "$FindBin::Bin";
@@ -807,6 +807,7 @@ sub run_STAR {
         . " --outReadsUnmapped None "
         . " --chimSegmentMin 12 "
         . " --chimJunctionOverhangMin 12 "
+        . " --chimOutJunctionFormat 1 "  # new option for STAR 2.6.1a
         . " --alignSJDBoverhangMin 10 "   
         . " --alignMatesGapMax $STAR_MAX_MATE_DIST "
         . " --alignIntronMax $STAR_MAX_MATE_DIST "
@@ -1013,13 +1014,17 @@ sub check_compatible_STAR_version {
     my $errmsg = "\n\n\tSorry, version [$star_version_info] is not supported. Please use at least STAR version " . join(".", @$min_star_major_minor_aref) . "\n";
     $errmsg .= "\tTo upgrade, obtain the latest STAR here: https://github.com/alexdobin/STAR/releases\n\n";
     
-    if ($star_version_info =~ /^STAR_(\d+)\.(\d+)\./) {
+    if ($star_version_info =~ /^STAR_(\d+)\.(\d+)\.(\d+)/) {
         my $major_ver = $1;
         my $minor_ver = $2;
+        my $patch_ver = $3;
 
         if ($major_ver < $min_star_major_minor_aref->[0] 
             || 
-            ($major_ver == $min_star_major_minor_aref->[0] && $minor_ver < $min_star_major_minor_aref->[1]) ) {
+            ($major_ver == $min_star_major_minor_aref->[0] && $minor_ver < $min_star_major_minor_aref->[1])
+            ||
+            ($major_ver == $min_star_major_minor_aref->[0] && $minor_ver == $min_star_major_minor_aref->[1] && $patch_ver < $min_star_major_minor_aref->[2])
+            ) {
             
             print STDERR $errmsg;
             exit(1);
