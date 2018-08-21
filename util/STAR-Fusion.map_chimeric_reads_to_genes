@@ -334,6 +334,7 @@ sub map_chimeric_reads_to_genes {
     my $counter = 0;
     open (my $fh, $junctions_file) or die "Error, cannot open file $junctions_file";
     while (<$fh>) {
+        if (/^\#/) { next; }
         $counter++;
         if ($counter % 100 == 0) {
             my $time = time();
