@@ -15,6 +15,8 @@ standard:
 standard_bbmerge:
 	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_bbmerge_outdir --bbmerge --STAR_use_shared_memory 
 
+standard_run_star_only:
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir_starOnly --STAR_use_shared_memory --run_STAR_only
 
 all: standard \
      kickstart \
@@ -28,7 +30,8 @@ all: standard \
      standard_bbmerge \
      standard_bbmerge_FI_inspect \
      standard_bbmerge_FI_validate \
-     samples_PE \
+     standard_run_star_only \
+	 samples_PE \
      samples_PE_FI
 
 
@@ -114,7 +117,7 @@ clean:
 	rm -rf ./star_fusion_bbmerge_outdir
 	(rm -rf ./test_docker_outdir) || sudo rm -rf ./test_docker_outdir
 	rm -rf ./star_fusion_samplesPE_outdir
-
+	rm -rf ./star_fusion_outdir_starOnly
 
 purge:
 	../STAR-Fusion --STAR_Remove

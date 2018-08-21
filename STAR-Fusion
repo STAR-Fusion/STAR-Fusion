@@ -69,6 +69,7 @@ my $STAR_limitBAMsortRAM = "40G";
 
 my $NO_REMOVE_DUPS = 0;
 
+my $RUN_STAR_ONLY_FLAG = 0;
 
 my $logo='
 ############################################################################################
@@ -150,6 +151,8 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #
 #    --STAR_PATH <string>                  /path/to/STAR  (default: uses STAR found in PATH setting).
 #
+#    --run_STAR_only                       stop after running STAR aligner (essentially just generating the Chimeric.out.junction file)
+#    
 #   Stitching overlapping reads settings:    
 #          --STAR_peOverlapNbasesMin <int>    minimum number of bases in the overlap (default: $STAR_peOverlapNbasesMin)
 #          --STAR_peOverlapMMp <int>          the max proportion of mismatches in the overlap (default: $STAR_peOverlapMMp)
@@ -341,7 +344,8 @@ my $SHOW_FULL_USAGE_INFO;
               'DEVEL_STAR' => \$DEVEL_STAR,
     
               'show_full_usage_info' => \$SHOW_FULL_USAGE_INFO,
-              
+
+              'run_STAR_only' => \$RUN_STAR_ONLY_FLAG,
     );
 
 
@@ -534,6 +538,11 @@ main: {
         
     }
 
+
+    if ($RUN_STAR_ONLY_FLAG) {
+        print STDERR "Option --run_STAR_only flag is set. Stopping here.\n";
+        exit(0);
+    }
 
 
     ########################################
