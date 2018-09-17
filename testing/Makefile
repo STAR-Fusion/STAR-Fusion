@@ -12,9 +12,6 @@ standard:
 	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir --STAR_use_shared_memory 
 
 
-standard_bbmerge:
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_bbmerge_outdir --bbmerge --STAR_use_shared_memory 
-
 standard_run_star_only:
 	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir_starOnly --STAR_use_shared_memory --run_STAR_only
 
@@ -27,9 +24,6 @@ all: standard \
      standard_coding_effect \
      standard_SE \
      kickstart_SE \
-     standard_bbmerge \
-     standard_bbmerge_FI_inspect \
-     standard_bbmerge_FI_validate \
      standard_run_star_only \
 	 samples_PE \
      samples_PE_FI
@@ -90,19 +84,6 @@ standard_SE:
 
 kickstart_SE:
 	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB} -J __kickstart_data/Chimeric.out.junction  --FusionInspector inspect --examine_coding_effect --left_fq ${left_fq} -O star_fusion_SE_outdir_kickstart  --STAR_use_shared_memory 
-
-
-##############################
-### bbmerge
-
-standard_bbmerge_FI_inspect: standard_bbmerge
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_bbmerge_outdir --bbmerge --FusionInspector inspect --examine_coding_effect  --STAR_use_shared_memory 
-
-
-standard_bbmerge_FI_validate: standard_bbmerge
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_bbmerge_outdir --bbmerge --FusionInspector validate --examine_coding_effect  --STAR_use_shared_memory 
-
-
 
 
 

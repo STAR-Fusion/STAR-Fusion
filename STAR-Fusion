@@ -46,8 +46,6 @@ my $CPU = 4;
 my $outTmpDir=undef;
 my $REQUIRE_LDAS = 1;
 
-my $BBMERGE_flag = 0;
-
 
 my $STAR_peOverlapNbasesMin = 12; # minimum number of bases in the overlap
 my $STAR_peOverlapMMp = 0.1; # the max proportion of mismatches in the overlap
@@ -134,12 +132,6 @@ __EOUSAGE__
 
 
 my $extended_usage_info = <<__EXTENDED_USAGE__
-#    
-#    --bbmerge                             Additionally use bbmerge to first assemble the reads.
-#                                          (note, as of STAR-Fusion v1.4, STAR includes functionality to do this internally.
-#                                                 Hence, the --bbmerge may be deprecated in future releases.  
-#                                                 See relevant --STAR_peOverlap* options below)
-#                                                 
 #
 # STAR program configurations:
 #    
@@ -336,8 +328,6 @@ my $SHOW_FULL_USAGE_INFO;
               'FusionInspector=s' => \$FUSIONINSPECTOR_MODE,
               'denovo_reconstruct' => \$DENOVO_RECONSTRUCT,
               
-              'bbmerge' => \$BBMERGE_flag,
-
               'no_remove_dups' => \$NO_REMOVE_DUPS,
               
               'DEVEL_STAR' => \$DEVEL_STAR,
@@ -348,14 +338,15 @@ my $SHOW_FULL_USAGE_INFO;
     );
 
 
-if ($help_flag) {
-    die $usage;
-}
+
 if ($SHOW_FULL_USAGE_INFO) {
     die "$usage$extended_usage_info";
 }
     
 
+if ($help_flag) {
+    die $usage;
+}
 
 if ($REPORT_VERSION) {
     print "\n\nSTAR-Fusion version: $VERSION\n\n";
@@ -429,10 +420,6 @@ unless (-s $annot_filt_module) {
 }
 
 
-
-if ($BBMERGE_flag && !($right_fq_filename || $samples_file) ) {
-    die "Error, can only use --bbmerge if paired-end reads are used ";
-}
 
 # ensure full paths:
 
@@ -519,21 +506,7 @@ main: {
             die "Error, cannot locate star index at $star_index_dir";
         }
         
-        &run_STAR($pipeliner, $left_fq_filename, $right_fq_filename, "std", $read_group_ids);
-        
-        if ($BBMERGE_flag) {
-            my $bbmerge_fq = &run_BBMerge($pipeliner, $left_fq_filename, $right_fq_filename, $read_group_ids);
-
-            &run_STAR($pipeliner, $bbmerge_fq, "", "bbmerge", $read_group_ids);
-            
-            $pipeliner->add_commands(Command->new("bash -c \"set -eou pipefail; cat std.Chimeric.out.junction bbmerge.Chimeric.out.junction | sed s/merged-// > $chimeric_out_junctions_file\" ",
-                                                  "$checkpoints_dir/combine_chimeric_junction_files.ok"));
-        }
-        else {
-            # just symlink to expected chimeric junction file:
-            $pipeliner->add_commands(Command->new("ln -s std.Chimeric.out.junction $chimeric_out_junctions_file",
-                                                  "$checkpoints_dir/symlink_chim_junctions.ok"));
-        }
+        &run_STAR($pipeliner, $left_fq_filename, $right_fq_filename, $read_group_ids);
         
     }
 
@@ -810,7 +783,7 @@ sub missing_required_program_installed {
 
 ####
 sub run_STAR {
-    my ($pipeliner, $left_fq_filename, $right_fq_filename, $output_prefix, $read_group_ids) = @_;
+    my ($pipeliner, $left_fq_filename, $right_fq_filename, $read_group_ids) = @_;
 
     my $maybe_tmpdir= defined($outTmpDir)? " --outTmpDir $outTmpDir " : "";
     
@@ -863,8 +836,7 @@ sub run_STAR {
             $cmd .= " --outSAMattrRGline ID:GRPundef ";
         }
     }
-        
-
+    
     # chim read multimapping settings
     $cmd .= " --chimMultimapScoreRange $STAR_chimMultimapScoreRange --chimMultimapNmax $STAR_chimMultimapNmax --chimNonchimScoreDropMin $STAR_chimNonchimScoreDropMin ";
     
@@ -885,26 +857,10 @@ sub run_STAR {
         $cmd .= " --readFilesCommand 'gunzip -c' ";
     }
     
-    $pipeliner->add_commands(Command->new($cmd, "$checkpoints_dir/$output_prefix-star.ok"));
-
-    # rename the STAR output files:
-
-    my $star_bam_file = ($STAR_SortedByCoordinate) ? "Aligned.sortedByCoord.out.bam" : "Aligned.out.bam";
+    $pipeliner->add_commands(Command->new($cmd, "$checkpoints_dir/run_star_aligner.ok"));
     
-    $pipeliner->add_commands(Command->new("mv $star_bam_file $output_prefix.STAR.bam", 
-                                          "$checkpoints_dir/renamed-$output_prefix-bam.ok"));
-
-
-    $pipeliner->add_commands(Command->new("mv Chimeric.out.junction $output_prefix.Chimeric.out.junction", 
-                                          "$checkpoints_dir/renamed-$output_prefix-cjunction.ok"));
-
-
-    #$pipeliner->add_commands(Command->new("mv Chimeric.out.sam $output_prefix.Chimeric.out.sam", 
-    #                                      "$checkpoints_dir/renamed-$output_prefix-csam.ok"));
-
-
     $pipeliner->run();
-
+    
     
     return;
 }
