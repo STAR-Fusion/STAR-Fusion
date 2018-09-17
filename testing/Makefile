@@ -5,7 +5,7 @@ right_fq="reads_2.fq.gz"
 
 
 kickstart:
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -J __kickstart_data/Chimeric.out.junction -O star_fusion_kickstarted_outdir 
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  -J __kickstart_data/Chimeric.out.junction -O star_fusion_kickstarted_outdir 
 
 
 standard:

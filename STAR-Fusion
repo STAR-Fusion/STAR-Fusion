@@ -25,7 +25,6 @@ my $PLUGINSDIR = "$BASEDIR/plugins";
 ## Options
 my $output_dir = "STAR-Fusion_outdir";
 my $out_prefix = "star-fusion";
-my $chimeric_junction_file;
 my $help_flag;
 my $MIN_NOVEL_JUNCTION_SUPPORT = 3;
 my $MIN_ALT_PCT_JUNCTION = 10.0;
@@ -545,6 +544,11 @@ main: {
     }
 
 
+    ## Get total number of rnaseq fragments reported by STAR:
+    my $num_total_rnaseq_frags = &get_num_total_rnaseq_frags($chimeric_out_junctions_file);
+    print STDERR "-sample contains $num_total_rnaseq_frags\n";
+    
+
     ########################################
     ## Map chimeric reads to genome features
     
@@ -614,14 +618,13 @@ main: {
         
         
     }
-
-    if ($left_fq_filename) {
-        ## convert vals to FFPM
-        $cmd = "$UTILDIR/incorporate_FFPM_into_final_report.pl $left_fq_filename $prelim_fusion_file > $prelim_fusion_file.FFPM";
-        $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/FFPM.ok") );
-
-        $prelim_fusion_file = "$prelim_fusion_file.FFPM";
-    }
+    
+    ## convert vals to FFPM
+    $cmd = "$UTILDIR/incorporate_FFPM_into_final_report.pl $prelim_fusion_file $num_total_rnaseq_frags > $prelim_fusion_file.FFPM";
+    $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/FFPM.ok") );
+    
+    $prelim_fusion_file = "$prelim_fusion_file.FFPM";
+    
     
     ## add breakpoint / splice junction info
 
@@ -651,9 +654,9 @@ main: {
         $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/annot_filter.ok"));
         $prelim_fusion_file = "$annotated_fusions_filename.pass";
     }
-
-
-    if ($MIN_FFPM > 0 && $left_fq_filename) { 
+    
+    
+    if ($MIN_FFPM > 0) { 
 
         # filter based on min FFPM value
         
@@ -1049,3 +1052,20 @@ sub check_compatible_STAR_version {
 
     return;
 }
+
+
+####
+sub get_num_total_rnaseq_frags {
+    my ($chimeric_out_junctions_file) = @_;
+
+    my $read_count_line = `tail -n1 $chimeric_out_junctions_file`;
+    
+    if ($read_count_line =~ /^\# Nreads (\d+)/) {
+        return($1);
+    }
+    else {
+        confess "Error, file: $chimeric_out_junctions_file doesn't have expected formatting.  Please be sure to use the STAR aligner with min version: " . join(".", @MIN_STAR_MAJOR_MINOR_VERSION);
+    }
+}
+
+

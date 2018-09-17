@@ -7,15 +7,13 @@ use FindBin;
 use lib ("$FindBin::Bin/../PerlLib");
 use DelimParser;
 
-my $usage = "\n\n\tusage: $0 left.fq finspector.fusion_predictions.final.abridged\n\n";
+my $usage = "\n\n\tusage: $0 finspector.fusion_predictions.final.abridged num_total_rnaseq_frags\n\n";
 
-my $fq_filename = $ARGV[0] or die $usage;
-my $finspector_results = $ARGV[1] or die $usage;
+my $finspector_results = $ARGV[0] or die $usage;
+my $num_frags = $ARGV[1] or die $usage;
 
 main: {
 
-    my $num_frags = &get_num_total_frags($fq_filename);
-    
     open (my $fh, $finspector_results) or die "Error, cannot open file $finspector_results";
     my $tab_reader = new DelimParser::Reader($fh, "\t");
 
@@ -42,34 +40,6 @@ main: {
     
 }
 
-####
-sub get_num_total_frags {
-    my ($fq_file_listing) = @_;
-
-    my @fq_files = split(',', $fq_file_listing);
-    
-    my $sum_lines = 0;
-    foreach my $fq_file (@fq_files) {
-        
-        my $num_lines;
-        if ($fq_file =~ /\.gz/) {
-            $num_lines = `gunzip -c $fq_file | wc -l`;
-        }
-        else {
-            $num_lines = `cat $fq_file | wc -l`;
-        }
-        chomp $num_lines;
-        $num_lines =~ /^\s*(\d+)/ or die "Error, cannot extract line count from [$num_lines]";
-        $num_lines = $1;
-
-        $sum_lines += $num_lines;
-    }
-
-    my $num_seq_records = $sum_lines / 4;
-
-    return($num_seq_records);
-}
-            
 
 ####
 sub compute_FFPM {
