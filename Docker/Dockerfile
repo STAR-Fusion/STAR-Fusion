@@ -117,10 +117,10 @@ RUN wget https://github.com/COMBINE-lab/salmon/releases/download/v0.9.1/Salmon-0
 ###############
 ## STAR-Fusion:
 WORKDIR $SRC
-ENV STAR_FUSION_VERSION=1.4.0
-ENV STARF_CHECKOUT=78d5310
+ENV STAR_FUSION_VERSION=1.5.0preA
+ENV STARF_CHECKOUT=1f673a1f7dae04229ae2cf0b5340b2e70c439b96
 
-RUN apt-get install -y git
+RUN apt-get update && apt-get install -y git
 
 RUN git clone --recursive https://github.com/STAR-Fusion/STAR-Fusion.git && \
      cd STAR-Fusion && \
@@ -135,8 +135,7 @@ ENV STAR_FUSION_HOME $SRC/STAR-Fusion
 ##############
 ## STAR
 
-ENV STAR_VERSION=2.6.0a
-# https://github.com/alexdobin/STAR/archive/2.6.0a.tar.gz
+ENV STAR_VERSION=2.6.1a
 RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" &&\
     wget -P $SRC $STAR_URL &&\
     tar -xvf $SRC/${STAR_VERSION}.tar.gz -C $SRC && \
