@@ -1,3 +1,10 @@
+
+STAR-Fusion Release v1.5.0
+	-removed BBEmerge
+	-require min of STAR version 2.6.1
+	-leverages updated Chimeric junction out files with embedded metadata
+	
+
 STAR-Fusion Release v1.4.0
 	-works with multimapping fusion evidence. Default: --STAR_chimMultimapNmax 10
 	-automatically integrates overlapping mate merging for short frags or long rna-seq reads. (--bbmerge no longer required for FFPE, but still retaining the --bbmerge option for now).

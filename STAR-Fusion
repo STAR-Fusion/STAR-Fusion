@@ -12,10 +12,10 @@ use Process_cmd;
 
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
-my $VERSION = "1.4.0";
+my $VERSION = "1.5.0";
 #my $VERSION = "__BLEEDING_EDGE__ Do not use - pull versioned release from: https://github.com/STAR-Fusion/STAR-Fusion/releases";
 
-my @MIN_STAR_MAJOR_MINOR_VERSION = (2, 6);
+my @MIN_STAR_MAJOR_MINOR_VERSION = (2, 6, 1);
 
 
 my $BASEDIR = "$FindBin::Bin";
@@ -25,7 +25,6 @@ my $PLUGINSDIR = "$BASEDIR/plugins";
 ## Options
 my $output_dir = "STAR-Fusion_outdir";
 my $out_prefix = "star-fusion";
-my $chimeric_junction_file;
 my $help_flag;
 my $MIN_NOVEL_JUNCTION_SUPPORT = 3;
 my $MIN_ALT_PCT_JUNCTION = 10.0;
@@ -47,8 +46,6 @@ my $CPU = 4;
 my $outTmpDir=undef;
 my $REQUIRE_LDAS = 1;
 
-my $BBMERGE_flag = 0;
-
 
 my $STAR_peOverlapNbasesMin = 12; # minimum number of bases in the overlap
 my $STAR_peOverlapMMp = 0.1; # the max proportion of mismatches in the overlap
@@ -69,6 +66,7 @@ my $STAR_limitBAMsortRAM = "40G";
 
 my $NO_REMOVE_DUPS = 0;
 
+my $RUN_STAR_ONLY_FLAG = 0;
 
 my $logo='
 ############################################################################################
@@ -134,12 +132,6 @@ __EOUSAGE__
 
 
 my $extended_usage_info = <<__EXTENDED_USAGE__
-#    
-#    --bbmerge                             Additionally use bbmerge to first assemble the reads.
-#                                          (note, as of STAR-Fusion v1.4, STAR includes functionality to do this internally.
-#                                                 Hence, the --bbmerge may be deprecated in future releases.  
-#                                                 See relevant --STAR_peOverlap* options below)
-#                                                 
 #
 # STAR program configurations:
 #    
@@ -150,6 +142,8 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #
 #    --STAR_PATH <string>                  /path/to/STAR  (default: uses STAR found in PATH setting).
 #
+#    --run_STAR_only                       stop after running STAR aligner (essentially just generating the Chimeric.out.junction file)
+#    
 #   Stitching overlapping reads settings:    
 #          --STAR_peOverlapNbasesMin <int>    minimum number of bases in the overlap (default: $STAR_peOverlapNbasesMin)
 #          --STAR_peOverlapMMp <int>          the max proportion of mismatches in the overlap (default: $STAR_peOverlapMMp)
@@ -334,25 +328,25 @@ my $SHOW_FULL_USAGE_INFO;
               'FusionInspector=s' => \$FUSIONINSPECTOR_MODE,
               'denovo_reconstruct' => \$DENOVO_RECONSTRUCT,
               
-              'bbmerge' => \$BBMERGE_flag,
-
               'no_remove_dups' => \$NO_REMOVE_DUPS,
               
               'DEVEL_STAR' => \$DEVEL_STAR,
     
               'show_full_usage_info' => \$SHOW_FULL_USAGE_INFO,
-              
+
+              'run_STAR_only' => \$RUN_STAR_ONLY_FLAG,
     );
 
 
-if ($help_flag) {
-    die $usage;
-}
+
 if ($SHOW_FULL_USAGE_INFO) {
     die "$usage$extended_usage_info";
 }
     
 
+if ($help_flag) {
+    die $usage;
+}
 
 if ($REPORT_VERSION) {
     print "\n\nSTAR-Fusion version: $VERSION\n\n";
@@ -426,10 +420,6 @@ unless (-s $annot_filt_module) {
 }
 
 
-
-if ($BBMERGE_flag && !($right_fq_filename || $samples_file) ) {
-    die "Error, can only use --bbmerge if paired-end reads are used ";
-}
 
 # ensure full paths:
 
@@ -516,25 +506,21 @@ main: {
             die "Error, cannot locate star index at $star_index_dir";
         }
         
-        &run_STAR($pipeliner, $left_fq_filename, $right_fq_filename, "std", $read_group_ids);
-        
-        if ($BBMERGE_flag) {
-            my $bbmerge_fq = &run_BBMerge($pipeliner, $left_fq_filename, $right_fq_filename, $read_group_ids);
-
-            &run_STAR($pipeliner, $bbmerge_fq, "", "bbmerge", $read_group_ids);
-            
-            $pipeliner->add_commands(Command->new("bash -c \"set -eou pipefail; cat std.Chimeric.out.junction bbmerge.Chimeric.out.junction | sed s/merged-// > $chimeric_out_junctions_file\" ",
-                                                  "$checkpoints_dir/combine_chimeric_junction_files.ok"));
-        }
-        else {
-            # just symlink to expected chimeric junction file:
-            $pipeliner->add_commands(Command->new("ln -s std.Chimeric.out.junction $chimeric_out_junctions_file",
-                                                  "$checkpoints_dir/symlink_chim_junctions.ok"));
-        }
+        &run_STAR($pipeliner, $left_fq_filename, $right_fq_filename, $read_group_ids);
         
     }
 
 
+    if ($RUN_STAR_ONLY_FLAG) {
+        print STDERR "Option --run_STAR_only flag is set. Stopping here.\n";
+        exit(0);
+    }
+
+
+    ## Get total number of rnaseq fragments reported by STAR:
+    my $num_total_rnaseq_frags = &get_num_total_rnaseq_frags($chimeric_out_junctions_file);
+    print STDERR "-sample contains $num_total_rnaseq_frags\n";
+    
 
     ########################################
     ## Map chimeric reads to genome features
@@ -605,14 +591,13 @@ main: {
         
         
     }
-
-    if ($left_fq_filename) {
-        ## convert vals to FFPM
-        $cmd = "$UTILDIR/incorporate_FFPM_into_final_report.pl $left_fq_filename $prelim_fusion_file > $prelim_fusion_file.FFPM";
-        $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/FFPM.ok") );
-
-        $prelim_fusion_file = "$prelim_fusion_file.FFPM";
-    }
+    
+    ## convert vals to FFPM
+    $cmd = "$UTILDIR/incorporate_FFPM_into_final_report.pl $prelim_fusion_file $num_total_rnaseq_frags > $prelim_fusion_file.FFPM";
+    $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/FFPM.ok") );
+    
+    $prelim_fusion_file = "$prelim_fusion_file.FFPM";
+    
     
     ## add breakpoint / splice junction info
 
@@ -642,9 +627,9 @@ main: {
         $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/annot_filter.ok"));
         $prelim_fusion_file = "$annotated_fusions_filename.pass";
     }
-
-
-    if ($MIN_FFPM > 0 && $left_fq_filename) { 
+    
+    
+    if ($MIN_FFPM > 0) { 
 
         # filter based on min FFPM value
         
@@ -798,7 +783,7 @@ sub missing_required_program_installed {
 
 ####
 sub run_STAR {
-    my ($pipeliner, $left_fq_filename, $right_fq_filename, $output_prefix, $read_group_ids) = @_;
+    my ($pipeliner, $left_fq_filename, $right_fq_filename, $read_group_ids) = @_;
 
     my $maybe_tmpdir= defined($outTmpDir)? " --outTmpDir $outTmpDir " : "";
     
@@ -807,6 +792,7 @@ sub run_STAR {
         . " --outReadsUnmapped None "
         . " --chimSegmentMin 12 "
         . " --chimJunctionOverhangMin 12 "
+        . " --chimOutJunctionFormat 1 "  # new option for STAR 2.6.1a
         . " --alignSJDBoverhangMin 10 "   
         . " --alignMatesGapMax $STAR_MAX_MATE_DIST "
         . " --alignIntronMax $STAR_MAX_MATE_DIST "
@@ -850,8 +836,7 @@ sub run_STAR {
             $cmd .= " --outSAMattrRGline ID:GRPundef ";
         }
     }
-        
-
+    
     # chim read multimapping settings
     $cmd .= " --chimMultimapScoreRange $STAR_chimMultimapScoreRange --chimMultimapNmax $STAR_chimMultimapNmax --chimNonchimScoreDropMin $STAR_chimNonchimScoreDropMin ";
     
@@ -872,26 +857,10 @@ sub run_STAR {
         $cmd .= " --readFilesCommand 'gunzip -c' ";
     }
     
-    $pipeliner->add_commands(Command->new($cmd, "$checkpoints_dir/$output_prefix-star.ok"));
-
-    # rename the STAR output files:
-
-    my $star_bam_file = ($STAR_SortedByCoordinate) ? "Aligned.sortedByCoord.out.bam" : "Aligned.out.bam";
+    $pipeliner->add_commands(Command->new($cmd, "$checkpoints_dir/run_star_aligner.ok"));
     
-    $pipeliner->add_commands(Command->new("mv $star_bam_file $output_prefix.STAR.bam", 
-                                          "$checkpoints_dir/renamed-$output_prefix-bam.ok"));
-
-
-    $pipeliner->add_commands(Command->new("mv Chimeric.out.junction $output_prefix.Chimeric.out.junction", 
-                                          "$checkpoints_dir/renamed-$output_prefix-cjunction.ok"));
-
-
-    #$pipeliner->add_commands(Command->new("mv Chimeric.out.sam $output_prefix.Chimeric.out.sam", 
-    #                                      "$checkpoints_dir/renamed-$output_prefix-csam.ok"));
-
-
     $pipeliner->run();
-
+    
     
     return;
 }
@@ -1013,13 +982,17 @@ sub check_compatible_STAR_version {
     my $errmsg = "\n\n\tSorry, version [$star_version_info] is not supported. Please use at least STAR version " . join(".", @$min_star_major_minor_aref) . "\n";
     $errmsg .= "\tTo upgrade, obtain the latest STAR here: https://github.com/alexdobin/STAR/releases\n\n";
     
-    if ($star_version_info =~ /^STAR_(\d+)\.(\d+)\./) {
+    if ($star_version_info =~ /^STAR_(\d+)\.(\d+)\.(\d+)/) {
         my $major_ver = $1;
         my $minor_ver = $2;
+        my $patch_ver = $3;
 
         if ($major_ver < $min_star_major_minor_aref->[0] 
             || 
-            ($major_ver == $min_star_major_minor_aref->[0] && $minor_ver < $min_star_major_minor_aref->[1]) ) {
+            ($major_ver == $min_star_major_minor_aref->[0] && $minor_ver < $min_star_major_minor_aref->[1])
+            ||
+            ($major_ver == $min_star_major_minor_aref->[0] && $minor_ver == $min_star_major_minor_aref->[1] && $patch_ver < $min_star_major_minor_aref->[2])
+            ) {
             
             print STDERR $errmsg;
             exit(1);
@@ -1035,3 +1008,20 @@ sub check_compatible_STAR_version {
 
     return;
 }
+
+
+####
+sub get_num_total_rnaseq_frags {
+    my ($chimeric_out_junctions_file) = @_;
+
+    my $read_count_line = `tail -n1 $chimeric_out_junctions_file`;
+    
+    if ($read_count_line =~ /^\# Nreads (\d+)/) {
+        return($1);
+    }
+    else {
+        confess "Error, file: $chimeric_out_junctions_file doesn't have expected formatting.  Please be sure to use the STAR aligner with min version: " . join(".", @MIN_STAR_MAJOR_MINOR_VERSION);
+    }
+}
+
+
