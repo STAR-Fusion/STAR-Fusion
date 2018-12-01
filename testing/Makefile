@@ -9,7 +9,7 @@ kickstart:
 
 
 standard:
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir --STAR_use_shared_memory 
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir --STAR_use_shared_memory --STAR_MAX_MATE_DIST 200000
 
 
 standard_run_star_only:
