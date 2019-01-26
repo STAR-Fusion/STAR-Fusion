@@ -551,6 +551,7 @@ sub parse_read_mapping_counts {
     
     open(my $fh, $chimeric_junctions_file) or die "Error, cannot open file $chimeric_junctions_file";
     while (<$fh>) {
+        if (/^\#/) { next; }
         chomp;
         my @x = split(/\t/);
         my $read_name = $x[9];

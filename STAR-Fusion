@@ -856,6 +856,8 @@ sub run_STAR {
     if ($left_fq_filename =~ /\.gz$/) {
         $cmd .= " --readFilesCommand 'gunzip -c' ";
     }
+
+    #$cmd .=  " --limitOutSJcollapsed 10000000 ";
     
     $pipeliner->add_commands(Command->new($cmd, "$checkpoints_dir/run_star_aligner.ok"));
     
