@@ -625,7 +625,7 @@ main: {
         
         $cmd = "$BASEDIR/FusionFilter/util/filter_by_annotation_rules.pl --fusions $annotated_fusions_filename --genome_lib_dir $genome_lib_dir";
         $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/annot_filter.ok"));
-        $prelim_fusion_file = "$annotated_fusions_filename.pass";
+        $prelim_fusion_file = "$annotated_fusions_filename.annot_filter.pass";
     }
     
     
