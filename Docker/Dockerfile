@@ -1,8 +1,8 @@
-FROM ubuntu:16.04
+FROM ubuntu:18.04
 
 MAINTAINER bhaas@broadinstitute.org
 
-RUN apt-get update && apt-get install -y gcc g++ perl python automake make \
+RUN apt-get update && apt-get install -y gcc g++ perl python3 automake make \
                                        wget curl libdb-dev \
 				       bzip2 zlibc zlib1g zlib1g-dev  default-jre \
                        python-setuptools python-dev build-essential \
@@ -35,32 +35,6 @@ RUN cpanm install URI::Escape
 RUN cpanm install Carp::Assert
 RUN cpanm install JSON::XS.pm
 
-
-######################
-## Tool installations:
-######################
-
-
-# blast
-WORKDIR $SRC
-RUN wget ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.5.0/ncbi-blast-2.5.0+-x64-linux.tar.gz && \
-    tar xvf ncbi-blast-2.5.0+-x64-linux.tar.gz && \
-        cp ncbi-blast-2.5.0+/bin/* $BIN && \
-            rm -r ncbi-blast-2.5.0+
-            
-
-
-## install hmmer for custom ctat genome lib construction
-WORKDIR $SRC
-RUN wget http://eddylab.org/software/hmmer3/3.1b2/hmmer-3.1b2-linux-intel-x86_64.tar.gz && \
-      tar zxvf hmmer-3.1b2-linux-intel-x86_64.tar.gz  && \
-      cd hmmer-3.1b2-linux-intel-x86_64 && \
-      cp binaries/* /usr/local/bin/
-
-
-
-
-
 ########
 # Samtools
 
@@ -79,7 +53,7 @@ RUN SAMTOOLS_URL="https://github.com/samtools/samtools/releases/download/${SAMTO
 ########
 # Trinity
 
-ENV TRINITY_VERSION=2.6.6
+ENV TRINITY_VERSION=2.8.4
 
 RUN TRINITY_URL="https://github.com/trinityrnaseq/trinityrnaseq/archive/Trinity-v${TRINITY_VERSION}.tar.gz" && \
    cd $SRC && \
@@ -118,7 +92,7 @@ RUN wget https://github.com/COMBINE-lab/salmon/releases/download/v0.9.1/Salmon-0
 ##############
 ## STAR
 
-ENV STAR_VERSION=2.6.1a
+ENV STAR_VERSION=2.7.0f
 RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" &&\
     wget -P $SRC $STAR_URL &&\
     tar -xvf $SRC/${STAR_VERSION}.tar.gz -C $SRC && \
