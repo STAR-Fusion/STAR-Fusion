@@ -114,12 +114,24 @@ RUN wget https://github.com/COMBINE-lab/salmon/releases/download/v0.9.1/Salmon-0
 
 
 
+
+##############
+## STAR
+
+ENV STAR_VERSION=2.6.1a
+RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" &&\
+    wget -P $SRC $STAR_URL &&\
+    tar -xvf $SRC/${STAR_VERSION}.tar.gz -C $SRC && \
+    mv $SRC/STAR-${STAR_VERSION}/bin/Linux_x86_64_static/STAR /usr/local/bin
+
+
+
 ###############
 ## STAR-Fusion:
 WORKDIR $SRC
 
-ENV STAR_FUSION_VERSION=1.5.0preA
-ENV STARF_CHECKOUT=1f673a1f7dae04229ae2cf0b5340b2e70c439b96
+ENV STAR_FUSION_VERSION=1.5.0
+ENV STARF_CHECKOUT=ef595ad
 
 
 RUN apt-get update && apt-get install -y git
@@ -134,14 +146,6 @@ ENV STAR_FUSION_HOME $SRC/STAR-Fusion
 ## FusionInspector and FusionAnnotator are bundled with STAR-Fusion
 
 
-##############
-## STAR
-
-ENV STAR_VERSION=2.6.1a
-RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" &&\
-    wget -P $SRC $STAR_URL &&\
-    tar -xvf $SRC/${STAR_VERSION}.tar.gz -C $SRC && \
-    mv $SRC/STAR-${STAR_VERSION}/bin/Linux_x86_64_static/STAR /usr/local/bin
 
 
 ########
