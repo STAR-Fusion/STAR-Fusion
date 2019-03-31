@@ -10,9 +10,16 @@ RUN apt-get update && apt-get install -y gcc g++ perl python3 automake make \
     apt-get clean
 
 
-RUN easy_install pip
 
-RUN pip install numpy
+RUN ln -sf /usr/bin/python3 /usr/bin/python
+
+RUN apt-get install -y python3-distutils
+
+RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
+    python get-pip.py
+
+
+RUN pip install numpy requests igv-reports
 
 
 RUN curl -L https://cpanmin.us | perl - App::cpanminus
@@ -52,6 +59,8 @@ RUN SAMTOOLS_URL="https://github.com/samtools/samtools/releases/download/${SAMTO
 
 ########
 # Trinity
+
+RUN apt-get install -y cmake
 
 ENV TRINITY_VERSION=2.8.4
 
@@ -131,4 +140,7 @@ RUN GMAP_URL="http://research-pub.gene.com/gmap/src/gmap-gsnap-$GMAP_VERSION.tar
     tar xvf gmap-gsnap-$GMAP_VERSION.tar.gz && \
     cd gmap-$GMAP_VERSION && ./configure && make && make install
 
+
+RUN apt-get clean && apt-get update && apt-get install -y locales
+RUN locale-gen en_US.UTF-8
 
