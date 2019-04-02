@@ -203,18 +203,30 @@ main: {
     my $filter_tab_writer = new DelimParser::Writer($filter_ofh, "\t", \@filter_col_headers);
     my $stage1_tab_writer = new DelimParser::Writer($stage1_ofh, "\t", \@column_headers);
         
-    @fusions = reverse sort {$a->{score} <=> $b->{score} } @fusions;
+    @fusions = reverse sort {$a->{score} <=> $b->{score}
+                             ||
+                                 $a->{brkptA} cmp $b->{brkptA}  # need deterministic ordering
+                             ||
+                                 $a->{brkptB} cmp $b->{brkptB} } @fusions;
     
     @fusions = &merge_neighboring_nonref_splice(\@fusions, $filter_tab_writer);
 
-    @fusions = reverse sort {$a->{score} <=> $b->{score} } @fusions;
-
-
+    @fusions = reverse sort {$a->{score} <=> $b->{score} 
+                             ||
+                                 $a->{brkptA} cmp $b->{brkptA}  # need deterministic ordering
+                             ||
+                                 $a->{brkptB} cmp $b->{brkptB} } @fusions;
+    
+    
     my %read_mapping_counts = &parse_read_mapping_counts($chimeric_out_junctions_file);
     
     &penalize_nondominant_fusion_multimap_reads(\@fusions, \%read_mapping_counts, $intermediates_out_prefix);
 
-    @fusions = reverse sort {$a->{score} <=> $b->{score} } @fusions;
+    @fusions = reverse sort {$a->{score} <=> $b->{score} 
+                             ||
+                                 $a->{brkptA} cmp $b->{brkptA} # need deterministic ordering
+                             ||
+                                 $a->{brkptB} cmp $b->{brkptB} } @fusions;
     
     @fusions = &remove_fusions_with_insufficient_support(\@fusions, $filter_tab_writer, 
                                                          $MIN_JUNCTION_READS, $MIN_SUM_FRAGS,
@@ -551,6 +563,7 @@ sub parse_read_mapping_counts {
     
     open(my $fh, $chimeric_junctions_file) or die "Error, cannot open file $chimeric_junctions_file";
     while (<$fh>) {
+        if (/^\#/) { next; }
         chomp;
         my @x = split(/\t/);
         my $read_name = $x[9];

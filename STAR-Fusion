@@ -12,6 +12,7 @@ use Process_cmd;
 
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
+
 my $VERSION = "1.6.0";
 #my $VERSION = "__BLEEDING_EDGE__ Do not use - pull versioned release from: https://github.com/STAR-Fusion/STAR-Fusion/releases";
 
@@ -625,7 +626,7 @@ main: {
         
         $cmd = "$BASEDIR/FusionFilter/util/filter_by_annotation_rules.pl --fusions $annotated_fusions_filename --genome_lib_dir $genome_lib_dir";
         $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/annot_filter.ok"));
-        $prelim_fusion_file = "$annotated_fusions_filename.pass";
+        $prelim_fusion_file = "$annotated_fusions_filename.annot_filter.pass";
     }
     
     
@@ -856,6 +857,8 @@ sub run_STAR {
     if ($left_fq_filename =~ /\.gz$/) {
         $cmd .= " --readFilesCommand 'gunzip -c' ";
     }
+
+    #$cmd .=  " --limitOutSJcollapsed 10000000 ";
     
     $pipeliner->add_commands(Command->new($cmd, "$checkpoints_dir/run_star_aligner.ok"));
     
@@ -978,6 +981,7 @@ sub check_compatible_STAR_version {
     my ($star_prog, $min_star_major_minor_aref) = @_;
 
     my $star_version_info = `$star_prog --version`;
+
     chomp $star_version_info;
 
     my @MIN_VERSION = @$min_star_major_minor_aref;
@@ -987,6 +991,7 @@ sub check_compatible_STAR_version {
     $errmsg .= "\tTo upgrade, obtain the latest STAR here: https://github.com/alexdobin/STAR/releases\n\n";
     
     if ($star_version_info =~ /^(\d+)\.(\d+)\.(\d+)([a-z]?)/) {
+
         my $major_ver = $1;
         my $minor_ver = $2;
         my $patch_ver = $3;

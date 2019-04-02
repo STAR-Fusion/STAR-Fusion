@@ -271,8 +271,12 @@ main: {
         
     # examining fusions based on the specific junction breakpoint, regardless of genes assigned to.
     
-    @fusion_candidates = reverse sort {$a->{score}<=>$b->{score}} @fusion_candidates;
-
+    @fusion_candidates = reverse sort {$a->{score}<=>$b->{score}
+                                       ||
+                                           $a->{left_coords} cmp $b->{left_coords}
+                                       ||
+                                           $a->{right_coords} cmp $b->{right_coords} } @fusion_candidates;
+    
 
     foreach my $fusion_candidate (@fusion_candidates) {
 
