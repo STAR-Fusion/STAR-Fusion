@@ -109,27 +109,6 @@ RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" 
 
 
 
-###############
-## STAR-Fusion:
-WORKDIR $SRC
-
-ENV STAR_FUSION_VERSION=1.6.0
-ENV STARF_CHECKOUT=01be74f581da353f2006323afd96d1a200119afc
-
-
-RUN apt-get update && apt-get install -y git
-
-RUN git clone https://github.com/STAR-Fusion/STAR-Fusion.git && \
-     cd STAR-Fusion && \
-     git checkout $STARF_CHECKOUT && \
-     git submodule init && git submodule update && \
-     make
-
-ENV STAR_FUSION_HOME $SRC/STAR-Fusion
-
-## FusionInspector and FusionAnnotator are bundled with STAR-Fusion
-
-
 ########
 # GMAP  (compile this last because this version unfortunately disrupts some headers in DL_LIBRARY_PATH)
 
@@ -143,4 +122,26 @@ RUN GMAP_URL="http://research-pub.gene.com/gmap/src/gmap-gsnap-$GMAP_VERSION.tar
 
 RUN apt-get clean && apt-get update && apt-get install -y locales
 RUN locale-gen en_US.UTF-8
+
+###############
+## STAR-Fusion:
+WORKDIR $SRC
+
+ENV STAR_FUSION_VERSION=1.6.0
+ENV STARF_CHECKOUT=5e26eee39fc59dd45e4a13403726790b14e9a6fc
+
+
+RUN apt-get update && apt-get install -y git
+
+RUN git clone https://github.com/STAR-Fusion/STAR-Fusion.git && \
+     cd STAR-Fusion && \
+     git checkout $STARF_CHECKOUT && \
+     git submodule init && git submodule update && \
+     cd FusionInspector && \
+     git submodule init && git submodule update
+
+ENV STAR_FUSION_HOME $SRC/STAR-Fusion
+
+## FusionInspector and FusionAnnotator are bundled with STAR-Fusion
+
 

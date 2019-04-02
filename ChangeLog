@@ -1,4 +1,12 @@
+STAR-Fusion Release v1.6.0, April 2, 2019
+	-requires min of STAR version 2.7.0f
+	-Annot filter retains cosmic and mitelman fusions even if found in the red herrings list
+	-updated CTAT genome libs and fusion annot lib, incorporates latest gtex, tcga, ccle results
+	-includes latest FusionInspector w/ igv-reports stand-alone dynamic html views
+	
+	
 
+	
 STAR-Fusion Release v1.5.0
 	-removed BBEmerge
 	-require min of STAR version 2.6.1
