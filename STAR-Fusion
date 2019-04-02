@@ -13,6 +13,7 @@ use Process_cmd;
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
 
+
 my $VERSION = "1.6.0";
 #my $VERSION = "__BLEEDING_EDGE__ Do not use - pull versioned release from: https://github.com/STAR-Fusion/STAR-Fusion/releases";
 
@@ -981,6 +982,7 @@ sub check_compatible_STAR_version {
     my ($star_prog, $min_star_major_minor_aref) = @_;
 
     my $star_version_info = `$star_prog --version`;
+
 
     chomp $star_version_info;
 
