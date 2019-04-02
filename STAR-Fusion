@@ -696,7 +696,7 @@ main: {
                 . " --min_junction_reads $MIN_JUNCTION_READS "
                 . " --min_novel_junction_support $MIN_NOVEL_JUNCTION_SUPPORT "
                 . " --min_spanning_frags_only $MIN_SPANNING_FRAGS_ONLY "
-                . " --prep_for_IGV "
+                . " --vis "
                 . " --max_promiscuity $MAX_PROMISCUITY "
                 . " --out_dir $FI_outdir "
                 . " --genome_lib_dir $genome_lib_dir "
