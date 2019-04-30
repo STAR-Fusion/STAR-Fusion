@@ -143,6 +143,7 @@ main: {
     foreach my $read_name (keys %data) {
         my @lines = @{$data{$read_name}};
 
+        ## see how often both read parts each match genes, vs. the other case where only one or no frag matches any gene.
         my $pct_paired_gene_mappings = &compute_pct_alns_mapping_to_gene_pairs(@lines);
 
         my @filter_reasons;
@@ -507,10 +508,9 @@ sub check_read_alignment_to_seq_similar_region {
     if (my $overlap_text = &any_coordsets_overlap($genome_coords_B_aref, $align_coords_B_aref)) {
         return("$left_gene_id/$right_gene_id seq_similar overlap on $right_gene_id: $overlap_text");
     }
-
-    
     
 }
+
 
 ####
 sub any_coordsets_overlap {
