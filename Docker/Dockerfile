@@ -1,8 +1,8 @@
-FROM ubuntu:16.04
+FROM ubuntu:18.04
 
 MAINTAINER bhaas@broadinstitute.org
 
-RUN apt-get update && apt-get install -y gcc g++ perl python automake make \
+RUN apt-get update && apt-get install -y gcc g++ perl python3 automake make \
                                        wget curl libdb-dev \
 				       bzip2 zlibc zlib1g zlib1g-dev  default-jre \
                        python-setuptools python-dev build-essential \
@@ -10,9 +10,16 @@ RUN apt-get update && apt-get install -y gcc g++ perl python automake make \
     apt-get clean
 
 
-RUN easy_install pip
 
-RUN pip install numpy
+RUN ln -sf /usr/bin/python3 /usr/bin/python
+
+RUN apt-get install -y python3-distutils
+
+RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
+    python get-pip.py
+
+
+RUN pip install numpy requests igv-reports
 
 
 RUN curl -L https://cpanmin.us | perl - App::cpanminus
@@ -35,32 +42,6 @@ RUN cpanm install URI::Escape
 RUN cpanm install Carp::Assert
 RUN cpanm install JSON::XS.pm
 
-
-######################
-## Tool installations:
-######################
-
-
-# blast
-WORKDIR $SRC
-RUN wget ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.5.0/ncbi-blast-2.5.0+-x64-linux.tar.gz && \
-    tar xvf ncbi-blast-2.5.0+-x64-linux.tar.gz && \
-        cp ncbi-blast-2.5.0+/bin/* $BIN && \
-            rm -r ncbi-blast-2.5.0+
-            
-
-
-## install hmmer for custom ctat genome lib construction
-WORKDIR $SRC
-RUN wget http://eddylab.org/software/hmmer3/3.1b2/hmmer-3.1b2-linux-intel-x86_64.tar.gz && \
-      tar zxvf hmmer-3.1b2-linux-intel-x86_64.tar.gz  && \
-      cd hmmer-3.1b2-linux-intel-x86_64 && \
-      cp binaries/* /usr/local/bin/
-
-
-
-
-
 ########
 # Samtools
 
@@ -79,7 +60,9 @@ RUN SAMTOOLS_URL="https://github.com/samtools/samtools/releases/download/${SAMTO
 ########
 # Trinity
 
-ENV TRINITY_VERSION=2.6.6
+RUN apt-get install -y cmake
+
+ENV TRINITY_VERSION=2.8.4
 
 RUN TRINITY_URL="https://github.com/trinityrnaseq/trinityrnaseq/archive/Trinity-v${TRINITY_VERSION}.tar.gz" && \
    cd $SRC && \
@@ -114,34 +97,16 @@ RUN wget https://github.com/COMBINE-lab/salmon/releases/download/v0.9.1/Salmon-0
 
 
 
-###############
-## STAR-Fusion:
-WORKDIR $SRC
-
-ENV STAR_FUSION_VERSION=1.5.0preA
-ENV STARF_CHECKOUT=1f673a1f7dae04229ae2cf0b5340b2e70c439b96
-
-
-RUN apt-get update && apt-get install -y git
-
-RUN git clone --recursive https://github.com/STAR-Fusion/STAR-Fusion.git && \
-     cd STAR-Fusion && \
-     git checkout $STARF_CHECKOUT && \
-     make
-
-ENV STAR_FUSION_HOME $SRC/STAR-Fusion
-
-## FusionInspector and FusionAnnotator are bundled with STAR-Fusion
-
 
 ##############
 ## STAR
 
-ENV STAR_VERSION=2.6.1a
+ENV STAR_VERSION=2.7.0f
 RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" &&\
     wget -P $SRC $STAR_URL &&\
     tar -xvf $SRC/${STAR_VERSION}.tar.gz -C $SRC && \
     mv $SRC/STAR-${STAR_VERSION}/bin/Linux_x86_64_static/STAR /usr/local/bin
+
 
 
 ########
@@ -153,5 +118,30 @@ RUN GMAP_URL="http://research-pub.gene.com/gmap/src/gmap-gsnap-$GMAP_VERSION.tar
     wget $GMAP_URL && \
     tar xvf gmap-gsnap-$GMAP_VERSION.tar.gz && \
     cd gmap-$GMAP_VERSION && ./configure && make && make install
+
+
+RUN apt-get clean && apt-get update && apt-get install -y locales
+RUN locale-gen en_US.UTF-8
+
+###############
+## STAR-Fusion:
+WORKDIR $SRC
+
+ENV STAR_FUSION_VERSION=1.6.0
+ENV STARF_CHECKOUT=c465cf33d111121f6be127483379bebd2f866fbd
+
+
+RUN apt-get update && apt-get install -y git
+
+RUN git clone https://github.com/STAR-Fusion/STAR-Fusion.git && \
+     cd STAR-Fusion && \
+     git checkout $STARF_CHECKOUT && \
+     git submodule init && git submodule update && \
+     cd FusionInspector && \
+     git submodule init && git submodule update
+
+ENV STAR_FUSION_HOME $SRC/STAR-Fusion
+
+## FusionInspector and FusionAnnotator are bundled with STAR-Fusion
 
 

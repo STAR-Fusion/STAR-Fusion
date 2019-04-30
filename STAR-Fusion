@@ -12,10 +12,12 @@ use Process_cmd;
 
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
-#my $VERSION = "1.5.0";
-my $VERSION = "__BLEEDING_EDGE__ Do not use - pull versioned release from: https://github.com/STAR-Fusion/STAR-Fusion/releases";
 
-my @MIN_STAR_MAJOR_MINOR_VERSION = (2, 7, 0);
+
+my $VERSION = "1.6.0";
+#my $VERSION = "__BLEEDING_EDGE__ Do not use - pull versioned release from: https://github.com/STAR-Fusion/STAR-Fusion/releases";
+
+my @MIN_STAR_MAJOR_MINOR_VERSION = (2, 7, 0, 'f');
 
 
 my $BASEDIR = "$FindBin::Bin";
@@ -980,20 +982,30 @@ sub check_compatible_STAR_version {
     my ($star_prog, $min_star_major_minor_aref) = @_;
 
     my $star_version_info = `$star_prog --version`;
+
+
+    chomp $star_version_info;
+
+    my @MIN_VERSION = @$min_star_major_minor_aref;
+    my $min_letter = pop @MIN_VERSION;
     
-    my $errmsg = "\n\n\tSorry, version [$star_version_info] is not supported. Please use at least STAR version " . join(".", @$min_star_major_minor_aref) . "\n";
+    my $errmsg = "\n\n\tSorry, version [$star_version_info] is not supported. Please use at least STAR version " . join(".", @MIN_VERSION) . "$min_letter\n";
     $errmsg .= "\tTo upgrade, obtain the latest STAR here: https://github.com/alexdobin/STAR/releases\n\n";
     
-    if ($star_version_info =~ /(\d+)\.(\d+)\.(\d+)/) {
+    if ($star_version_info =~ /^(\d+)\.(\d+)\.(\d+)([a-z]?)/) {
+
         my $major_ver = $1;
         my $minor_ver = $2;
         my $patch_ver = $3;
-
+        my $letter_ver = $4;
+        
         if ($major_ver < $min_star_major_minor_aref->[0] 
             || 
             ($major_ver == $min_star_major_minor_aref->[0] && $minor_ver < $min_star_major_minor_aref->[1])
             ||
             ($major_ver == $min_star_major_minor_aref->[0] && $minor_ver == $min_star_major_minor_aref->[1] && $patch_ver < $min_star_major_minor_aref->[2])
+            ||
+            ($major_ver == $min_star_major_minor_aref->[0] && $minor_ver == $min_star_major_minor_aref->[1] && $patch_ver == $min_star_major_minor_aref->[2] && ord($letter_ver) < ord($min_star_major_minor_aref->[3]))
             ) {
             
             print STDERR $errmsg;
@@ -1022,7 +1034,8 @@ sub get_num_total_rnaseq_frags {
         return($1);
     }
     else {
-        confess "Error, file: $chimeric_out_junctions_file doesn't have expected formatting.  Please be sure to use the STAR aligner with min version: " . join(".", @MIN_STAR_MAJOR_MINOR_VERSION);
+        my $v_letter = pop @MIN_STAR_MAJOR_MINOR_VERSION;
+        confess "Error, file: $chimeric_out_junctions_file doesn't have expected formatting.  Please be sure to use the STAR aligner with min version: " . join(".", @MIN_STAR_MAJOR_MINOR_VERSION) . $v_letter;
     }
 }
 
