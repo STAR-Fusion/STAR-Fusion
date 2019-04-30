@@ -15,21 +15,114 @@ my $star_fusion_outdir = $ARGV[1] or die $usage;
  main: {
      
      my %audit;
-
-     &count_pre_blast_filt("$star_fusion_outdir/star-fusion.preliminary/star-fusion.filter.intermediates_dir/star-fusion.pre_blast_filter.filt_info", \%audit);
+     
+     &count_red_herrings("$star_fusion_outdir/star-fusion.preliminary/star-fusion.fusion_candidates.preliminary.wSpliceInfo.wAnnot.annot_filt", \%audit);
      
      &get_total_reads($chimJ_file, \%audit);
      
      &audit_failed_read_alignments("$star_fusion_outdir/star-fusion.preliminary/star-fusion.junction_breakpts_to_genes.txt.fail", \%audit);
      
      &count_prelim_fusions("$star_fusion_outdir/star-fusion.preliminary/star-fusion.fusion_candidates.preliminary", \%audit);
+     
+     
+     ## applied basic filtering criteria (ie. min support)
+     
+     &count_pre_blast_filt("$star_fusion_outdir/star-fusion.preliminary/star-fusion.filter.intermediates_dir/star-fusion.pre_blast_filter.filt_info", \%audit);
+
+
+     &count_blast_filt("$star_fusion_outdir/star-fusion.preliminary/star-fusion.filter.intermediates_dir/star-fusion.pre_blast_filter.post_blast_filter.info", \%audit);
 
      
+     &count_promiscuous_filt("$star_fusion_outdir/star-fusion.preliminary/star-fusion.filter.intermediates_dir/star-fusion.pre_blast_filter.post_blast_filter.post_promisc_filter.info", \%audit);
+
      
      print Dumper(\%audit);
      
      
 }
+
+
+
+####
+sub count_red_herrings {
+    my ($file, $audit_href) = @_;
+    
+    print STDERR "count_red_herrings() - parsing $file\n";
+    
+    my %fusions;
+    
+    open(my $fh, $file) or confess "Error, cannot open file: $file";
+    my $header = <$fh>;
+    while(<$fh>) {
+        my @x = split(/\t/);
+        my $fusion = $x[0];
+        $fusions{$fusion}++;
+    }
+    close $fh;
+
+    my $num_fusions = scalar(keys %fusions);
+    
+    $audit_href->{"red_herrings_filt"} = $num_fusions;
+    
+    return;
+}
+
+
+####
+sub count_promiscuous_filt {
+    my ($file, $audit_href) = @_;
+    
+    print STDERR "count_promiscuous_filt() - parsing $file\n";
+    
+    my %fusions;
+    
+    open(my $fh, $file) or confess "Error, cannot open file: $file";
+    my $header = <$fh>;
+    while(<$fh>) {
+        chomp;
+        if (/^\#(\S+)/) {
+            my $fusion_name = $1;
+            $fusions{$fusion_name}++;
+        }
+    }
+    close $fh;
+
+    my $num_fusions = scalar(keys %fusions);
+
+    $audit_href->{"promisc_filt"} = $num_fusions;
+    
+    return;
+}
+    
+
+
+####
+sub count_blast_filt {
+    my ($file, $audit_href) = @_;
+
+    print STDERR "count_blast_filt() - parsing $file\n";
+    
+    my %fusions;
+    
+    open(my $fh, $file) or confess "Error, cannot open file: $file";
+    my $header = <$fh>;
+    while(<$fh>) {
+        chomp;
+        if (/^\#(\S+)/) {
+            my $fusion_name = $1;
+            $fusions{$fusion_name}++;
+        }
+    }
+    close $fh;
+
+    my $num_fusions = scalar(keys %fusions);
+
+    $audit_href->{"blast_filt"} = $num_fusions;
+
+    return;
+}
+    
+
 
 ####
 sub count_prelim_fusions {
