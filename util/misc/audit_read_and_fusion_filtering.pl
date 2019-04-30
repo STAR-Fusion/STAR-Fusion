@@ -11,13 +11,10 @@ my $chimJ_file = $ARGV[0] or die $usage;
 my $star_fusion_outdir = $ARGV[1] or die $usage;
 
 
-
- main: {
+main: {
      
      my %audit;
-     
-     &count_red_herrings("$star_fusion_outdir/star-fusion.preliminary/star-fusion.fusion_candidates.preliminary.wSpliceInfo.wAnnot.annot_filt", \%audit);
-     
+               
      &get_total_reads($chimJ_file, \%audit);
      
      &audit_failed_read_alignments("$star_fusion_outdir/star-fusion.preliminary/star-fusion.junction_breakpts_to_genes.txt.fail", \%audit);
@@ -26,21 +23,129 @@ my $star_fusion_outdir = $ARGV[1] or die $usage;
      
      
      ## applied basic filtering criteria (ie. min support)
-     
      &count_pre_blast_filt("$star_fusion_outdir/star-fusion.preliminary/star-fusion.filter.intermediates_dir/star-fusion.pre_blast_filter.filt_info", \%audit);
 
-
+     
+     ## remove those that are lesser scored paralogs of fusion partners
      &count_blast_filt("$star_fusion_outdir/star-fusion.preliminary/star-fusion.filter.intermediates_dir/star-fusion.pre_blast_filter.post_blast_filter.info", \%audit);
 
      
      &count_promiscuous_filt("$star_fusion_outdir/star-fusion.preliminary/star-fusion.filter.intermediates_dir/star-fusion.pre_blast_filter.post_blast_filter.post_promisc_filter.info", \%audit);
 
+
+     &count_red_herrings("$star_fusion_outdir/star-fusion.preliminary/star-fusion.fusion_candidates.preliminary.wSpliceInfo.wAnnot.annot_filt", \%audit);
+
+     &count_FFPM_filtered("$star_fusion_outdir/star-fusion.preliminary/star-fusion.fusion_candidates.preliminary.wSpliceInfo.wAnnot.pass",
+                          "$star_fusion_outdir/star-fusion.preliminary/star-fusion.fusion_candidates.preliminary.wSpliceInfo.wAnnot.pass.minFFPM.0.1.pass",
+                          \%audit);
      
-     print Dumper(\%audit);
      
+
+
+     my $report = "";
+     
+     ## starting read counts:
+     # 'Nreads' => '21430514',
+     # 'NreadsUnique' => '17249407',
+     # 'NreadsMulti' => '1094325',
+
+     $report .= "# Read Counts\n"
+         . "Nreads:\t" . $audit{'Nreads'} . "\n"
+         . "NreadsUnique:\t" . $audit{'NreadsUnique'} . "\n"
+         . "NreadsMulti:\t" . $audit{'NreadsMulti'} . "\n"
+         . "\n";
+         
+     ## Read filtering 
+     # 'read_fail__no_gene_anchors' => 1087355,
+     # 'read_fail__selfie_or_homology' => 145793,
+     # 'read_fail__discarded_multimap_deficient_anchors' => 53221,
+     # 'read_fail__multimap_homology_congruence_fail' => 6523,
+
+     $report .= "# read filtering\n"
+         . "no anchors:\t" . $audit{'read_fail__no_gene_anchors'} . "\n"
+         . "selfie or homolog:\t" . $audit{'read_fail__selfie_or_homology'} . "\n"
+         . "multimap deficient anchors:\t" . $audit{'read_fail__discarded_multimap_deficient_anchors'} . "\n"
+         . "multimap homology congruence:\t" . $audit{'read_fail__multimap_homology_congruence_fail'} . "\n"
+         . "\n";
+
+     ## initial fusion candidates:
+     # 'prelim_fusion_count' => 131313,
+
+     $report .= "# initial fusion candidates\n"
+         . "prelim fusion count:\t" . $audit{'prelim_fusion_count'} . "\n"
+         . "\n";
+     
+     ## Basic filtering applied.
+     # 'pre_blast::insuf_sum_support' => 125407,
+     # 'pre_blast::insuf_novel_junc_support' => 5789,
+     # 'pre_blast::no_junction_support' => 4377,
+     # 'pre_blast::no_span_no_LDAS' => 40,
+     # 'pre_blast::low_pct_isoform' => 1
+
+     $report .= "# basic filtering criteria applied.\n"
+         . "insufficient sum support:\t" . $audit{'pre_blast::insuf_sum_support'} . "\n"
+         . "insufficient novel junction support:\t" . $audit{'pre_blast::insuf_novel_junc_support'} . "\n"
+         . "no junction support:\t" . $audit{'pre_blast::no_junction_support'} . "\n"
+         . "no span, no LDAS:\t" . $audit{'pre_blast::no_span_no_LDAS'} . "\n"
+         . "low pct isoform:\t" . $audit{'pre_blast::low_pct_isoform'} . "\n"
+         . "\n";
+     
+
+
+     $report .= "# Final feature filters.\n"
+         ## blast filter   A--B exists, removing C--B where A,C are paralogs and score(C--B) < score(A--B) 
+         # 'blast_filt' => 27,
+         
+         . "blast paralog filter:\t" . $audit{'blast_filt'} . "\n"
+         
+         ## promiscuity filter
+         # 'promisc_filt' => 4, 
+         . "promiscuity filter:\t" . $audit{'promisc_filt'} . "\n"
+         
+         ## red herring annotation filter:
+         ## 'red_herrings_filt' => 27,
+         . "red herrings filter:\t" . $audit{'red_herrings_filt'} . "\n"
+     
+         ## final expression filter
+         # 'FFPM_filt' => 5,
+         . "FFPM filter:\t" . $audit{'FFPM_filt'} . "\n"
+
+         . "\n";
+
+
+     print $report;
      
 }
 
+####
+sub count_FFPM_filtered {
+    my ($file_before, $file_after, $audit_href) = @_;
+        
+    my $count_sub = sub {
+        my ($file) = @_;
+
+        print STDERR "count_FFPM_filtered() - parsing $file\n";
+        
+        open(my $fh, $file) or confess "Error, cannot open file: $file";
+        my $header = <$fh>;
+        my %fusions;
+        while(<$fh>) {
+            my @x = split(/\t/);
+            my $fusion = $x[0];
+            $fusions{$fusion}++;
+        }
+        close $fh;
+
+        return(scalar(keys %fusions));
+    };
+
+    my $count_before = &$count_sub($file_before);
+    my $count_after = &$count_sub($file_after);
+
+    $audit_href->{FFPM_filt} = ($count_before - $count_after);
+
+    return;
+}
 
 
 ####
