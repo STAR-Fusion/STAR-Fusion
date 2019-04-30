@@ -16,11 +16,15 @@ my $star_fusion_outdir = $ARGV[1] or die $usage;
      
      my %audit;
 
+     &count_pre_blast_filt("$star_fusion_outdir/star-fusion.preliminary/star-fusion.filter.intermediates_dir/star-fusion.pre_blast_filter.filt_info", \%audit);
+     
      &get_total_reads($chimJ_file, \%audit);
      
      &audit_failed_read_alignments("$star_fusion_outdir/star-fusion.preliminary/star-fusion.junction_breakpts_to_genes.txt.fail", \%audit);
      
      &count_prelim_fusions("$star_fusion_outdir/star-fusion.preliminary/star-fusion.fusion_candidates.preliminary", \%audit);
+
+     
      
      print Dumper(\%audit);
      
@@ -102,4 +106,50 @@ sub audit_failed_read_alignments {
     return;
 }
 
+####
+sub count_pre_blast_filt {
+    my ($file, $audit_href) = @_;
 
+    print STDERR "count_pre_blast_filt() - parsing $file\n";
+
+    my %seen;
+    
+    open(my $fh, $file) or die "Error, cannot open file: $file";
+    my $header = <$fh>;
+    while(<$fh>) {
+        unless (/^\#/) { next; } # only examining filtered ones. 
+        chomp;
+        my @x = split(/\t/);
+        my $fusion = $x[0];
+        
+        if ($seen{$fusion}) { next; }
+        
+        my $reason = $x[11];
+        if ($reason eq 'Merged') { next; }
+
+        my $token;
+        
+        if ($reason =~ /FILTERED DUE TO .*novel.* junction support/) {
+            $token = "insuf_novel_junc_support";
+        }
+        elsif ($reason =~ /FILTERED DUE TO junction read support/) {
+            $token = "no_junction_support";
+        }
+        elsif (/no spanning reads and no long double anchor support at breakpoint/) {
+            $token = "no_span_no_LDAS";
+        }
+        elsif (/FILTERED DUE TO sum_support/) {
+            $token = "insuf_sum_support";
+        }
+        elsif (/FILTERED DUE TO ONLY .* % of dominant isoform support/) {
+            $token = "low_pct_isoform";
+        }
+        else {
+            confess " error, not recognizing reasoning here: $reason ";
+        }
+        
+        $audit_href->{"pre_blast::$token"}++;
+    }
+            
+    return;
+}
