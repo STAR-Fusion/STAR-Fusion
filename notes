@@ -1,1 +1,21 @@
 git clone https://github.com/STAR-Fusion/STAR-Fusion.git --recursive
+
+
+
+testing and release prep:
+
+	check devel / master submodule commit hashes
+
+	ctat_testing_repo for starF and FI
+
+   	FI internal test
+   	FI docker test
+
+	starF internal test
+    starF docker test
+
+	ev_capture starF, FI
+
+	starF singularity sims and ccle tests
+
+

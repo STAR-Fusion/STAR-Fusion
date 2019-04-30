@@ -24,8 +24,6 @@ my $help_flag;
 my $genome_lib_dir;
 
 
-my $LONG_ANCHOR_SIZE = 25;
-
 my $usage = <<__EOUSAGE__;
 
 ###################################################################################
