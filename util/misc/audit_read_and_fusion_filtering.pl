@@ -35,8 +35,12 @@ main: {
      my %audit;
                
      &get_total_reads($chimJ_file, \%audit);
+
+     &audit_chimeric_alignments($chimJ_file, \%audit, "total_chim_reads");
      
      &audit_failed_read_alignments("$star_fusion_outdir/star-fusion.preliminary/star-fusion.junction_breakpts_to_genes.txt.fail", \%audit);
+
+     &audit_chimeric_alignments("$star_fusion_outdir/star-fusion.preliminary/star-fusion.junction_breakpts_to_genes.txt.pass", \%audit, "chim_reads_passed");
      
      &count_prelim_fusions("$star_fusion_outdir/star-fusion.preliminary/star-fusion.fusion_candidates.preliminary", \%audit);
      
@@ -68,6 +72,11 @@ main: {
      
      my $total_final_fusions = &$count_sub("$star_fusion_outdir/star-fusion.fusion_predictions.abridged.tsv");
      
+
+     ##########
+     ## Reporting
+     #############
+
      
      my $report = "";
      
@@ -76,18 +85,26 @@ main: {
      # 'NreadsUnique' => '17249407',
      # 'NreadsMulti' => '1094325',
 
+     my $num_mapped_reads = $audit{'NreadsUnique'} + $audit{'NreadsMulti'};
+     
      $report .= "# Read Counts\n"
          . "Nreads:\t" . $audit{'Nreads'} . "\n"
          . "NreadsUnique:\t" . $audit{'NreadsUnique'} . "\n"
          . "NreadsMulti:\t" . $audit{'NreadsMulti'} . "\n"
          . "\n";
-         
+     
+     $report .= "pct reads mapped:\t" . sprintf("%.2f", $num_mapped_reads / $audit{'Nreads'} * 100) . "\n\n";
+     
+     $report .= "chimeric read count:\t" . $audit{'total_chim_reads'} . "\t" . sprintf("%.2f", $audit{'total_chim_reads'} / $num_mapped_reads * 100) . " \n\n";
+     
      ## Read filtering 
      # 'read_fail__no_gene_anchors' => 1087355,
      # 'read_fail__selfie_or_homology' => 145793,
      # 'read_fail__discarded_multimap_deficient_anchors' => 53221,
      # 'read_fail__multimap_homology_congruence_fail' => 6523,
 
+     
+     
      $report .= "# read filtering\n"
          . "no anchors:\t" . $audit{'read_fail__no_gene_anchors'} . "\n"
          . "selfie or homolog:\t" . $audit{'read_fail__selfie_or_homology'} . "\n"
@@ -95,6 +112,8 @@ main: {
          . "multimap homology congruence:\t" . $audit{'read_fail__multimap_homology_congruence_fail'} . "\n"
          . "\n";
 
+     $report .= "chimeric reads passed:\t" . $audit{'chim_reads_passed'} . "\t = " . sprintf("%.2f", $audit{'chim_reads_passed'} / $audit{'total_chim_reads'} * 100) . "\n";
+     
      ## initial fusion candidates:
      # 'prelim_fusion_count' => 131313,
 
@@ -295,6 +314,35 @@ sub get_total_reads {
     
     return;
 }
+####
+sub audit_chimeric_alignments {
+    my ($chimJ_file, $audit_href, $token) = @_;
+
+    print STDERR "audit_chimeric_alignments() - parsing $chimJ_file\n";
+
+    my $count = 0;
+    
+    open(my $fh, $chimJ_file) or die $!;
+    my $prev_read = "";
+    while(<$fh>) {
+        unless (/\w/) { next; }
+        if (/^\#/) { next; }
+        my @x = split(/\t/);
+        my $read_name = $x[9];
+        if ($read_name ne $prev_read) {
+            $count++;
+        }
+        $prev_read = $read_name;
+    }
+    close $fh;
+
+    $audit_href->{$token} = $count;
+
+    return;
+    
+}
+
+
 
 ####
 sub audit_failed_read_alignments {
