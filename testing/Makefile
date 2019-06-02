@@ -50,27 +50,27 @@ kickstart_FI_inspect: kickstart_coding_effect
 #### Full mode, starting from reads
 
 standard_denovo_reconstruct: standard
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --denovo_reconstruct --FusionInspector validate --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir  --STAR_use_shared_memory 
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --denovo_reconstruct --FusionInspector validate --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir  
 
 standard_coding_effect: standard
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --FusionInspector validate --examine_coding_effect --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir  --STAR_use_shared_memory 
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --FusionInspector validate --examine_coding_effect --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir  
 
 
 ####################
 ## use samples file:
 
 samples_PE:
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB} --samples_file data/samples.txt  -O star_fusion_samplesPE_outdir  --STAR_use_shared_memory 
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB} --samples_file data/samples.txt  -O star_fusion_samplesPE_outdir  
 
 
 samples_PE_FI: samples_PE_FI_inspect samples_PE_FI_validate
 
 
 samples_PE_FI_inspect: samples_PE
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB} --samples_file data/samples.txt  -O star_fusion_samplesPE_outdir  --STAR_use_shared_memory --FusionInspector inspect
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB} --samples_file data/samples.txt  -O star_fusion_samplesPE_outdir  --FusionInspector inspect
 
 samples_PE_FI_validate: samples_PE
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB} --samples_file data/samples.txt  -O star_fusion_samplesPE_outdir  --STAR_use_shared_memory --FusionInspector validate
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB} --samples_file data/samples.txt  -O star_fusion_samplesPE_outdir  --FusionInspector validate
 
 
 
@@ -80,10 +80,10 @@ samples_PE_FI_validate: samples_PE
 #### Single-end reads instead of pairs
 
 standard_SE:
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --FusionInspector inspect --examine_coding_effect --left_fq ${left_fq} -O star_fusion_SE_outdir  --STAR_use_shared_memory 
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --FusionInspector inspect --examine_coding_effect --left_fq ${left_fq} -O star_fusion_SE_outdir  
 
 kickstart_SE:
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB} -J __kickstart_data/Chimeric.out.junction  --FusionInspector inspect --examine_coding_effect --left_fq ${left_fq} -O star_fusion_SE_outdir_kickstart  --STAR_use_shared_memory 
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB} -J __kickstart_data/Chimeric.out.junction  --FusionInspector inspect --examine_coding_effect --left_fq ${left_fq} -O star_fusion_SE_outdir_kickstart  
 
 
 
