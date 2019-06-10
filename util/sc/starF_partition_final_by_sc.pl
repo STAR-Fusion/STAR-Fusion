@@ -54,6 +54,8 @@ main: {
             
             $cellrow{SpanningFragCount} = $cell_spanning_frags_count;
             $cellrow{SpanningFrags} = $cell_spanning_frags_string;
+
+            $cellrow{FFPM} = "NA"; # dont have the per cell read counts here.
             
             $delim_writer->write_row(\%cellrow);
             
@@ -81,10 +83,11 @@ sub partition_by_cell {
     my @reads = split(/,/, $reads_string);
 
     foreach my $read (@reads) {
-        my ($cell, $rest) = split(/\^/, $read);
+        my ($cell, $rest) = split(/\@/, $read);
+        $cell =~ s/^\&//;
         $cell_to_reads{$cell}->{$read} = 1;
     }
-
+    
     return(%cell_to_reads);
 }
 

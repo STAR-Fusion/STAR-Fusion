@@ -645,6 +645,19 @@ main: {
     # generate final fusion prediction output files:
     my $final_output_fusions = "$out_prefix.fusion_predictions.tsv";
     $pipeliner->add_commands(new Command("cp $prelim_fusion_file $final_output_fusions", "$checkpoints_dir/cp_final.ok"));
+
+
+    ## if samples file for sc, separate by cell:
+    if ($samples_file) {
+        $pipeliner->add_commands(new Command("$UTILDIR/sc/starF_partition_final_by_sc.pl $final_output_fusions > $final_output_fusions.samples_deconvolved.tsv",
+                                             "$checkpoints_dir/samples_deconvolved.ok") );
+
+        ## make abridged version.
+        $pipeliner->add_commands(new Command("$UTILDIR/column_exclusions.pl $final_output_fusions.samples_deconvolved.tsv JunctionReads,SpanningFrags > $final_output_fusions.samples_deconvolved.abridged.tsv",
+                                             "$checkpoints_dir/samples_deconvolved.abridged.ok") );
+        
+    }
+    
     
     ## make abridged versions:
     my $abridged_final_output = $final_output_fusions;
@@ -859,6 +872,8 @@ sub run_STAR {
         $cmd .= " --readFilesCommand 'gunzip -c' ";
     }
 
+    $cmd .= " --quantMode GeneCounts";
+    
     #$cmd .=  " --limitOutSJcollapsed 10000000 ";
     
     $pipeliner->add_commands(Command->new($cmd, "$checkpoints_dir/run_star_aligner.ok"));
