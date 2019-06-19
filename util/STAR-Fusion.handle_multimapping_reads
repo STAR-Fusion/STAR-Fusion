@@ -23,6 +23,7 @@ my $UTILDIR = "$FindBin::Bin/util";
 ## Options
 my $chimeric_junction_file;
 my $help_flag;
+my $min_pct_multimapping_to_genes = 50;
 my $MIN_MM_HOMOLOGY_CONGRUENCE = 50;
 my $MAX_PCT_LOCUS_OVERLAP = 50;
 
@@ -51,6 +52,11 @@ Removes chimeric reads that have the following properties:
 #    --filt_file <string>                 file to write the problematic reads to (those removed).
 #                                         The primary output (passing reads) is to stdout.
 #
+# Optional:
+#
+#    --min_pct_MM_nonspecific|M <int>     min pct of multimapping reads that should map to 2 genes
+#                                         (avoids multimapping reads that lack specificity)
+#                                           value must be between [1,100] (default: $min_pct_multimapping_to_genes)
 ###################################################################################################
 
 
@@ -66,6 +72,7 @@ my $filt_file;
 &GetOptions ( 'h' => \$help_flag,
               
               'annotated_junctions|J=s' => \$chimeric_junction_file,
+              'min_pct_MM_nonspecific|M=i' => \$min_pct_multimapping_to_genes,
               'filt_file=s' => \$filt_file,
               'genome_lib_dir=s' => \$genome_lib_dir,
               'd' => \$DEBUG,
@@ -76,6 +83,10 @@ if ($help_flag) {
     die $usage;
 }
 unless ($chimeric_junction_file && $genome_lib_dir && $filt_file && $genome_lib_dir) {
+    die $usage;
+}
+
+unless ($min_pct_multimapping_to_genes >= 1 && $min_pct_multimapping_to_genes <= 100) {
     die $usage;
 }
 
@@ -136,10 +147,14 @@ main: {
 
         my @filter_reasons;
 
-        if (my $selfie = &contains_selfie_or_homology_match(@lines)) {
+        if ($pct_paired_gene_mappings <= $min_pct_multimapping_to_genes) {
+            push (@filter_reasons, "only Pct (" . sprintf("%.2f", $pct_paired_gene_mappings) . "%) of alignments had paired gene anchors");
+        }
+        
+        elsif (my $selfie = &contains_selfie_or_homology_match(@lines)) {
             push (@filter_reasons, "Contains selfie or homology match ($selfie).");
         }
-                
+        
         else {
             my ($left_homology_congruence, $right_homology_congruence) = &compute_pct_homology_congruence(@lines);
 
