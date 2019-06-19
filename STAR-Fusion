@@ -54,13 +54,11 @@ my $STAR_peOverlapMMp = 0.1; # the max proportion of mismatches in the overlap
 
 
 my $STAR_chimMultimapScoreRange = 10;
-my $STAR_chimMultimapNmax = 10; 
+my $STAR_chimMultimapNmax = 20; 
 my $STAR_chimNonchimScoreDropMin = 10;
 
 
 my $STAR_MAX_MATE_DIST = 100000;
-
-my $MIN_PCT_MM_NONSPECIFIC = 50;
 
 
 my $STAR_SortedByCoordinate = 0;
@@ -158,10 +156,6 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 # Chimeric read filtering parameters:
 #
 #  
-#    --min_pct_MM_nonspecific|M <int>     min pct of multimapping reads that should map to 2 genes
-#                                         (avoids multimapping reads that lack specificity)
-#                                           value must be between [1,100] (default: $MIN_PCT_MM_NONSPECIFIC)
-#    
 # Fusion transcript filtering:
 #
 #    --no_filter                           do not filter predictions. (stops execution prior to the filtering stage).
@@ -541,7 +535,6 @@ main: {
     $cmd = "$UTILDIR/STAR-Fusion.handle_multimapping_reads "
         . " -J $preliminary_outdir/star-fusion.junction_breakpts_to_genes.txt "
         . " --genome_lib_dir $genome_lib_dir "
-        . " -M $MIN_PCT_MM_NONSPECIFIC "
         . " --filt_file $preliminary_outdir/star-fusion.junction_breakpts_to_genes.txt.fail "
         . " > $preliminary_outdir/star-fusion.junction_breakpts_to_genes.txt.pass ";
     
