@@ -126,6 +126,7 @@ main: {
         print STDERR "-parsing $chimeric_junction_file, organizing read mapping info.\n";
         open(my $fh, $chimeric_junction_file) or die "Error, cannot open file: $chimeric_junction_file";
         while (<$fh>) {
+            if (/^\#/) { next; } 
             my $line = $_;
             chomp;
             my @x = split(/\t/);
@@ -157,7 +158,7 @@ main: {
         
         else {
             my ($left_homology_congruence, $right_homology_congruence) = &compute_pct_homology_congruence(@lines);
-
+            
             if ($left_homology_congruence < $MIN_MM_HOMOLOGY_CONGRUENCE
                 ||
                 $right_homology_congruence < $MIN_MM_HOMOLOGY_CONGRUENCE) {
@@ -282,9 +283,10 @@ sub contains_selfie_or_homology_match {
                     return($left_gene_id);
                 }
                 
-                if (my $homology_hit = &examine_seq_similarity($left_gene_id, $right_gene_id)) {
-                    return("blast_pair: $left_gene_id vs. $right_gene_id : $homology_hit");
-                }
+                
+                #if (my $homology_hit = &examine_seq_similarity($left_gene_id, $right_gene_id)) {
+                #    return("blast_pair: $left_gene_id vs. $right_gene_id : $homology_hit");
+                #}   ## turning off simple homology check. It's not specific enough to use at this stage.
                 
                 
                 # maybe not the same gene id, but both parts are effectively matching the same genomic locus (aka gene).
