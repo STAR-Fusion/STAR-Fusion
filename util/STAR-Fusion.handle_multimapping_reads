@@ -117,28 +117,46 @@ else {
 
 my $JSON_DECODER = JSON::XS->new();
 
+my %data;
+open(my $fh, $chimeric_junction_file) or die "Error, cannot open file: $chimeric_junction_file";
+open(my $ofh_filt, ">$filt_file") or die "Error, cannot write to $filt_file";
+
+
 main: {
     
+    print STDERR "-parsing $chimeric_junction_file, organizing read mapping info.\n";
 
-    my %data;
-
-    {
-        print STDERR "-parsing $chimeric_junction_file, organizing read mapping info.\n";
-        open(my $fh, $chimeric_junction_file) or die "Error, cannot open file: $chimeric_junction_file";
-        while (<$fh>) {
-            if (/^\#/) { next; } 
-            my $line = $_;
-            chomp;
-            my @x = split(/\t/);
-            my $read_name = $x[9];
-            
-            push (@{$data{$read_name}}, $line);
+    my $prev_read_name = "";
+    while (<$fh>) {
+        if (/^\#/) { next; } 
+        my $line = $_;
+        chomp;
+        my @x = split(/\t/);
+        my $read_name = $x[9];
+        
+        if ($read_name ne $read_name) {
+            if (%data) {
+                &examine_reads();
+                %data = ();
+            }
         }
-        close $fh;
+        push (@{$data{$read_name}}, $line);
     }
-
-    open(my $ofh_filt, ">$filt_file") or die "Error, cannot write to $filt_file";
+    close $fh;
     
+    if (%data) {
+        &examine_reads();
+    }
+    
+    exit(0);    
+    
+}
+
+
+####
+sub examine_reads {
+    
+    # using the global %data here (after code reorg).
     
     foreach my $read_name (keys %data) {
         my @lines = @{$data{$read_name}};
@@ -177,7 +195,7 @@ main: {
     }
 
 
-    exit(0);
+
     
 }
 
