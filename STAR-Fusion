@@ -53,9 +53,10 @@ my $STAR_peOverlapNbasesMin = 12; # minimum number of bases in the overlap
 my $STAR_peOverlapMMp = 0.1; # the max proportion of mismatches in the overlap
 
 
-my $STAR_chimMultimapScoreRange = 10;
+my $STAR_chimMultimapScoreRange = 3;
 my $STAR_chimMultimapNmax = 20; 
 my $STAR_chimNonchimScoreDropMin = 10;
+my $STAR_chimScoreJunctionNonGTAG = -4;
 
 
 my $STAR_MAX_MATE_DIST = 100000;
@@ -94,12 +95,7 @@ $logo
 #
 #      --right_fq <string>                   right.fq file  (actually optional, but highly recommended)
 #
-#  Or
-#
-#      --samples_file <string>               file containing list of targeted samples
-#                                            (with format:
-#                                                sample_name(tab)/path/to/left.fq(tab)/path/to/right.fq
-#                                             and for single-end reads, exclude the 2nd read path. )
+
 #  Or use output from earlier STAR run:
 #
 #      --chimeric_junction|J <string>        Chimeric.out.junction file
@@ -223,6 +219,16 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #    --STAR_LoadAndExit                    runs STAR to load the genome index into shared RAM, then exits.
 #
 #    --STAR_Remove                         removes genome from shared RAM and exits.
+#
+#
+## Support for single-cell data
+#
+#  ## SmartSeq2
+#
+#      --samples_file <string>               file containing list of targeted files, separate fastqs for each cell.
+#                                            (with format:
+#                                                sample_name(tab)/path/to/left.fq(tab)/path/to/right.fq
+#                                             and for single-end reads, exclude the 2nd read path. )
 #
 # Remaining misc. options:
 #
@@ -851,7 +857,10 @@ sub run_STAR {
     }
     
     # chim read multimapping settings
-    $cmd .= " --chimMultimapScoreRange $STAR_chimMultimapScoreRange --chimMultimapNmax $STAR_chimMultimapNmax --chimNonchimScoreDropMin $STAR_chimNonchimScoreDropMin ";
+    $cmd .= " --chimMultimapScoreRange $STAR_chimMultimapScoreRange "
+          . " --chimScoreJunctionNonGTAG $STAR_chimScoreJunctionNonGTAG " 
+          . " --chimMultimapNmax $STAR_chimMultimapNmax "
+          . " --chimNonchimScoreDropMin $STAR_chimNonchimScoreDropMin ";
     
     # merge overlapping reads
     $cmd .= " --peOverlapNbasesMin $STAR_peOverlapNbasesMin --peOverlapMMp $STAR_peOverlapMMp ";

@@ -10,7 +10,7 @@ ifeq ("", "$(CTAT_GENOME_LIB)")
 endif
 
 kickstart_hg19:
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  -J __kickstart_hg19_data/hg19.Chimeric.out.junction -O star_fusion_kickstart_hg19ed_outdir 
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  -J __kickstart_data/hg19.Chimeric.out.junction -O star_fusion_kickstart_hg19ed_outdir 
 
 
 standard:
@@ -40,15 +40,15 @@ all: standard \
 #### Kickstart_Hg19, starting from chimeric junctions file
 
 kickstart_hg19_evreads: kickstart_hg19
-	../STAR-Fusion -J __kickstart_hg19_data/hg19.Chimeric.out.junction --genome_lib_dir ${CTAT_GENOME_LIB}  --extract_fusion_reads --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_kickstart_hg19ed_outdir
+	../STAR-Fusion -J __kickstart_data/hg19.Chimeric.out.junction --genome_lib_dir ${CTAT_GENOME_LIB}  --extract_fusion_reads --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_kickstart_hg19ed_outdir
 
 
 kickstart_hg19_coding_effect: kickstart_hg19
-	../STAR-Fusion -J __kickstart_hg19_data/hg19.Chimeric.out.junction --genome_lib_dir ${CTAT_GENOME_LIB} --examine_coding_effect --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_kickstart_hg19ed_outdir
+	../STAR-Fusion -J __kickstart_data/hg19.Chimeric.out.junction --genome_lib_dir ${CTAT_GENOME_LIB} --examine_coding_effect --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_kickstart_hg19ed_outdir
 
 
 kickstart_hg19_FI_inspect: kickstart_hg19_coding_effect
-	../STAR-Fusion -J __kickstart_hg19_data/hg19.Chimeric.out.junction --genome_lib_dir ${CTAT_GENOME_LIB}  --examine_coding_effect --FusionInspector inspect --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_kickstart_hg19ed_outdir 
+	../STAR-Fusion -J __kickstart_data/hg19.Chimeric.out.junction --genome_lib_dir ${CTAT_GENOME_LIB}  --examine_coding_effect --FusionInspector inspect --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_kickstart_hg19ed_outdir 
 
 
 ###################################
@@ -88,7 +88,7 @@ standard_SE:
 	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --FusionInspector inspect --examine_coding_effect --left_fq ${left_fq} -O star_fusion_SE_outdir  --STAR_use_shared_memory 
 
 kickstart_hg19_SE:
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB} -J __kickstart_hg19_data/hg19.Chimeric.out.junction  --FusionInspector inspect --examine_coding_effect --left_fq ${left_fq} -O star_fusion_SE_outdir_kickstart_hg19  --STAR_use_shared_memory 
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB} -J __kickstart_data/hg19.Chimeric.out.junction  --FusionInspector inspect --examine_coding_effect --left_fq ${left_fq} -O star_fusion_SE_outdir_kickstart_hg19  --STAR_use_shared_memory 
 
 
 
