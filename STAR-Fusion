@@ -522,7 +522,19 @@ main: {
     ## Get total number of rnaseq fragments reported by STAR:
     my $num_total_rnaseq_frags = &get_num_total_rnaseq_frags($chimeric_out_junctions_file);
     print STDERR "-sample contains $num_total_rnaseq_frags\n";
-    
+
+    ##Sorting Chimeric.out.junctions file.
+    my $extract_non_meta_data_from_chimeric_out_junctions_file_cmd = 'head -n -2 ' . $chimeric_out_junctions_file . ' > ' .  $chimeric_out_junctions_file . '.temp';
+    system($extract_non_meta_data_from_chimeric_out_junctions_file_cmd);
+    print STDERR "Executing: $extract_non_meta_data_from_chimeric_out_junctions_file_cmd Output: $! \n";
+    my $sort_chimeric_out_junctions_file_cmd = "sort -k 10 -b -t'\t' ". $chimeric_out_junctions_file . ".temp > " .$chimeric_out_junctions_file .".sorted" ;
+    system($sort_chimeric_out_junctions_file_cmd) ;
+    print STDERR "Executing : $sort_chimeric_out_junctions_file_cmd Ouput: $! \n";
+    my $dump_meta_data_to_sorted_chimeric_junctions_file = 'tail -n2 ' . $chimeric_out_junctions_file . " >> " . $chimeric_out_junctions_file . ".sorted" ;
+    system($dump_meta_data_to_sorted_chimeric_junctions_file);
+    print STDERR "Executing $dump_meta_data_to_sorted_chimeric_junctions_file Ouput: $! \n";
+
+    $chimeric_out_junctions_file = $chimeric_out_junctions_file . ".sorted";
 
     ########################################
     ## Map chimeric reads to genome features
