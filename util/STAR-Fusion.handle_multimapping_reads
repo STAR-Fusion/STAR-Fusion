@@ -119,30 +119,12 @@ else {
 my $JSON_DECODER = JSON::XS->new();
 
 main: {
-
-
-    # my %data;
-    # {
-    #     print STDERR "-parsing $chimeric_junction_file, organizing read mapping info.\n";
-    #     open(my $fh, $chimeric_junction_file) or die "Error, cannot open file: $chimeric_junction_file";
-    #     while (<$fh>) {
-    #         my $line = $_;
-    #         chomp;
-    #         my @x = split(/\t/);
-    #         my $read_name = $x[9];
-    #
-    #         push (@{$data{$read_name}}, $line);
-    #     }
-    #     close $fh;
-    # }
-
     open(my $ofh_filt, ">$filt_file") or die "Error, cannot write to $filt_file";
     print STDERR "-parsing $chimeric_junction_file, organizing read mapping info.\n";
     open(my $fh, $chimeric_junction_file) or die "Error, cannot open file: $chimeric_junction_file";
     my @lines;
     my $current_read_name = "";
     my $file_completed = 0;
-    my $len;
     while ($file_completed != 1) {
         $file_completed =1;
         while(<$fh>) {
@@ -156,8 +138,6 @@ main: {
                 $current_read_name = $read_name;
             }
             else{
-                $len = scalar @lines;
-                print STDERR "Reading $read_name : $len\n" ;
                 my $pct_paired_gene_mappings = &compute_pct_alns_mapping_to_gene_pairs(@lines);
 
                 my @filter_reasons;
@@ -183,7 +163,6 @@ main: {
                     print $ofh_filt join("", @lines) . "\n";
                 }
                 else {
-                    print STDERR "going in";
                     print join("", @lines);
                 }
                 @lines = ($line);
@@ -191,7 +170,6 @@ main: {
                 last;
             }
         }
-        print STDERR $file_completed
     }
     if (scalar(@lines) != 0) {
         my $pct_paired_gene_mappings = &compute_pct_alns_mapping_to_gene_pairs(@lines);
