@@ -141,8 +141,12 @@ main: {
     open(my $fh, $chimeric_junction_file) or die "Error, cannot open file: $chimeric_junction_file";
     my @lines;
     my $current_read_name = "";
-    while (<$fh>) {
+    my $file_completed = 0;
+    my $len;
+    while ($file_completed != 1) {
+        $file_completed =1;
         while(<$fh>) {
+            $file_completed = 0;
             my $line = $_;
             chomp;
             my @x = split(/\t/);
@@ -152,6 +156,8 @@ main: {
                 $current_read_name = $read_name;
             }
             else{
+                $len = scalar @lines;
+                print STDERR "Reading $read_name : $len\n" ;
                 my $pct_paired_gene_mappings = &compute_pct_alns_mapping_to_gene_pairs(@lines);
 
                 my @filter_reasons;
@@ -177,6 +183,7 @@ main: {
                     print $ofh_filt join("", @lines) . "\n";
                 }
                 else {
+                    print STDERR "going in";
                     print join("", @lines);
                 }
                 @lines = ($line);
@@ -184,6 +191,7 @@ main: {
                 last;
             }
         }
+        print STDERR $file_completed
     }
     if (scalar(@lines) != 0) {
         my $pct_paired_gene_mappings = &compute_pct_alns_mapping_to_gene_pairs(@lines);
