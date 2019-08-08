@@ -636,10 +636,14 @@ main: {
         $prelim_fusion_file = "$annotated_fusions_filename.annot_filter.pass";
 
         ## filter out likely RT artifacts
+        $cmd = "$UTILDIR/filter_likely_RT_artifacts.pl $prelim_fusion_file";
+        $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/RTartifact_filter.ok"));
+        $prelim_fusion_file = "$prelim_fusion_file.RTartifact.pass";
+        
+        ## report best candidates per breakpoint.
         
 
-        ## report best candidates per breakpoint.
-
+        
     }
     
     

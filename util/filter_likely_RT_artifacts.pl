@@ -8,23 +8,23 @@ use lib ("$FindBin::Bin/../PerlLib");
 use DelimParser;
 
 
-my $usage = "\n\n\tusage: $0 fusion_preds.tsv\n\n\t\t(writes .pass and .filtered files)\n\n\n";
+my $usage = "\n\n\tusage: $0 fusion_preds.tsv\n\n\t\t(writes .RTartifact.pass and .RTartifact.filtered files)\n\n\n";
 
 my $fusion_preds_file = $ARGV[0] or die $usage;
 
 main: {
-
+    
     open(my $fh, $fusion_preds_file) or die "Error, cannot open file: $fusion_preds_file";
     my $delim_reader = new DelimParser::Reader($fh, "\t");
 
     my @column_headers = $delim_reader->get_column_headers();
 
-    my $pass_file = "$fusion_preds_file.pass";
+    my $pass_file = "$fusion_preds_file.RTartifact.pass";
     open(my $pass_ofh, ">$pass_file") or die "Error, cannot write to $pass_file";
     my $pass_writer = new DelimParser::Writer($pass_ofh, "\t", \@column_headers);
     
     
-    my $filtered_file = "$fusion_preds_file.filtered";
+    my $filtered_file = "$fusion_preds_file.RTartifact.filtered";
     open(my $filtered_ofh, ">$filtered_file") or die "Error, cannot write to $filtered_file";
     my $filtered_writer = new DelimParser::Writer($filtered_ofh, "\t", \@column_headers);
 
