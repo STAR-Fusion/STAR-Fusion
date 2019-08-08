@@ -53,15 +53,15 @@ my $STAR_peOverlapNbasesMin = 12; # minimum number of bases in the overlap
 my $STAR_peOverlapMMp = 0.1; # the max proportion of mismatches in the overlap
 
 
-my $STAR_chimMultimapScoreRange = 10;
-my $STAR_chimMultimapNmax = 10; 
+my $STAR_chimMultimapScoreRange = 3;
+my $STAR_chimMultimapNmax = 20; 
 my $STAR_chimNonchimScoreDropMin = 10;
+my $STAR_chimScoreJunctionNonGTAG = -4;
 
 
 my $STAR_MAX_MATE_DIST = 100000;
 
 my $MIN_PCT_MM_NONSPECIFIC = 50;
-
 
 my $STAR_SortedByCoordinate = 0;
 my $STAR_limitBAMsortRAM = "40G";
@@ -95,12 +95,7 @@ $logo
 #
 #      --right_fq <string>                   right.fq file  (actually optional, but highly recommended)
 #
-#  Or
-#
-#      --samples_file <string>               file containing list of targeted samples
-#                                            (with format:
-#                                                sample_name(tab)/path/to/left.fq(tab)/path/to/right.fq
-#                                             and for single-end reads, exclude the 2nd read path. )
+
 #  Or use output from earlier STAR run:
 #
 #      --chimeric_junction|J <string>        Chimeric.out.junction file
@@ -157,11 +152,10 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #    
 # Chimeric read filtering parameters:
 #
-#  
 #    --min_pct_MM_nonspecific|M <int>     min pct of multimapping reads that should map to 2 genes
 #                                         (avoids multimapping reads that lack specificity)
 #                                           value must be between [1,100] (default: $MIN_PCT_MM_NONSPECIFIC)
-#    
+##  
 # Fusion transcript filtering:
 #
 #    --no_filter                           do not filter predictions. (stops execution prior to the filtering stage).
@@ -225,6 +219,16 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #    --STAR_LoadAndExit                    runs STAR to load the genome index into shared RAM, then exits.
 #
 #    --STAR_Remove                         removes genome from shared RAM and exits.
+#
+#
+## Support for single-cell data
+#
+#  ## SmartSeq2
+#
+#      --samples_file <string>               file containing list of targeted files, separate fastqs for each cell.
+#                                            (with format:
+#                                                sample_name(tab)/path/to/left.fq(tab)/path/to/right.fq
+#                                             and for single-end reads, exclude the 2nd read path. )
 #
 # Remaining misc. options:
 #
@@ -541,8 +545,8 @@ main: {
     $cmd = "$UTILDIR/STAR-Fusion.handle_multimapping_reads "
         . " -J $preliminary_outdir/star-fusion.junction_breakpts_to_genes.txt "
         . " --genome_lib_dir $genome_lib_dir "
-        . " -M $MIN_PCT_MM_NONSPECIFIC "
         . " --filt_file $preliminary_outdir/star-fusion.junction_breakpts_to_genes.txt.fail "
+        . " -M $MIN_PCT_MM_NONSPECIFIC "
         . " > $preliminary_outdir/star-fusion.junction_breakpts_to_genes.txt.pass ";
     
     $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/$out_prefix.handle_multimappers.ok"));
@@ -653,6 +657,19 @@ main: {
     # generate final fusion prediction output files:
     my $final_output_fusions = "$out_prefix.fusion_predictions.tsv";
     $pipeliner->add_commands(new Command("cp $prelim_fusion_file $final_output_fusions", "$checkpoints_dir/cp_final.ok"));
+
+
+    ## if samples file for sc, separate by cell:
+    if ($samples_file) {
+        $pipeliner->add_commands(new Command("$UTILDIR/sc/starF_partition_final_by_sc.pl $final_output_fusions > $final_output_fusions.samples_deconvolved.tsv",
+                                             "$checkpoints_dir/samples_deconvolved.ok") );
+
+        ## make abridged version.
+        $pipeliner->add_commands(new Command("$UTILDIR/column_exclusions.pl $final_output_fusions.samples_deconvolved.tsv JunctionReads,SpanningFrags > $final_output_fusions.samples_deconvolved.abridged.tsv",
+                                             "$checkpoints_dir/samples_deconvolved.abridged.ok") );
+        
+    }
+    
     
     ## make abridged versions:
     my $abridged_final_output = $final_output_fusions;
@@ -848,7 +865,10 @@ sub run_STAR {
     }
     
     # chim read multimapping settings
-    $cmd .= " --chimMultimapScoreRange $STAR_chimMultimapScoreRange --chimMultimapNmax $STAR_chimMultimapNmax --chimNonchimScoreDropMin $STAR_chimNonchimScoreDropMin ";
+    $cmd .= " --chimMultimapScoreRange $STAR_chimMultimapScoreRange "
+          . " --chimScoreJunctionNonGTAG $STAR_chimScoreJunctionNonGTAG " 
+          . " --chimMultimapNmax $STAR_chimMultimapNmax "
+          . " --chimNonchimScoreDropMin $STAR_chimNonchimScoreDropMin ";
     
     # merge overlapping reads
     $cmd .= " --peOverlapNbasesMin $STAR_peOverlapNbasesMin --peOverlapMMp $STAR_peOverlapMMp ";
@@ -867,6 +887,8 @@ sub run_STAR {
         $cmd .= " --readFilesCommand 'gunzip -c' ";
     }
 
+    $cmd .= " --quantMode GeneCounts";
+    
     #$cmd .=  " --limitOutSJcollapsed 10000000 ";
     
     $pipeliner->add_commands(Command->new($cmd, "$checkpoints_dir/run_star_aligner.ok"));

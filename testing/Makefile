@@ -3,9 +3,14 @@
 left_fq="reads_1.fq.gz"
 right_fq="reads_2.fq.gz"
 
+check:
+ifeq ("", "$(CTAT_GENOME_LIB)")
+	echo WARNING: Must specify CTAT_GENOME_LIB env var.
+	exit 1
+endif
 
-kickstart:
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  -J __kickstart_data/Chimeric.out.junction -O star_fusion_kickstarted_outdir 
+kickstart_hg19:
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  -J __kickstart_data/hg19.Chimeric.out.junction -O star_fusion_kickstart_hg19ed_outdir 
 
 
 standard:
@@ -16,14 +21,14 @@ standard_run_star_only:
 	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir_starOnly --run_STAR_only
 
 all: standard \
-     kickstart \
-     kickstart_evreads \
-     kickstart_coding_effect \
-     kickstart_FI_inspect \
+     kickstart_hg19 \
+     kickstart_hg19_evreads \
+     kickstart_hg19_coding_effect \
+     kickstart_hg19_FI_inspect \
      standard_denovo_reconstruct \
      standard_coding_effect \
      standard_SE \
-     kickstart_SE \
+     kickstart_hg19_SE \
      standard_run_star_only \
 	 samples_PE \
      samples_PE_FI
@@ -32,18 +37,18 @@ all: standard \
 
 
 #####################################################
-#### Kickstart, starting from chimeric junctions file
+#### Kickstart_Hg19, starting from chimeric junctions file
 
-kickstart_evreads: kickstart
-	../STAR-Fusion -J __kickstart_data/Chimeric.out.junction --genome_lib_dir ${CTAT_GENOME_LIB}  --extract_fusion_reads --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_kickstarted_outdir
-
-
-kickstart_coding_effect: kickstart
-	../STAR-Fusion -J __kickstart_data/Chimeric.out.junction --genome_lib_dir ${CTAT_GENOME_LIB} --examine_coding_effect --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_kickstarted_outdir
+kickstart_hg19_evreads: kickstart_hg19
+	../STAR-Fusion -J __kickstart_data/hg19.Chimeric.out.junction --genome_lib_dir ${CTAT_GENOME_LIB}  --extract_fusion_reads --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_kickstart_hg19ed_outdir
 
 
-kickstart_FI_inspect: kickstart_coding_effect
-	../STAR-Fusion -J __kickstart_data/Chimeric.out.junction --genome_lib_dir ${CTAT_GENOME_LIB}  --examine_coding_effect --FusionInspector inspect --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_kickstarted_outdir 
+kickstart_hg19_coding_effect: kickstart_hg19
+	../STAR-Fusion -J __kickstart_data/hg19.Chimeric.out.junction --genome_lib_dir ${CTAT_GENOME_LIB} --examine_coding_effect --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_kickstart_hg19ed_outdir
+
+
+kickstart_hg19_FI_inspect: kickstart_hg19_coding_effect
+	../STAR-Fusion -J __kickstart_data/hg19.Chimeric.out.junction --genome_lib_dir ${CTAT_GENOME_LIB}  --examine_coding_effect --FusionInspector inspect --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_kickstart_hg19ed_outdir 
 
 
 ###################################
@@ -82,8 +87,8 @@ samples_PE_FI_validate: samples_PE
 standard_SE:
 	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --FusionInspector inspect --examine_coding_effect --left_fq ${left_fq} -O star_fusion_SE_outdir  --STAR_use_shared_memory 
 
-kickstart_SE:
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB} -J __kickstart_data/Chimeric.out.junction  --FusionInspector inspect --examine_coding_effect --left_fq ${left_fq} -O star_fusion_SE_outdir_kickstart  --STAR_use_shared_memory 
+kickstart_hg19_SE:
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB} -J __kickstart_data/hg19.Chimeric.out.junction  --FusionInspector inspect --examine_coding_effect --left_fq ${left_fq} -O star_fusion_SE_outdir_kickstart_hg19  --STAR_use_shared_memory 
 
 
 
@@ -92,9 +97,9 @@ kickstart_SE:
 
 clean:
 	rm -rf ./star_fusion_outdir
-	rm -rf ./star_fusion_kickstarted_outdir
+	rm -rf ./star_fusion_kickstart_hg19ed_outdir
 	rm -rf ./star_fusion_SE_outdir
-	rm -rf ./star_fusion_SE_outdir_kickstart
+	rm -rf ./star_fusion_SE_outdir_kickstart_hg19
 	rm -rf ./star_fusion_bbmerge_outdir
 	(rm -rf ./test_docker_outdir) || sudo rm -rf ./test_docker_outdir
 	rm -rf ./star_fusion_samplesPE_outdir
