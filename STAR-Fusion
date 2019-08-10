@@ -193,10 +193,21 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #
 #    --no_remove_dups                      do not remove duplicate reads
 #    
-# Downstream analysis of fusion candidates: 
+
+#
+#   **  Turn off specific fusion filters:
 #
 #    --no_annotation_filter                exclude filtering of fusion predictions based on annotations 
 #                                               (ie. by default, removing fusions found in normal (non-cancer) samples))
+#
+#    --no_RT_artifact_filter               exclude filtering of likely RT artifacts
+#                                               (by default, fusions w/o GT-AG, GC-AG, or AT-AC splice junctions at fusion breakpoint are excluded
+#                                                as likely artifacts, with few exceptions of known fusions that involve intra-exon breakpoints. ie. IGH-fusions)
+#
+#    --no_single_fusion_per_breakpoint     exclude filtering of potentially superfluous fusions involving different gene 
+#                                                annotations overlapping the same fusion breakpoint.
+#
+# Downstream analysis of fusion candidates: 
 #
 #    --examine_coding_effect               explore impact of fusions on coding sequences
 #
@@ -260,7 +271,6 @@ my $USE_SHARED_MEMORY = 0;
 my $EXTRACT_FUSION_READS = 0;
 my $FUSIONINSPECTOR_MODE = 0;
 my $DENOVO_RECONSTRUCT = 0;
-my $NO_ANNOTATION_FILTER = 0;
 my $EXAMINE_CODING_EFFECT = 0;
 
 my $STAR_PROG;
@@ -269,7 +279,15 @@ my $DEVEL_STAR;
 my $STAR_LOAD_AND_EXIT;
 my $STAR_REMOVE;
 
+my $NO_ANNOTATION_FILTER = 0;
+my $NO_RT_ARTIFACT_FILTER = 0;
+my $NO_SINGLE_FUSION_PER_BREAKPOINT = 0;
+
+
 my $SHOW_FULL_USAGE_INFO;
+
+
+
 
 &GetOptions ( 'help|h' => \$help_flag,
               
@@ -302,7 +320,9 @@ my $SHOW_FULL_USAGE_INFO;
               'no_filter' => \$no_filter,
               
               'no_annotation_filter' => \$NO_ANNOTATION_FILTER,
-    
+              'no_RT_artifact_filter' => \$NO_RT_ARTIFACT_FILTER,
+              'no_single_fusion_per_breakpoint' => \$NO_SINGLE_FUSION_PER_BREAKPOINT,
+              
               'genome_lib_dir=s' => \$genome_lib_dir,
               
               'version' => \$REPORT_VERSION,
@@ -623,22 +643,29 @@ main: {
     $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/fusion_annotator.ok"));
     
 
+
+    ## various downstream fusion filters
+    $prelim_fusion_file = $annotated_fusions_filename;
     
     # filter based on annotations
-    if ($NO_ANNOTATION_FILTER) {
-        $prelim_fusion_file = $annotated_fusions_filename;
-    }
-    else {
-
+    unless ($NO_ANNOTATION_FILTER) {
+            
         ## filter by annotations
         $cmd = "$BASEDIR/FusionFilter/util/filter_by_annotation_rules.pl --fusions $annotated_fusions_filename --genome_lib_dir $genome_lib_dir";
         $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/annot_filter.ok"));
         $prelim_fusion_file = "$annotated_fusions_filename.annot_filter.pass";
+    }
+
+    unless ($NO_RT_ARTIFACT_FILTER) {
 
         ## filter out likely RT artifacts
         $cmd = "$UTILDIR/filter_likely_RT_artifacts.pl $prelim_fusion_file";
         $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/RTartifact_filter.ok"));
         $prelim_fusion_file = "$prelim_fusion_file.RTartifact.pass";
+        
+    }
+     
+    unless ($NO_SINGLE_FUSION_PER_BREAKPOINT) {
         
         ## report best candidates per breakpoint.
         $cmd = "$UTILDIR/remove_lesser_candidates_at_breakpoint.pl $prelim_fusion_file";
