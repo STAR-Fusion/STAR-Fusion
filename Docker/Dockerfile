@@ -112,12 +112,12 @@ RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" 
 ########
 # GMAP  (compile this last because this version unfortunately disrupts some headers in DL_LIBRARY_PATH)
 
-ENV GMAP_VERSION=2017-11-15
-WORKDIR $SRC
-RUN GMAP_URL="http://research-pub.gene.com/gmap/src/gmap-gsnap-$GMAP_VERSION.tar.gz" && \
-    wget $GMAP_URL && \
-    tar xvf gmap-gsnap-$GMAP_VERSION.tar.gz && \
-    cd gmap-$GMAP_VERSION && ./configure && make && make install
+#ENV GMAP_VERSION=2017-11-15
+#WORKDIR $SRC
+#RUN GMAP_URL="http://research-pub.gene.com/gmap/src/gmap-gsnap-$GMAP_VERSION.tar.gz" && \
+#    wget $GMAP_URL && \
+#    tar xvf gmap-gsnap-$GMAP_VERSION.tar.gz && \
+#    cd gmap-$GMAP_VERSION && ./configure --prefix=`pwd` && make && make install && cp ./bin/* $BIN/
 
 
 RUN apt-get clean && apt-get update && apt-get install -y locales
@@ -129,7 +129,7 @@ WORKDIR $SRC
 
 ENV STAR_FUSION_VERSION=devel
 #1.6.0
-ENV STARF_CHECKOUT=933c9aa38f9d7032687b6af102e22d35c82dc02d
+ENV STARF_CHECKOUT=50e2144afcb19541266e1635c2f8ee650252a7d8
 
 
 RUN apt-get update && apt-get install -y git
@@ -145,4 +145,14 @@ ENV STAR_FUSION_HOME $SRC/STAR-Fusion
 
 ## FusionInspector and FusionAnnotator are bundled with STAR-Fusion
 
+## swap out star: 2.7.1a_Chimeric_1
+
+WORKDIR $SRC
+ENV STAR_VERSION=2.7.1a_Chimeric_2
+ENV STAR_CO=075a6db9bdec77815e4a4ef653a5fc969b87fd90
+RUN git clone https://github.com/brianjohnhaas/STAR.git STAR.bhaas && \
+    cd STAR.bhaas && \
+    git checkout $STAR_CO && \
+    cd source && make && \
+    mv STAR /usr/local/bin
 
