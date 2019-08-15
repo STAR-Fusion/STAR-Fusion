@@ -116,9 +116,11 @@ RUN locale-gen en_US.UTF-8
 
 # blast
 WORKDIR $SRC
-RUN wget ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.5.0/ncbi-blast-2.5.0+-x64-linux.tar.gz && \
-    tar xvf ncbi-blast-2.5.0+-x64-linux.tar.gz && \
-        cp ncbi-blast-2.5.0+/bin/* /usr/local/bin/
+ENV BLAST_VERSION=2.9.0
+RUN wget ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/${BLAST_VERSION}/ncbi-blast-${BLAST_VERSION}+-x64-linux.tar.gz && \
+    tar xvf ncbi-blast-${BLAST_VERSION}+-x64-linux.tar.gz && \
+        cp ncbi-blast-${BLAST_VERSION}+/bin/* /usr/local/bin/
+
 
 # hmmer3:
 WORKDIR $SRC
