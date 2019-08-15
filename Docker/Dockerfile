@@ -96,12 +96,43 @@ RUN wget https://github.com/COMBINE-lab/salmon/releases/download/v0.9.1/Salmon-0
     ln -s $SRC/Salmon-latest_linux_x86_64/bin/salmon $BIN/.
 
 
+########
+# GMAP  (build / install using --prefix, or else this one will clobber important header files)
+
+ENV GMAP_VERSION=2017-11-15
+WORKDIR $SRC
+RUN GMAP_URL="http://research-pub.gene.com/gmap/src/gmap-gsnap-$GMAP_VERSION.tar.gz" && \
+    wget $GMAP_URL && \
+    tar xvf gmap-gsnap-$GMAP_VERSION.tar.gz && \
+    cd gmap-$GMAP_VERSION && ./configure --prefix=`pwd` && make && make install && cp ./bin/* $BIN/
+
+
+RUN apt-get clean && apt-get update && apt-get install -y locales
+RUN locale-gen en_US.UTF-8
+
+
+###############################################
+## Tools needed for building a CTAT Genome lib.
+
+# blast
+WORKDIR $SRC
+RUN wget ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.5.0/ncbi-blast-2.5.0+-x64-linux.tar.gz && \
+    tar xvf ncbi-blast-2.5.0+-x64-linux.tar.gz && \
+        cp ncbi-blast-2.5.0+/bin/* /usr/local/bin/
+
+# hmmer3:
+WORKDIR $SRC
+RUN wget http://eddylab.org/software/hmmer3/3.1b2/hmmer-3.1b2-linux-intel-x86_64.tar.gz && \
+    tar xvf hmmer-3.1b2-linux-intel-x86_64.tar.gz && \
+        cp hmmer-3.1b2-linux-intel-x86_64/binaries/* /usr/local/bin/
+        
+
 
 
 ##############
 ## STAR
 
-ENV STAR_VERSION=2.7.1a
+ENV STAR_VERSION=2.7.2a
 RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" &&\
     wget -P $SRC $STAR_URL &&\
     tar -xvf $SRC/${STAR_VERSION}.tar.gz -C $SRC && \
@@ -109,27 +140,12 @@ RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" 
 
 
 
-########
-# GMAP  (compile this last because this version unfortunately disrupts some headers in DL_LIBRARY_PATH)
-
-#ENV GMAP_VERSION=2017-11-15
-#WORKDIR $SRC
-#RUN GMAP_URL="http://research-pub.gene.com/gmap/src/gmap-gsnap-$GMAP_VERSION.tar.gz" && \
-#    wget $GMAP_URL && \
-#    tar xvf gmap-gsnap-$GMAP_VERSION.tar.gz && \
-#    cd gmap-$GMAP_VERSION && ./configure --prefix=`pwd` && make && make install && cp ./bin/* $BIN/
-
-
-RUN apt-get clean && apt-get update && apt-get install -y locales
-RUN locale-gen en_US.UTF-8
-
 ###############
 ## STAR-Fusion:
 WORKDIR $SRC
 
-ENV STAR_FUSION_VERSION=devel
-#1.6.0
-ENV STARF_CHECKOUT=50e2144afcb19541266e1635c2f8ee650252a7d8
+ENV STAR_FUSION_VERSION=1.7.0
+ENV STARF_CHECKOUT=e10996411f51d3b7c6314acacf2bd63828d0e093
 
 
 RUN apt-get update && apt-get install -y git
@@ -144,15 +160,4 @@ RUN git clone https://github.com/STAR-Fusion/STAR-Fusion.git && \
 ENV STAR_FUSION_HOME $SRC/STAR-Fusion
 
 ## FusionInspector and FusionAnnotator are bundled with STAR-Fusion
-
-## swap out star: 2.7.1a_Chimeric_1
-
-WORKDIR $SRC
-ENV STAR_VERSION=2.7.1a_Chimeric_2
-ENV STAR_CO=075a6db9bdec77815e4a4ef653a5fc969b87fd90
-RUN git clone https://github.com/brianjohnhaas/STAR.git STAR.bhaas && \
-    cd STAR.bhaas && \
-    git checkout $STAR_CO && \
-    cd source && make && \
-    mv STAR /usr/local/bin
 
