@@ -12,6 +12,13 @@ my $usage = "\n\n\tusage: $0 fusion_preds.tsv\n\n\t\t(writes .RTartifact.pass an
 
 my $fusion_preds_file = $ARGV[0] or die $usage;
 
+my @FREE_PASS = qw(Mitelman chimerdb_omim chimerdb_pubmed ChimerKB ChimerPub
+                   Cosmic HaasMedCancer); # TODO: put in config, currently sharing this here and w/ AnnotFilterRule
+
+my $FREE_PASS_REGEX = join("|", @FREE_PASS);
+
+print "$FREE_PASS_REGEX\n";
+
 main: {
     
     open(my $fh, $fusion_preds_file) or die "Error, cannot open file: $fusion_preds_file";
@@ -37,6 +44,10 @@ main: {
         my $right_dinuc = $delim_reader->get_row_val($row, "RightBreakDinuc");
 
         my $fusion_name = $delim_reader->get_row_val($row, "#FusionName");
+
+        my $annots = $delim_reader->get_row_val($row, "annots");
+        
+        print STDERR "$annots";
         
         my $combo = $left_dinuc . $right_dinuc;
 
@@ -47,6 +58,9 @@ main: {
             ## allow for known cases of peculiar fusions.
             $fusion_name =~ /\@/ # includes the IGH and IGL super loci
 
+            ||
+            $annots =~ /\b($FREE_PASS_REGEX)\b/
+            
             ## TODO:  add additional exceptions
             
             ) {
