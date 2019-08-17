@@ -89,8 +89,6 @@ standard_SE:
 
 kickstart_hg19_SE:
 	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB} -J __kickstart_data/hg19.Chimeric.out.junction  --FusionInspector inspect --examine_coding_effect --left_fq ${left_fq} -O star_fusion_SE_outdir_kickstart_hg19  --STAR_use_shared_memory 
->>>>>>> 4e92cf9c70b4a9a2b06ef64c0bbc3859ec121d59
-
 
 
 ######################
@@ -105,6 +103,7 @@ clean:
 	(rm -rf ./test_docker_outdir) || sudo rm -rf ./test_docker_outdir
 	rm -rf ./star_fusion_samplesPE_outdir
 	rm -rf ./star_fusion_outdir_starOnly
+	rm -rf ./test_singularity_outdir
 
 purge:
 	../STAR-Fusion --STAR_Remove
