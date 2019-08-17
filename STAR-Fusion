@@ -14,10 +14,10 @@ use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
 
 
-#my $VERSION = "1.6.0";
-my $VERSION = "__BLEEDING_EDGE__ Do not use - pull versioned release from: https://github.com/STAR-Fusion/STAR-Fusion/releases";
+my $VERSION = "1.7.0";
+#my $VERSION = "__BLEEDING_EDGE__ Do not use - pull versioned release from: https://github.com/STAR-Fusion/STAR-Fusion/releases";
 
-my @MIN_STAR_MAJOR_MINOR_VERSION = (2, 7, 0, 'f');
+my @MIN_STAR_MAJOR_MINOR_VERSION = (2, 7, 2, 'a');
 
 
 my $BASEDIR = "$FindBin::Bin";
