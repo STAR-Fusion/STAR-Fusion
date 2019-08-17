@@ -741,7 +741,7 @@ main: {
     }
     else {
         
-        print STDERR "\n\n\t* STAR-Fusion complete.  See output: $out_prefix.fusion_candidates.tsv (or .abridged.tsv version)\n\n\n";
+        print STDERR "\n\n\t* STAR-Fusion complete.  See output: $output_dir/$out_prefix.fusion_predictions.tsv (or .abridged.tsv version)\n\n\n";
     }
     
     
