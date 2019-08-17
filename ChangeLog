@@ -1,3 +1,10 @@
+STAR-Fusion Release v1.7.0, August 17, 2019
+	-requires newly released STAR aligner v2.7.2a, where we updated the chimeric junction reporting, requiring chimeric read alignments to have higher alignment scores than the non-chimeric read alignment counterparts. The chimeric junction output file includes all the alignment scores and new column headers to facilitate further updates.
+	-now filtering likely reverse transcription artifacts - defined as those lacking canonical splicing dinucleotides at transcript chimeric breakpoints, not involving known cancer fusions, and not involving targets known to involve non-canonical breakpoints.
+	-now only reporting a single fusion pair report per breakpoint. In the case there are multiple annotations overlapping the breakpoint, we report the one with the highest evidence support.
+	-lowered Star-F memory requirements by streaming the chimJ file rather than putting it all into memory.
+	-disabled simple homolog filtering during initial read alignment filtering steps - postponing filtering to later fusion filtering stage.
+
 STAR-Fusion Release v1.6.0, April 2, 2019
 	-requires min of STAR version 2.7.0f
 	-Annot filter retains cosmic and mitelman fusions even if found in the red herrings list
