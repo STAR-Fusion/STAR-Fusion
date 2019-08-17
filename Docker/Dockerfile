@@ -147,7 +147,7 @@ RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" 
 WORKDIR $SRC
 
 ENV STAR_FUSION_VERSION=1.7.0
-ENV STARF_CHECKOUT=925a72799cfcef1334de6482bba85d7d005b8d0d
+ENV STARF_CHECKOUT=0e78cf54b5f0762ded076f15039a3c9175cd9e63
 
 
 RUN apt-get update && apt-get install -y git
