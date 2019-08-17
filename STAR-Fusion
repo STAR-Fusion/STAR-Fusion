@@ -757,7 +757,7 @@ main: {
                 . " --min_spanning_frags_only $MIN_SPANNING_FRAGS_ONLY "
                 . " --vis "
                 . " --max_promiscuity $MAX_PROMISCUITY "
-                . " --out_dir $FI_outdir "
+                . " --output_dir $FI_outdir "
                 . " --genome_lib_dir $genome_lib_dir "
                 .  " --CPU $CPU ";
         
