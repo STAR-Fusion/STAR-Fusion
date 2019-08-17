@@ -2,5 +2,5 @@
 
 set -ev
 
-docker push trinityctat/ctatfusion:latest
+docker push trinityctat/starfusion:latest
 

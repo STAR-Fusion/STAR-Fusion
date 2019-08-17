@@ -4,6 +4,6 @@ set -ev
 
 VERSION=`cat VERSION.txt`
 
-docker build -t trinityctat/ctatfusion:${VERSION} .
-docker build -t trinityctat/ctatfusion:latest .
+docker build -t trinityctat/starfusion:${VERSION} .
+docker build -t trinityctat/starfusion:latest .
 
