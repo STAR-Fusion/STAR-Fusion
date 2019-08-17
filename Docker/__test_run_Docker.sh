@@ -2,9 +2,10 @@
 
 set -ve
 
-CTAT_GENOME_LIB="GRCh38_gencode_v29_CTAT_lib_Mar272019.plug-n-play"
+CTAT_GENOME_LIB="GRCh37_gencode_v19_CTAT_lib_Aug152019.plug-n-play"
 
-CTAT_GENOME_LIB_URL="https://data.broadinstitute.org/Trinity/CTAT_RESOURCE_LIB/__genome_libs_StarFv1.6/GRCh38_gencode_v29_CTAT_lib_Mar272019.plug-n-play.tar.gz"
+
+CTAT_GENOME_LIB_URL="https://data.broadinstitute.org/Trinity/CTAT_RESOURCE_LIB/GRCh37_gencode_v19_CTAT_lib_Aug152019.plug-n-play.tar.gz"
 
 
 if [ ! -s "../${CTAT_GENOME_LIB}.tar.gz" ] && [ ! -d "../${CTAT_GENOME_LIB}" ]; then
