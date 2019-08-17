@@ -13,3 +13,6 @@
 [submodule "FusionAnnotator"]
 	path = FusionAnnotator
 	url = https://github.com/FusionAnnotator/FusionAnnotator.git
+[submodule "ctat-genome-lib-builder"]
+	path = ctat-genome-lib-builder
+	url = https://github.com/NCIP/ctat-genome-lib-builder.git

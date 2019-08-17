@@ -96,12 +96,45 @@ RUN wget https://github.com/COMBINE-lab/salmon/releases/download/v0.9.1/Salmon-0
     ln -s $SRC/Salmon-latest_linux_x86_64/bin/salmon $BIN/.
 
 
+########
+# GMAP  (build / install using --prefix, or else this one will clobber important header files)
+
+ENV GMAP_VERSION=2017-11-15
+WORKDIR $SRC
+RUN GMAP_URL="http://research-pub.gene.com/gmap/src/gmap-gsnap-$GMAP_VERSION.tar.gz" && \
+    wget $GMAP_URL && \
+    tar xvf gmap-gsnap-$GMAP_VERSION.tar.gz && \
+    cd gmap-$GMAP_VERSION && ./configure --prefix=`pwd` && make && make install && cp ./bin/* $BIN/
+
+
+RUN apt-get clean && apt-get update && apt-get install -y locales
+RUN locale-gen en_US.UTF-8
+
+
+###############################################
+## Tools needed for building a CTAT Genome lib.
+
+# blast
+WORKDIR $SRC
+ENV BLAST_VERSION=2.9.0
+RUN wget ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/${BLAST_VERSION}/ncbi-blast-${BLAST_VERSION}+-x64-linux.tar.gz && \
+    tar xvf ncbi-blast-${BLAST_VERSION}+-x64-linux.tar.gz && \
+        cp ncbi-blast-${BLAST_VERSION}+/bin/* /usr/local/bin/
+
+
+# hmmer3:
+WORKDIR $SRC
+RUN wget http://eddylab.org/software/hmmer3/3.1b2/hmmer-3.1b2-linux-intel-x86_64.tar.gz && \
+    tar xvf hmmer-3.1b2-linux-intel-x86_64.tar.gz && \
+        cp hmmer-3.1b2-linux-intel-x86_64/binaries/* /usr/local/bin/
+        
+
 
 
 ##############
 ## STAR
 
-ENV STAR_VERSION=2.7.0f
+ENV STAR_VERSION=2.7.2a
 RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" &&\
     wget -P $SRC $STAR_URL &&\
     tar -xvf $SRC/${STAR_VERSION}.tar.gz -C $SRC && \
@@ -109,26 +142,12 @@ RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" 
 
 
 
-########
-# GMAP  (compile this last because this version unfortunately disrupts some headers in DL_LIBRARY_PATH)
-
-ENV GMAP_VERSION=2017-11-15
-WORKDIR $SRC
-RUN GMAP_URL="http://research-pub.gene.com/gmap/src/gmap-gsnap-$GMAP_VERSION.tar.gz" && \
-    wget $GMAP_URL && \
-    tar xvf gmap-gsnap-$GMAP_VERSION.tar.gz && \
-    cd gmap-$GMAP_VERSION && ./configure && make && make install
-
-
-RUN apt-get clean && apt-get update && apt-get install -y locales
-RUN locale-gen en_US.UTF-8
-
 ###############
 ## STAR-Fusion:
 WORKDIR $SRC
 
-ENV STAR_FUSION_VERSION=1.6.0
-ENV STARF_CHECKOUT=c465cf33d111121f6be127483379bebd2f866fbd
+ENV STAR_FUSION_VERSION=1.7.0
+ENV STARF_CHECKOUT=f40f166e05f964db8dd8e84a03d8a3f6463fd2de
 
 
 RUN apt-get update && apt-get install -y git
@@ -143,5 +162,4 @@ RUN git clone https://github.com/STAR-Fusion/STAR-Fusion.git && \
 ENV STAR_FUSION_HOME $SRC/STAR-Fusion
 
 ## FusionInspector and FusionAnnotator are bundled with STAR-Fusion
-
 

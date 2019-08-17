@@ -57,7 +57,6 @@ Removes chimeric reads that have the following properties:
 #    --min_pct_MM_nonspecific|M <int>     min pct of multimapping reads that should map to 2 genes
 #                                         (avoids multimapping reads that lack specificity)
 #                                           value must be between [1,100] (default: $min_pct_multimapping_to_genes)
-#    
 ###################################################################################################
 
 
@@ -100,8 +99,6 @@ else {
     die "Error: cannot locate $blast_pairs_idx_file";
 }
 
-my %BLAST_CACHE;
-
 my $GENE_OVERLAP_CHECKER = new Gene_overlap_check("$genome_lib_dir/ref_annot.gtf.gene_spans");
 
 
@@ -118,67 +115,95 @@ else {
 
 my $JSON_DECODER = JSON::XS->new();
 
+
+open(my $fh, $chimeric_junction_file) or die "Error, cannot open file: $chimeric_junction_file";
+open(my $ofh_filt, ">$filt_file") or die "Error, cannot write to $filt_file";
+
+my $READ_COUNTER = 0;
+my $START_TIME = time();
+
 main: {
     
+    print STDERR "-parsing $chimeric_junction_file, organizing read mapping info.\n";
 
-    my %data;
-
-    {
-        print STDERR "-parsing $chimeric_junction_file, organizing read mapping info.\n";
-        open(my $fh, $chimeric_junction_file) or die "Error, cannot open file: $chimeric_junction_file";
-        while (<$fh>) {
-            my $line = $_;
-            chomp;
-            my @x = split(/\t/);
-            my $read_name = $x[9];
-            
-            push (@{$data{$read_name}}, $line);
-        }
-        close $fh;
-    }
-
-    open(my $ofh_filt, ">$filt_file") or die "Error, cannot write to $filt_file";
-    
-    
-    foreach my $read_name (keys %data) {
-        my @lines = @{$data{$read_name}};
-
-        my $pct_paired_gene_mappings = &compute_pct_alns_mapping_to_gene_pairs(@lines);
-
-        my @filter_reasons;
-        if ($pct_paired_gene_mappings <= $min_pct_multimapping_to_genes) {
-            push (@filter_reasons, "only Pct (" . sprintf("%.2f", $pct_paired_gene_mappings) . "%) of alignments had paired gene anchors");
-        }
-
-        elsif (my $selfie = &contains_selfie_or_homology_match(@lines)) {
-            push (@filter_reasons, "Contains selfie or homology match ($selfie).");
-        }
+    my @lines;
+    my $prev_read_name = "";
+    while (<$fh>) {
+        if (/^\#/) { next; } 
+        my $line = $_;
+        chomp;
+        my @x = split(/\t/);
+        my $read_name = $x[9];
         
-        
-        
-        else {
-            my ($left_homology_congruence, $right_homology_congruence) = &compute_pct_homology_congruence(@lines);
-
-            if ($left_homology_congruence < $MIN_MM_HOMOLOGY_CONGRUENCE
-                ||
-                $right_homology_congruence < $MIN_MM_HOMOLOGY_CONGRUENCE) {
-
-                push (@filter_reasons, "Fails mulitmapper homology congruence (Left: $left_homology_congruence, Right: $right_homology_congruence)");
+        if ($read_name ne $prev_read_name) {
+            if (@lines) {
+                &examine_reads(\@lines);
+                @lines = (); # reinit
             }
         }
-         
-        if (@filter_reasons) {
-            print $ofh_filt "#" . join("; ", @filter_reasons) . "\n";
-            print $ofh_filt join("", @lines) . "\n";
-        }
-        else {
-            print join("", @lines);
-        }
+        push (@lines, $line);
+        
+        $prev_read_name = $read_name;
+    }
+    close $fh;
+    
+    if (@lines) {
+        ## get last one
+        &examine_reads(\@lines);
     }
 
-
-    exit(0);
+    print STDERR "\ndone.\n\n";
     
+    exit(0);    
+    
+}
+
+
+####
+sub examine_reads {
+    my ($lines_aref) = @_;
+
+    $READ_COUNTER++;
+
+    if ($READ_COUNTER % 100000 == 0) { 
+        &progress_monitor();
+    }
+    
+    my @lines = @$lines_aref;
+    
+    ## see how often both read parts each match genes, vs. the other case where only one or no frag matches any gene.
+    my $pct_paired_gene_mappings = &compute_pct_alns_mapping_to_gene_pairs(@lines);
+    
+    my @filter_reasons;
+    
+    if ($pct_paired_gene_mappings <= $min_pct_multimapping_to_genes) {
+        push (@filter_reasons, "only Pct (" . sprintf("%.2f", $pct_paired_gene_mappings) . "%) of alignments had paired gene anchors");
+    }
+    
+    elsif (my $selfie = &contains_selfie_or_homology_match(@lines)) {
+        push (@filter_reasons, "Contains selfie or homology match ($selfie).");
+    }
+    
+    else {
+        my ($left_homology_congruence, $right_homology_congruence) = &compute_pct_homology_congruence(@lines);
+        
+        if ($left_homology_congruence < $MIN_MM_HOMOLOGY_CONGRUENCE
+            ||
+            $right_homology_congruence < $MIN_MM_HOMOLOGY_CONGRUENCE) {
+            
+            push (@filter_reasons, "Fails mulitmapper homology congruence (Left: $left_homology_congruence, Right: $right_homology_congruence)");
+        }
+    }
+    
+    if (@filter_reasons) {
+        print $ofh_filt "#" . join("; ", @filter_reasons) . "\n";
+        print $ofh_filt join("", @lines) . "\n";
+    }
+    else {
+        print join("", @lines);
+    }
+    
+    return;
 }
 
 ####
@@ -283,9 +308,10 @@ sub contains_selfie_or_homology_match {
                     return($left_gene_id);
                 }
                 
-                if (my $homology_hit = &examine_seq_similarity($left_gene_id, $right_gene_id)) {
-                    return("blast_pair: $left_gene_id vs. $right_gene_id : $homology_hit");
-                }
+                
+                #if (my $homology_hit = &examine_seq_similarity($left_gene_id, $right_gene_id)) {
+                #    return("blast_pair: $left_gene_id vs. $right_gene_id : $homology_hit");
+                #}   ## turning off simple homology check. It's not specific enough to use at this stage.
                 
                 
                 # maybe not the same gene id, but both parts are effectively matching the same genomic locus (aka gene).
@@ -507,10 +533,9 @@ sub check_read_alignment_to_seq_similar_region {
     if (my $overlap_text = &any_coordsets_overlap($genome_coords_B_aref, $align_coords_B_aref)) {
         return("$left_gene_id/$right_gene_id seq_similar overlap on $right_gene_id: $overlap_text");
     }
-
-    
     
 }
+
 
 ####
 sub any_coordsets_overlap {
@@ -534,4 +559,17 @@ sub any_coordsets_overlap {
     return undef;
 }
 
+
+sub progress_monitor {
+   
+    my $end_time = time();
+
+    my $time_delta = $end_time - $START_TIME;
+
+    my $reads_per_min = $READ_COUNTER / ($time_delta/60);
+
+    print STDERR "\r " . sprintf("%.2f", $reads_per_min) . " reads per min processed...  ";
+
+    return;
+}
 
