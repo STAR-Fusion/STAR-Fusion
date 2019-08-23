@@ -17,7 +17,7 @@ my @FREE_PASS = qw(Mitelman chimerdb_omim chimerdb_pubmed ChimerKB ChimerPub
 
 my $FREE_PASS_REGEX = join("|", @FREE_PASS);
 
-print "$FREE_PASS_REGEX\n";
+#print "$FREE_PASS_REGEX\n";
 
 main: {
     
@@ -47,7 +47,7 @@ main: {
 
         my $annots = $delim_reader->get_row_val($row, "annots");
         
-        print STDERR "$annots";
+        #print STDERR "$annots";
         
         my $combo = $left_dinuc . $right_dinuc;
 
