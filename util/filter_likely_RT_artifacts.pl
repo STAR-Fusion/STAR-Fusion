@@ -40,9 +40,9 @@ main: {
     
     while (my $row = $delim_reader->get_row()) {
 
-        my $left_dinuc = $delim_reader->get_row_val($row, "LeftBreakDinuc");
-        my $right_dinuc = $delim_reader->get_row_val($row, "RightBreakDinuc");
-
+        my $left_dinuc = uc $delim_reader->get_row_val($row, "LeftBreakDinuc");
+        my $right_dinuc = uc $delim_reader->get_row_val($row, "RightBreakDinuc");
+        
         my $fusion_name = $delim_reader->get_row_val($row, "#FusionName");
 
         my $annots = $delim_reader->get_row_val($row, "annots");
