@@ -132,6 +132,15 @@ $fusion_preds_file = &ensure_full_path($fusion_preds_file);
 
 $out_prefix = &ensure_full_path($out_prefix);
 
+############################################################
+## Need AnnotFilterRule for organism-specific exceptions to filtering rules based on genes
+my $annot_filt_module = "$genome_lib_dir/AnnotFilterRule.pm";
+unless (-s $annot_filt_module) {
+    die "Error, cannot locate required $annot_filt_module  ... be sure to use a more modern version of the companion CTAT_GENOME_LIB ";
+}
+
+require $annot_filt_module;
+############################################################
 
 
 main: {
@@ -488,7 +497,8 @@ sub remove_fusions_with_insufficient_support {
 
     foreach my $fusion (@$fusions_aref) {
         
-
+        my $fusion_name = $fusion->{fusion_name};
+        
         my $splice_type = $fusion->{splice_type};
 
         my $sum = $fusion->{J} + $fusion->{S};
@@ -512,13 +522,13 @@ sub remove_fusions_with_insufficient_support {
         }
 
         
-        if ($fusion->{J} < $min_J) {
+        if ($fusion->{J} < $min_J && ! &AnnotFilterRule::fusion_has_junction_reads_exception($fusion_name) ) {
             # skip it
             $row{Note} = "FILTERED DUE TO junction read support ($fusion->{J}) < $min_J";
             $filter_tab_writer->write_row(\%row);
             next;
         }
-
+        
         if ($fusion->{J} == 0 && $fusion->{S} < $min_spanning_frags_only) {
             $row{Note} = "FILTERED DUE TO only spanning reads and num spanning frags $fusion->{S} < $min_spanning_frags_only";
             $filter_tab_writer->write_row(\%row);

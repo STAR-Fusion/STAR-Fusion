@@ -2,6 +2,7 @@
 
 use strict;
 use warnings;
+use Carp;
 
 use FindBin;
 use lib ("$FindBin::Bin/../PerlLib");
@@ -18,6 +19,23 @@ my @FREE_PASS = qw(Mitelman chimerdb_omim chimerdb_pubmed ChimerKB ChimerPub
 my $FREE_PASS_REGEX = join("|", @FREE_PASS);
 
 #print "$FREE_PASS_REGEX\n";
+
+
+
+############################################################
+## Need AnnotFilterRule for organism-specific exceptions to filtering rules based on genes
+
+my $genome_lib_dir = $ENV{CTAT_GENOME_LIB} || confess "Error, must have env var CTAT_GENOME_LIB set";
+
+my $annot_filt_module = "$genome_lib_dir/AnnotFilterRule.pm";
+unless (-s $annot_filt_module) {
+    die "Error, cannot locate required $annot_filt_module  ... be sure to use a more modern version of the companion CTAT_GENOME_LIB ";
+}
+
+require $annot_filt_module;
+############################################################
+
+
 
 main: {
     
@@ -59,9 +77,12 @@ main: {
             $fusion_name =~ /\@/ # includes the IGH and IGL super loci
 
             ||
+            
             $annots =~ /\b($FREE_PASS_REGEX)\b/
             
-            ## TODO:  add additional exceptions
+            ||
+
+            &AnnotFilterRule::fusion_has_junction_reads_exception($fusion_name) # ie. IGH--CRLF2
             
             ) {
 
