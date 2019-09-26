@@ -774,11 +774,12 @@ main: {
                 my $FI_right_fq = "$out_prefix.fusion_evidence_reads_2.fq";
                 $FI_cmd .= " --right_fq $FI_right_fq ";
             }
+            $FI_cmd .= " --no_FFPM "; # FFPM would be meaningless in this context of fusion-only reads.
         }
         else {
             # validate mode
             # use all original reads.
-
+            
             if ($samples_file) {
                 $FI_cmd .= " --samples_file $samples_file ";
             }
