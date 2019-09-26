@@ -439,6 +439,9 @@ unless (-d $genome_lib_dir) {
     die "Error, cannot locate genome_lib_dir: $genome_lib_dir";
 }
 
+## reset it just in case it's different or unset to begin with:
+$ENV{CTAT_GENOME_LIB} = $genome_lib_dir;
+
 ## ensure that we can locate the AnnotFilterRule in the CTAT_GENOME_LIB
 my $annot_filt_module = "$genome_lib_dir/AnnotFilterRule.pm";
 unless (-s $annot_filt_module) {
