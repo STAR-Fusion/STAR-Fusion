@@ -177,7 +177,7 @@ sub examine_reads {
     
     my @filter_reasons;
     
-    if ($pct_paired_gene_mappings < $min_pct_multimapping_to_genes) {
+    if ($pct_paired_gene_mappings <= $min_pct_multimapping_to_genes) {
         push (@filter_reasons, "only Pct (" . sprintf("%.2f", $pct_paired_gene_mappings) . "%) of alignments had paired gene anchors");
     }
     
