@@ -491,6 +491,9 @@ my $read_group_ids = "";
 
 main: {
 
+    
+    &validate_ctat_genome_lib($genome_lib_dir);
+    
             
     unless (-d $output_dir) {
         &process_cmd("mkdir -p $output_dir");
@@ -1108,3 +1111,17 @@ sub get_num_total_rnaseq_frags {
 }
 
 
+####
+sub validate_ctat_genome_lib {
+    my ($genome_lib_dir) = @_;
+
+    my $cmd = "$UTILDIR/validate_ctat_genome_lib.pl $genome_lib_dir";
+    
+    my $ret = system($cmd);
+    if ($ret) {
+        die "\n\n\tERROR, ctat genome lib: $genome_lib_dir does not validate and may require indices to be rebuilt.\n\n"
+            . "\tVisit: https://github.com/STAR-Fusion/STAR-Fusion/wiki/rebuild_ctat_genome_lib_indices\n\tfor details.\n\n";
+    }
+    
+    return;
+}
