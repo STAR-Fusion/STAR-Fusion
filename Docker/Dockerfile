@@ -134,7 +134,7 @@ RUN wget http://eddylab.org/software/hmmer3/3.1b2/hmmer-3.1b2-linux-intel-x86_64
 ##############
 ## STAR
 
-ENV STAR_VERSION=2.7.2a
+ENV STAR_VERSION=2.7.2b
 RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" &&\
     wget -P $SRC $STAR_URL &&\
     tar -xvf $SRC/${STAR_VERSION}.tar.gz -C $SRC && \
@@ -147,7 +147,7 @@ RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" 
 WORKDIR $SRC
 
 ENV STAR_FUSION_VERSION=1.8.0test
-ENV STARF_CHECKOUT=ae2d00ea1c8b45f7fc1359fb7185f36b1c882169
+ENV STARF_CHECKOUT=0544ca699cfcf04689cda833e5613b52f4831a3c
 
 
 RUN apt-get update && apt-get install -y git
@@ -162,4 +162,11 @@ RUN git clone https://github.com/STAR-Fusion/STAR-Fusion.git && \
 ENV STAR_FUSION_HOME $SRC/STAR-Fusion
 
 ## FusionInspector and FusionAnnotator are bundled with STAR-Fusion
+
+## Dfam scan
+WORKDIR $SRC
+RUN wget https://dfam.org/releases/current/infrastructure/dfamscan.pl.gz && \
+     gunzip dfamscan.pl.gz && \
+     chmod 755 dfamscan.pl && \
+     mv dfamscan.pl $BIN/
 
