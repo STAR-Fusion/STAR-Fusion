@@ -134,7 +134,7 @@ RUN wget http://eddylab.org/software/hmmer3/3.1b2/hmmer-3.1b2-linux-intel-x86_64
 ##############
 ## STAR
 
-ENV STAR_VERSION=2.7.2b
+ENV STAR_VERSION=2.7.2a
 RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" &&\
     wget -P $SRC $STAR_URL &&\
     tar -xvf $SRC/${STAR_VERSION}.tar.gz -C $SRC && \
@@ -147,7 +147,7 @@ RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" 
 WORKDIR $SRC
 
 ENV STAR_FUSION_VERSION=1.8.0test
-ENV STARF_CHECKOUT=cae0db7bc060baeb931f9572ba88da1b3b9cd22a
+ENV STARF_CHECKOUT=ae2d00ea1c8b45f7fc1359fb7185f36b1c882169
 
 
 RUN apt-get update && apt-get install -y git
