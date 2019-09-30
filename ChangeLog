@@ -1,3 +1,12 @@
+STAR-Fusion Release v1.8.0, Oct 1, 2019
+	-requires STAR aligner 2.7.2b
+	-bugfix for RT-artifact removal, no longer case sensitive on splice dinucleotides
+	-allow exceptions to requirement of breakpoint-defining reads such as IGH--CRLF2 where breakpoints may be ill defined given complex structural rearrangements.
+	-ctat genome lib updates:
+		-use Dfam-based masking of cds-plus database prior to blast & homology detection. (this is similar to the earlier repeatmasker approach used in earlier versions of STAR-Fusion.  Because of repbase licensing requirements, its more straightforward to just use Dfam with nhmmer for identifying human-homologous repeat elements and softmask them prior to blast.  This was found to be particularly relevant to excluding blast-homology detection between BRAF and AKAP9 in gencode v31 where additional transcript annotations in both genes extend into Alu elements and would otherwise be detected as false homology.  The BRAF/AKAP9 fusion was falsely excluded by the previous STAR-F release, and now properly recaptured again in this release).
+		-human-specific refinements: IGH and IGL super-loci now include intergenic regions; included upstream regions as targets for CRLF2, DUX4, and MALT1 known to fuse w/ IGH in cancer; hard-masking DUX4-paralogs and pseudogenes that confound IGH--DUX4 fusion calling (ideas inspired by FusionCatcher so certain important known cancer-relevant fusions aren't missed, even when the data likely stem from contaminating DNA rather than true RNA-based reads).
+
+
 STAR-Fusion Release v1.7.0, August 17, 2019
 	-requires newly released STAR aligner v2.7.2a, where we updated the chimeric junction reporting, requiring chimeric read alignments to have higher alignment scores than the non-chimeric read alignment counterparts. The chimeric junction output file includes all the alignment scores and new column headers to facilitate further updates.
 	-now filtering likely reverse transcription artifacts - defined as those lacking canonical splicing dinucleotides at transcript chimeric breakpoints, not involving known cancer fusions, and not involving targets known to involve non-canonical breakpoints.
