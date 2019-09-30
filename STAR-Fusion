@@ -14,10 +14,10 @@ use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
 
 
-my $VERSION = "1.7.0";
-#my $VERSION = "__BLEEDING_EDGE__ Do not use - pull versioned release from: https://github.com/STAR-Fusion/STAR-Fusion/releases";
+#my $VERSION = "1.7.0";
+my $VERSION = "__BLEEDING_EDGE__ Do not use - pull versioned release from: https://github.com/STAR-Fusion/STAR-Fusion/releases";
 
-my @MIN_STAR_MAJOR_MINOR_VERSION = (2, 7, 2, 'a');
+my @MIN_STAR_MAJOR_MINOR_VERSION = (2, 7, 2, 'b');
 
 
 my $BASEDIR = "$FindBin::Bin";
@@ -439,6 +439,9 @@ unless (-d $genome_lib_dir) {
     die "Error, cannot locate genome_lib_dir: $genome_lib_dir";
 }
 
+## reset it just in case it's different or unset to begin with:
+$ENV{CTAT_GENOME_LIB} = $genome_lib_dir;
+
 ## ensure that we can locate the AnnotFilterRule in the CTAT_GENOME_LIB
 my $annot_filt_module = "$genome_lib_dir/AnnotFilterRule.pm";
 unless (-s $annot_filt_module) {
@@ -488,6 +491,9 @@ my $read_group_ids = "";
 
 main: {
 
+    
+    &validate_ctat_genome_lib($genome_lib_dir);
+    
             
     unless (-d $output_dir) {
         &process_cmd("mkdir -p $output_dir");
@@ -774,11 +780,12 @@ main: {
                 my $FI_right_fq = "$out_prefix.fusion_evidence_reads_2.fq";
                 $FI_cmd .= " --right_fq $FI_right_fq ";
             }
+            $FI_cmd .= " --no_FFPM "; # FFPM would be meaningless in this context of fusion-only reads.
         }
         else {
             # validate mode
             # use all original reads.
-
+            
             if ($samples_file) {
                 $FI_cmd .= " --samples_file $samples_file ";
             }
@@ -857,6 +864,7 @@ sub run_STAR {
         . " --alignMatesGapMax $STAR_MAX_MATE_DIST "
         . " --alignIntronMax $STAR_MAX_MATE_DIST "
         . " --alignSJstitchMismatchNmax 5 -1 5 5 "  #which allows for up to 5 mismatches for non-canonical GC/AG, and AT/AC junctions, and any number of mismatches for canonical junctions (the default values 0 -1 0 0 replicate the old behavior (from AlexD)
+        
         . " --runThreadN $CPU"
         . $maybe_tmpdir
         . " --outSAMstrandField intronMotif "
@@ -1103,3 +1111,17 @@ sub get_num_total_rnaseq_frags {
 }
 
 
+####
+sub validate_ctat_genome_lib {
+    my ($genome_lib_dir) = @_;
+
+    my $cmd = "$UTILDIR/validate_ctat_genome_lib.pl $genome_lib_dir";
+    
+    my $ret = system($cmd);
+    if ($ret) {
+        die "\n\n\tERROR, ctat genome lib: $genome_lib_dir does not validate and may require indices to be rebuilt.\n\n"
+            . "\tVisit: https://github.com/STAR-Fusion/STAR-Fusion/wiki/rebuild_ctat_genome_lib_indices\n\tfor details.\n\n";
+    }
+    
+    return;
+}

@@ -14,7 +14,7 @@ use JSON::XS;
 use TiedHash;
 use Gene_overlap_check;
 require "cigar_parser.ph";
-
+require "overlapping_nucs.ph";
 
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
@@ -57,6 +57,7 @@ Removes chimeric reads that have the following properties:
 #    --min_pct_MM_nonspecific|M <int>     min pct of multimapping reads that should map to 2 genes
 #                                         (avoids multimapping reads that lack specificity)
 #                                           value must be between [1,100] (default: $min_pct_multimapping_to_genes)
+#
 ###################################################################################################
 
 
@@ -75,6 +76,7 @@ my $filt_file;
               'min_pct_MM_nonspecific|M=i' => \$min_pct_multimapping_to_genes,
               'filt_file=s' => \$filt_file,
               'genome_lib_dir=s' => \$genome_lib_dir,
+              
               'd' => \$DEBUG,
     );
 
@@ -96,7 +98,7 @@ if (-s $blast_pairs_idx_file) {
     $BLAST_PAIRS_IDX = new TiedHash( { use => $blast_pairs_idx_file } );
 }
 else {
-    die "Error: cannot locate $blast_pairs_idx_file";
+    die "Error: cannot locate blast pairs idx file: $blast_pairs_idx_file";
 }
 
 my $GENE_OVERLAP_CHECKER = new Gene_overlap_check("$genome_lib_dir/ref_annot.gtf.gene_spans");
@@ -110,7 +112,6 @@ if (-s $blast_aligns_idx_file) {
 else {
     die "Error, cannot lcoate blast idx file: $blast_aligns_idx_file";
 }
-
 
 
 my $JSON_DECODER = JSON::XS->new();
@@ -180,8 +181,8 @@ sub examine_reads {
         push (@filter_reasons, "only Pct (" . sprintf("%.2f", $pct_paired_gene_mappings) . "%) of alignments had paired gene anchors");
     }
     
-    elsif (my $selfie = &contains_selfie_or_homology_match(@lines)) {
-        push (@filter_reasons, "Contains selfie or homology match ($selfie).");
+    elsif (my $fail_info = &contains_selfie_or_homology_region_match(@lines)) {
+        push (@filter_reasons, "Contains selfie, homology, or repeat match ($fail_info).");
     }
     
     else {
@@ -225,7 +226,7 @@ sub compute_pct_alns_mapping_to_gene_pairs {
 }
 
 ####
-sub contains_selfie_or_homology_match {
+sub contains_selfie_or_homology_region_match {
     my (@lines) = @_;
     
     # if parts i,j of a chimeric read effectively match the same gene
@@ -269,14 +270,14 @@ sub contains_selfie_or_homology_match {
         }
 
         my ($left_genes_aref, $right_genes_aref);
-
+        
         eval {
             $left_genes_aref = $JSON_DECODER->decode($json_left);
         };
         if ($@) {
             confess "Error trying to decode json string:\n$json_left\n$@";
         }
-         
+        
         eval {
             $right_genes_aref = $JSON_DECODER->decode($json_right);
         };
@@ -305,7 +306,7 @@ sub contains_selfie_or_homology_match {
                 $right_gene_id =~ s/\^.*$//;
 
                 if ($left_gene_id eq $right_gene_id) {
-                    return($left_gene_id);
+                    return("selfie: $left_gene_id");
                 }
                 
                 
@@ -332,6 +333,7 @@ sub contains_selfie_or_homology_match {
                                                                 $right_gene_id, $genome_coords_B_aref) ) {
                     return("alignment in seq-similar region between genes: $align_found");
                 }
+                
             }
         }
     }
@@ -572,4 +574,3 @@ sub progress_monitor {
 
     return;
 }
-
