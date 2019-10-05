@@ -14,8 +14,8 @@ use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
 
 
-my $VERSION = "1.8.0";
-#my $VERSION = "__BLEEDING_EDGE__ Do not use - pull versioned release from: https://github.com/STAR-Fusion/STAR-Fusion/releases";
+#my $VERSION = "1.8.0";
+my $VERSION = "__BLEEDING_EDGE__ Do not use - pull versioned release from: https://github.com/STAR-Fusion/STAR-Fusion/releases";
 
 my @MIN_STAR_MAJOR_MINOR_VERSION = (2, 7, 2, 'b');
 
@@ -335,7 +335,7 @@ my $SHOW_FULL_USAGE_INFO;
               'STAR_LoadAndExit' => \$STAR_LOAD_AND_EXIT,
               'STAR_Remove' => \$STAR_REMOVE,
               
-              'STAR_MAX_MATE_DIST=i' => \$STAR_MAX_MATE_DIST,
+              'STAR_max_mate_dist=i' => \$STAR_MAX_MATE_DIST,
 
               'STAR_SortedByCoordinate' => \$STAR_SortedByCoordinate,
               'STAR_limitBAMsortRAM=s' => \$STAR_limitBAMsortRAM,
