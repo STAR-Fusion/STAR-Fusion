@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import sys, os, re
 import subprocess
@@ -31,6 +31,7 @@ def reads_need_cleaning(bam_file):
 
     counter = 0
     for line in bam_reader.stdout:
+        line = line.decode()
         fields = line.split("\t")
         readname = fields[0]
         counter += 1
@@ -49,9 +50,10 @@ def clean_reads(input_bam, output_bam):
 
         
     for line in sam_reader.stdout:
+        line = line.decode()
         if re.search("^@", line):
             # header line
-            sam_writer.stdin.write(line)
+            sam_writer.stdin.write(line.encode())
             continue
         
         # adjust sam record
@@ -73,7 +75,7 @@ def clean_reads(input_bam, output_bam):
 
         x[1] = str(flag)
         
-        sam_writer.stdin.write("\t".join(x))
+        sam_writer.stdin.write( ("\t".join(x)).encode() )
     
 
 
