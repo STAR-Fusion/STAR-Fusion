@@ -172,3 +172,11 @@ RUN wget https://dfam.org/releases/current/infrastructure/dfamscan.pl.gz && \
      chmod 755 dfamscan.pl && \
      mv dfamscan.pl $BIN/
 
+
+## add Picard tools
+## Picard
+WORKDIR $SRC
+
+RUN wget https://github.com/broadinstitute/picard/releases/download/2.20.3/picard.jar
+
+ENV PICARD_HOME $SRC
