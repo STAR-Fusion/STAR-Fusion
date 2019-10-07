@@ -1,4 +1,4 @@
 #!/bin/bash
 
-docker run --rm -it -v `pwd`:`pwd` trinityctat/ctatfusion:latest $*
+docker run --rm -it -v `pwd`:`pwd` trinityctat/starfusion:latest $*
 

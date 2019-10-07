@@ -180,3 +180,6 @@ WORKDIR $SRC
 RUN wget https://github.com/broadinstitute/picard/releases/download/2.20.3/picard.jar
 
 ENV PICARD_HOME $SRC
+
+
+COPY sam_readname_cleaner.py $BIN/
