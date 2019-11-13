@@ -142,15 +142,21 @@ RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" 
 
 
 
+
+## Dfam scan
+WORKDIR $SRC
+RUN wget https://dfam.org/releases/current/infrastructure/dfamscan.pl.gz && \
+     gunzip dfamscan.pl.gz && \
+     chmod 755 dfamscan.pl && \
+     mv dfamscan.pl $BIN/
+
+
 ###############
 ## STAR-Fusion:
 WORKDIR $SRC
 
-
-ENV STAR_FUSION_VERSION=1.8.0
-ENV STARF_CHECKOUT=72ba6801e9eff726f4acb9d8b4ba5fd06d7fb2f3
-
-
+ENV STAR_FUSION_VERSION=1.8.1
+ENV STARF_CHECKOUT=54f608e57300398e6cffb881521f66613add2f46
 
 RUN apt-get update && apt-get install -y git
 
@@ -163,14 +169,6 @@ RUN git clone https://github.com/STAR-Fusion/STAR-Fusion.git && \
 
 ENV STAR_FUSION_HOME $SRC/STAR-Fusion
 
-## FusionInspector and FusionAnnotator are bundled with STAR-Fusion
-
-## Dfam scan
-WORKDIR $SRC
-RUN wget https://dfam.org/releases/current/infrastructure/dfamscan.pl.gz && \
-     gunzip dfamscan.pl.gz && \
-     chmod 755 dfamscan.pl && \
-     mv dfamscan.pl $BIN/
 
 
 ## add Picard tools
