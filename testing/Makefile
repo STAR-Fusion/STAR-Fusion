@@ -54,26 +54,13 @@ kickstart_hg19_FI_inspect: kickstart_hg19_coding_effect
 ###################################
 #### Full mode, starting from reads
 
-<<<<<<< HEAD
+
 standard_denovo_reconstruct: standard
 	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --denovo_reconstruct --FusionInspector validate --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir  
 
 standard_coding_effect: standard
 	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --FusionInspector validate --examine_coding_effect --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir  
-=======
-standard_FI_inspect: standard
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir  --STAR_use_shared_memory --FusionInspector inspect
 
-standard_FI_validate: standard
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir  --STAR_use_shared_memory --FusionInspector validate
-
-
-standard_denovo_reconstruct: standard_FI_validate
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --denovo_reconstruct --FusionInspector validate --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir  --STAR_use_shared_memory 
-
-standard_coding_effect: standard_FI_validate
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --FusionInspector validate --examine_coding_effect --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir  --STAR_use_shared_memory 
->>>>>>> c3c06f85139158e19de0696ca6ffe408523cefa0
 
 
 ####################
