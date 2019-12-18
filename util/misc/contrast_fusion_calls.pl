@@ -8,16 +8,50 @@ use lib ("$FindBin::Bin/../../PerlLib");
 use DelimParser;
 use File::Basename;
 
-my $usage = "\n\tusage: $0 A.fusions.aggregated.tsv  B.fusions.aggregated.tsv\n\n";
+use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
-my $A_tsv = $ARGV[0] or die $usage;
-my $B_tsv = $ARGV[1] or die $usage;
+my $usage = <<__EOUSAGE__;
+
+########################################################################################
+#
+# --A_fusions <string>      aggregated fusions dat file A
+#
+# --B_fusions <string>      aggregated fusions dat file B
+#
+# --val_type <string>       FFPM  | J | S | T   (J=junction, S=split, and T=total reads)
+#
+########################################################################################
+
+
+__EOUSAGE__
+
+    ;
+
+
+my $help_flag;
+my $A_tsv;
+my $B_tsv;
+my $val_type;
+
+
+&GetOptions (
+    'h' => \$help_flag,
+    'A_fusions=s' => \$A_tsv,
+    'B_fusions=s' => \$B_tsv,
+    'val_type=s' => \$val_type,
+    
+    );
+
+unless ($A_tsv && $B_tsv && $val_type) {
+    die $usage;
+}
+
 
 main: {
 
-    my %fusions_A = &parse_top_fusions($A_tsv);
+    my %fusions_A = &parse_top_fusions($A_tsv, $val_type);
 
-    my %fusions_B = &parse_top_fusions($B_tsv);
+    my %fusions_B = &parse_top_fusions($B_tsv, $val_type);
 
     my %all_fusion_calls = map { + $_ => 1 } (keys %fusions_A, keys %fusions_B);
 
@@ -38,8 +72,8 @@ main: {
 
 ####
 sub parse_top_fusions {
-    my ($tsv_file) = @_;
-
+    my ($tsv_file, $val_type) = @_;
+    
     my $fh;
     if ($tsv_file =~ /\.gz$/) {
         open($fh, "gunzip -c $tsv_file | ") or die "Error, cannot gunzip file: $tsv_file";
@@ -50,30 +84,43 @@ sub parse_top_fusions {
     
     my $delim_reader = new DelimParser::Reader($fh, "\t");
     
-    my %top_fusions;
+    my %fusion_to_val;
 
     while (my $row = $delim_reader->get_row()) {
         
         my $sample_name = $delim_reader->get_row_val($row, "#sample");
         my $fusion_name = $delim_reader->get_row_val($row, "#FusionName");
         my $FFPM = $delim_reader->get_row_val($row, "FFPM");
+
+        my $J = $delim_reader->get_row_val($row, "JunctionReadCount");
+        my $S = $delim_reader->get_row_val($row, "SpanningFragCount");
+        my $T = $J + $S;
         
         $sample_name =~ s/\.(Fusion|STAR).*$//g; # just the sample please
 
         my $left_breakpoint = $delim_reader->get_row_val($row, "LeftBreakpoint");
         my $right_breakpoint = $delim_reader->get_row_val($row, "RightBreakpoint");
-        
+
+        ## encoding sample name and breakpoint info into a unique fusion instance.
         $fusion_name = join("::", $sample_name, $fusion_name, $left_breakpoint, $right_breakpoint);
+
+        my $val =
+            ($val_type eq "FFPM") ? $FFPM :
+            ($val_type eq "J") ? $J :
+            ($val_type eq "S") ? $S :
+            ($val_type eq "T") ? $T :
+            die "Error, not recognizing val type: $val_type";
         
-        if ( (! exists $top_fusions{$fusion_name})
-             ||
-             $top_fusions{$fusion_name} < $FFPM) {
-            
-            $top_fusions{$fusion_name} = $FFPM;
+        
+        if (exists $fusion_to_val{$fusion_name}) {
+            die "Error, found multiple instances of fusion: $fusion_name ";
         }
+        
+        $fusion_to_val{$fusion_name} = $val;
         
     }
     
-    return(%top_fusions);
+    return(%fusion_to_val);
     
 }
+
