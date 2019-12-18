@@ -1,0 +1,23 @@
+#!/usr/bin/env Rscript
+
+options(stringsAsFactors = FALSE)
+
+args<-commandArgs(TRUE)
+if (length(args) == 0) {
+    stop("require param: dat_filename")
+}
+
+
+dat_filename = args[1]
+
+pdf_filename = paste0(dat_filename, '.pdf')
+pdf(pdf_filename)
+
+data = read.table(dat_filename, header=T, row.names=1, com='')
+cnames = colnames(data)
+
+plot(log2(data[,1]+1), log2(data[,2]+1), xlab=cnames[1], ylab=cnames[2], main=sprintf("%s vs %s", cnames[1], cnames[2]))
+abline(a=0,b=1,col='red')
+
+dev.off()
+
