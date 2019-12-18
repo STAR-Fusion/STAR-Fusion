@@ -46,6 +46,10 @@ unless ($A_tsv && $B_tsv && $val_type) {
     die $usage;
 }
 
+unless ($val_type =~ /^(FFPM|J|S|T)$/) {
+    die "error, val_type $val_type not supported";
+}
+
 
 main: {
 
@@ -90,8 +94,11 @@ sub parse_top_fusions {
         
         my $sample_name = $delim_reader->get_row_val($row, "#sample");
         my $fusion_name = $delim_reader->get_row_val($row, "#FusionName");
-        my $FFPM = $delim_reader->get_row_val($row, "FFPM");
-
+        my $FFPM = "NA";
+        if ($val_type eq "FFPM") {
+            # not included in fusion inspector 'inspect' mode.
+            $FFPM = $delim_reader->get_row_val($row, "FFPM");
+        }
         my $J = $delim_reader->get_row_val($row, "JunctionReadCount");
         my $S = $delim_reader->get_row_val($row, "SpanningFragCount");
         my $T = $J + $S;
