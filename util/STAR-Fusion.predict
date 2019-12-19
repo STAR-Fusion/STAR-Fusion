@@ -13,6 +13,7 @@ use Data::Dumper;
 use Process_cmd;
 use DelimParser;
 use JSON::XS;
+use ChimericCigarParser;
 
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
@@ -26,6 +27,8 @@ my $help_flag;
 my $NO_REMOVE_DUPS;
 
 my $LONG_ANCHOR_SIZE = 25;
+
+my $FUZZ_DISTANCE = 5;
 
 my $usage = <<__EOUSAGE__;
 
@@ -41,6 +44,9 @@ my $usage = <<__EOUSAGE__;
 #    --out_prefix|O <string>         output file prefix (default: $out_prefix)
 #    
 #    --no_remove_dups                do not remove duplicate reads
+#
+#    --brktp_fuzz_dist <int>         spanning read alignment allowed to extend beyond the breakpoint by this amount
+#                                        (default: $FUZZ_DISTANCE) 
 #
 ###################################################################################
 
@@ -60,6 +66,8 @@ my $DEBUG;
 
               'no_remove_dups' => \$NO_REMOVE_DUPS,
               
+              'brktp_fuzz_dist' => \$FUZZ_DISTANCE,
+
               'd' => \$DEBUG,
     );
 
@@ -79,7 +87,7 @@ main: {
     my %all_fusion_candidate_complex_names;  # {fusion_complex_name} = info struct.  complex_name = gene_symbolA^gene_idA--gene_symbolB^gene_idB
     my %junction_breakpoint_to_read_names;  #  {fusion_complex_name} -> {breakpoint} -> {read_name} = 1 
     my %junction_breakpoint_to_long_anchors; # {fusion_complex_name} -> {breakpoint} -> {left|right} = 1 
-    my %spans_to_read_names; # {fusion_complex_name} -> { read_name } = 1
+    my %spans_to_read_names; # {fusion_complex_name} -> { read_name } = { left_span => [lend,rend], right_span => [lend,rend] }
     
     
     print STDERR "-parsing fusion evidence: $chimeric_junction_file\n";
@@ -142,15 +150,23 @@ main: {
                                 
                 my $breakpoint_count = scalar(@junc_reads);
 
+                my ($left_chr, $left_brkpt, $left_orient) = split(/:/, $left_coords);
+                my ($right_chr, $right_brkpt, $right_orient) = split(/:/, $right_coords);
                 
                 
-                # prune any junction reads from the span support for this fusion.
-                my %local_spanning_reads = map { + $_ => 1 } @spanning_reads;                
+                # require spanning reads to flank the breakpoint
+                my %local_spanning_reads;
                 
                 foreach my $junction_read (@junc_reads) {
                     print $ofh_junc "$fusion_complex_name\t$best_breakpoint\t$junction_read\n";
-                    if (exists $local_spanning_reads{$junction_read}) {
-                        delete $local_spanning_reads{$junction_read};
+                    foreach my $spanning_read (@spanning_reads) {
+                        my $spanning_read_coords_struct = $spanning_reads_href->{$spanning_read};
+                        if (&spanning_read_consistent_with_LEFT_breakpoint($left_brkpt, $left_orient, $spanning_read_coords_struct->{left_span})
+                            &&
+                            &spanning_read_consistent_with_RIGHT_breakpoint($right_brkpt, $right_orient, $spanning_read_coords_struct->{right_span}) ) {
+                            
+                            $local_spanning_reads{$spanning_read} = 1;
+                        }
                     }
                 }
                 
@@ -398,6 +414,13 @@ sub get_chimeric_reads_to_genes {
             $seen{$PE_read_map_token} = 1;
         }
         
+        my ($A_genome_coords_aref, $A_read_coords_aref) = &get_genome_coords_via_cigar($rst_A, $cigar_A);
+        my ($B_genome_coords_aref, $B_read_coords_aref) = &get_genome_coords_via_cigar($rst_B, $cigar_B);
+
+        my ($A_span_lend, $A_span_rend) = &extract_first_and_last_coords($A_genome_coords_aref);
+        my ($B_span_lend, $B_span_rend) = &extract_first_and_last_coords($B_genome_coords_aref);
+        
+
         my $left_gene_json = $x[$#x-1];
         my @A_hits;
         if ($left_gene_json ne '.') {
@@ -458,7 +481,9 @@ sub get_chimeric_reads_to_genes {
                 if ($junction_type == -1) { 
                     # Not a split read, but rather a split pair
                     
-                    $spans_to_read_names_href->{$fusion_complex_name}->{$read_name} = 1;
+                    $spans_to_read_names_href->{$fusion_complex_name}->{$read_name} = { left_span => [$A_span_lend, $A_span_rend],
+                                                                                        right_span => [$B_span_lend, $B_span_rend] };
+                    
                     push (@x, $fusion_complex_name);
                 }
                 else {
@@ -502,4 +527,64 @@ sub get_chimeric_reads_to_genes {
     return;    
 }
 
+####
+sub extract_first_and_last_coords {
+    my ($coords_list_aref) = @_;
+    
+    my $first_coord = $coords_list_aref->[0][0];
+    my $last_coord = $coords_list_aref->[$#$coords_list_aref]->[1];
 
+    return($first_coord, $last_coord);
+}
+
+####
+sub spanning_read_consistent_with_LEFT_breakpoint {
+    my ($brkpt, $orient, $read_span_aref) = @_;
+        
+    my ($read_lend, $read_rend) = @$read_span_aref;
+    
+    ## Acceptable scenarios:
+    #                          brkpt
+    #                            |
+    #    (+)     ================== 
+    #                           ================  (-)
+    #                       FUZZ_DISTANCE extenion allowed.
+
+    
+    if ( ($orient eq "+" && $read_rend - $FUZZ_DISTANCE <= $brkpt)
+         ||
+         ($orient eq "-" && $read_lend + $FUZZ_DISTANCE >= $brkpt) ) {
+        
+        return(1); # ok
+    }
+    else {
+        return(0); # nope
+    }
+}
+
+sub spanning_read_consistent_with_RIGHT_breakpoint {
+    my ($brkpt, $orient, $read_span_aref) = @_;
+        
+    my ($read_lend, $read_rend) = @$read_span_aref;
+    
+    ## Acceptable scenarios:
+    #                          brkpt
+    #                            |
+    #                           ==================  (+)
+    #      (-)     ================ 
+    #                       FUZZ_DISTANCE extenion allowed.
+
+    
+    if ( ($orient eq "+" && $read_lend + $FUZZ_DISTANCE >= $brkpt)
+         ||
+         ($orient eq "-" && $read_rend - $FUZZ_DISTANCE <= $brkpt) ) {
+        
+        return(1); # ok
+    }
+    else {
+        return(0); # nope
+    }
+}
+
+
+    
