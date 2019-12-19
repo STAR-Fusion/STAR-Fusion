@@ -16,7 +16,7 @@ pdf(pdf_filename)
 data = read.table(dat_filename, header=T, row.names=1, com='')
 cnames = colnames(data)
 
-plot(log2(data[,1]+1), log2(data[,2]+1), xlab=cnames[1], ylab=cnames[2], main=sprintf("%s vs %s", cnames[1], cnames[2]))
+plot(log2(data[,1]+1), log2(data[,2]+1), xlab=cnames[1], ylab=cnames[2], main=dat_filename)
 abline(a=0,b=1,col='red')
 
 dev.off()

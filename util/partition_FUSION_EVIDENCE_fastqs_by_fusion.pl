@@ -40,6 +40,8 @@ main: {
         
         my $left_record_text = $left_fq_record->get_fastq_record();
         my $right_record_text = $right_fq_record->get_fastq_record();
+
+        my $fusion_name = &extract_fusion_name_from_fq_record($left_record_text);
         
         chomp $left_record_text;
         $left_record_text =~ s/\n/$;/g;
@@ -47,7 +49,7 @@ main: {
         chomp $right_record_text;
         $right_record_text =~ s/\n/$;/g;
         
-        print $ofh join("\t", $left_record_text, $right_record_text) . "\n";
+        print $ofh join("\t", $fusion_name, $left_record_text, $right_record_text) . "\n";
         
     }
 
@@ -63,13 +65,10 @@ main: {
     my $left_ofh;
     my $right_ofh;
     
-    open (my $fh, $sorted_tmp_file) or die $!;
+    open (my $fh, $sorted_tmp_file) or die "Error, cannot open file: $sorted_tmp_file";
     while (<$fh>) {
         chomp;
-        my ($left_record, $right_record) = split(/\t/);
-
-        my ($fusion_name, @rest) = split(/\|/, $left_record);
-        $fusion_name =~ s/^\@//;
+        my ($fusion_name, $left_record, $right_record) = split(/\t/);
         
         if ($fusion_name ne $prev_fusion_name) {
 
@@ -78,11 +77,11 @@ main: {
                         
             my $fusion_reads_left_fq = "$outdir_name/${fusion_name}.left.fq";
             my $fusion_reads_right_fq = "$outdir_name/${fusion_name}.right.fq";
-            open ($left_ofh, ">$fusion_reads_left_fq") or die $!;
-            open ($right_ofh, ">$fusion_reads_right_fq") or die $!;
-
+            open ($left_ofh, ">$fusion_reads_left_fq") or die "Error, cannot write to $fusion_reads_left_fq";
+            open ($right_ofh, ">$fusion_reads_right_fq") or die "Error, cannot write to $fusion_reads_right_fq";
+            
         }
-
+        
         $left_record =~ s/$;/\n/g;
         $right_record =~ s/$;/\n/g;
 
@@ -131,6 +130,20 @@ sub parse_core_frag_names {
 
     
     return(%core_frag_names);
+}
+
+####
+sub extract_fusion_name_from_fq_record {
+    my ($fq_record) = @_;
+
+    my @lines = split(/\n/, $fq_record);
+    my $meta_line = $lines[2];
+
+    my @parts = split(/[\:\|]/, $meta_line);
+    my $fusion_name = $parts[0];
+    $fusion_name =~ s/^\+//;
+    
+    return($fusion_name);
 }
 
 
