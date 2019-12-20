@@ -8,10 +8,46 @@ use FindBin;
 use lib ("$FindBin::Bin/../PerlLib");
 use DelimParser;
 
+use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
-my $usage = "\n\n\tusage: $0 fusion_preds.tsv\n\n\t\t(writes .RTartifact.pass and .RTartifact.filtered files)\n\n\n";
+my $genome_lib_dir = $ENV{CTAT_GENOME_LIB};
 
-my $fusion_preds_file = $ARGV[0] or die $usage;
+
+
+my $usage = <<__EOUSAGE__;
+
+#############################################################################
+ 
+   writes .RTartifact.pass and .RTartifact.filtered files)
+
+#############################################################################
+#
+#  --fusions <string>               preliminary fusion predictions
+#
+#  --genome_lib_dir <string>        genome lib dir (default: ${genome_lib_dir})       
+#
+#############################################################################
+
+__EOUSAGE__
+    
+    ;
+
+
+my $fusion_preds_file;
+my $help_flag;
+
+&GetOptions ( 'help|h' => \$help_flag,
+              'fusions=s' => \$fusion_preds_file,
+              'genome_lib_dir=s' => \$genome_lib_dir,
+    );
+
+if ($help_flag) {
+    die $usage;
+}
+
+unless ($genome_lib_dir && $fusion_preds_file) {
+    die $usage;
+}
 
 my @FREE_PASS = qw(Mitelman chimerdb_omim chimerdb_pubmed ChimerKB ChimerPub
                    Cosmic HaasMedCancer); # TODO: put in config, currently sharing this here and w/ AnnotFilterRule
@@ -24,8 +60,6 @@ my $FREE_PASS_REGEX = join("|", @FREE_PASS);
 
 ############################################################
 ## Need AnnotFilterRule for organism-specific exceptions to filtering rules based on genes
-
-my $genome_lib_dir = $ENV{CTAT_GENOME_LIB} || confess "Error, must have env var CTAT_GENOME_LIB set";
 
 my $annot_filt_module = "$genome_lib_dir/AnnotFilterRule.pm";
 unless (-s $annot_filt_module) {

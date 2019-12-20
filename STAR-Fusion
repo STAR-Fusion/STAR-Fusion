@@ -439,7 +439,7 @@ unless (-d $genome_lib_dir) {
 }
 
 ## reset it just in case it's different or unset to begin with:
-$ENV{CTAT_GENOME_LIB} = $genome_lib_dir;
+$ENV{CTAT_GENOME_LIB} = &ensure_full_path($genome_lib_dir);
 
 ## ensure that we can locate the AnnotFilterRule in the CTAT_GENOME_LIB
 my $annot_filt_module = "$genome_lib_dir/AnnotFilterRule.pm";
@@ -664,7 +664,7 @@ main: {
     unless ($NO_RT_ARTIFACT_FILTER) {
 
         ## filter out likely RT artifacts
-        $cmd = "$UTILDIR/filter_likely_RT_artifacts.pl $prelim_fusion_file";
+        $cmd = "$UTILDIR/filter_likely_RT_artifacts.pl --fusions $prelim_fusion_file --genome_lib_dir $genome_lib_dir";
         $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/RTartifact_filter.ok"));
         $prelim_fusion_file = "$prelim_fusion_file.RTartifact.pass";
         
