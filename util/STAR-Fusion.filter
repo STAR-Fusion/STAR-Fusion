@@ -12,6 +12,7 @@ use Process_cmd;
 use File::Basename;
 use Pipeliner;
 use DelimParser;
+use FusionEM;
 
 my $tmpdir = "/tmp";
 
@@ -609,70 +610,42 @@ sub parse_read_mapping_counts {
 sub reassign_reads_to_dominant_fusion_and_penalize_multimaps {
     my ($fusions_aref, $read_mapping_counts_href, $outfile_prefix) = @_;
     
-    ## IMPORTANT: fusions should already be sorted by score before running this method.
+    my $fusion_em = new FusionEM();
     
-    open(my $ofh, ">$outfile_prefix.scores_adjusted_for_multimapping") or die "Error, cannot write to file: $outfile_prefix.scores_adjusted_for_multimapping";
-        
-    my %seen_reads;
-
     foreach my $fusion (@$fusions_aref) {
         
         my ($fusion_name, $orig_J, $orig_S) = ($fusion->{fusion_name}, $fusion->{J}, $fusion->{S});
         
         ## penalize multimapping reads
         my $junction_reads_string = $fusion->{junction_reads};
+        my @junction_reads;
         if ($junction_reads_string ne '.') {
-            #print STDERR "-junction reads: $junction_reads_string\n";
-            my $new_J_count = 0;
-            my @new_J_reads;
-            
-            my @J_reads = split(/,/, $junction_reads_string);
-            
-            foreach my $J_read (@J_reads) {
-                my $mapping_count = $read_mapping_counts_href->{$J_read};
-                unless ($mapping_count) {
-                    confess "Error, missing mapping count for junction read: [$J_read] ";
-                }
-                if (! $seen_reads{$J_read}) {
-                    $new_J_count +=  1/$mapping_count;
-                    $seen_reads{$J_read} = $fusion_name;
-                    push (@new_J_reads, $J_read);
-                }
-                
+            foreach my $junction_read (split(/,/, $junction_reads_string)) {
+                $junction_read =~ s|/[12]$||;
+                push (@junction_reads, $junction_read);
             }
-            $fusion->{J} = int($new_J_count + 0.5);
-            $fusion->{junction_reads} = join(",", @new_J_reads);
         }
         
         my $spanning_frags_string = $fusion->{spanning_frags};
+        my @spanning_frags;
         if ($spanning_frags_string ne '.') {
-            #print STDERR "-spanning frags string: $spanning_frags_string\n";
-            my $new_S_count = 0;
-            my @new_S_reads;
-
-            my @S_frags = split(/,/, $spanning_frags_string);
-            
-            foreach my $S_frag (@S_frags) {
-                my $mapping_count = $read_mapping_counts_href->{$S_frag};
-                unless ($mapping_count) {
-                    confess "Error, missing mapping count for spanning frag: [$S_frag] ";
-                }
-                if ( ! $seen_reads{$S_frag} ) {
-                    $new_S_count += 1/$mapping_count;
-                    $seen_reads{$S_frag} = $fusion_name;
-                    push(@new_S_reads, $S_frag);
-                }
-            }
-            $fusion->{S} = int($new_S_count + 0.5);
+            push(@spanning_frags, split(/,/, $spanning_frags_string));
         }
         
-        &score_fusion($fusion);
-
-        print $ofh join("\t", $fusion_name, "($orig_J,$orig_S)", "->", "($fusion->{J},$fusion->{S})") . "\n";
+        $fusion_em->add_fusion_transcript($fusion_name, \@junction_reads, \@spanning_frags);
+        
     }
     
-    close $ofh;
+    $fusion_em->run();
+
     
+
+
+
+        
+    &score_fusion($fusion);
+    
+        
     return;
 }
 
