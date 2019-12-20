@@ -229,8 +229,8 @@ main: {
     
     my %read_mapping_counts = &parse_read_mapping_counts($chimeric_out_junctions_file);
     
-    &penalize_nondominant_fusion_multimap_reads(\@fusions, \%read_mapping_counts, $intermediates_out_prefix);
-
+    &reassign_reads_to_dominant_fusion_and_penalize_multimaps(\@fusions, \%read_mapping_counts, $intermediates_out_prefix);
+    
     @fusions = reverse sort {$a->{score} <=> $b->{score} 
                              ||
                                  $a->{brkptA} cmp $b->{brkptA} # need deterministic ordering
@@ -251,17 +251,32 @@ main: {
         my %row = %{$fusion->{row}}; # init to initial info
         
         # now update it
+        
+        ## and readjust the fusion read counts based on what remains assigned.
+        
+        my $junction_read_count = 0;
+        my $junction_reads = $fusion->{junction_reads};
+        if ($junction_reads ne ".") {
+            $junction_read_count = scalar(split(/,/, $junction_reads));
+        }
+
+        my $spanning_frag_count = 0;
+        my $spanning_frags = $fusion->{spanning_frags};
+        if ($spanning_frags ne ".") {
+            $spanning_frag_count = scalar(split(/,/, $spanning_frags));
+        }
+        
 
         my %rowadj = ('#FusionName' => $fusion->{fusion_name}, 
-                      'JunctionReadCount' => $fusion->{J}, 
-                      'SpanningFragCount' => $fusion->{S}, 
+                      'JunctionReadCount' => $junction_read_count,
+                      'SpanningFragCount' => $spanning_frag_count,
                       'SpliceType' => $fusion->{splice_type},
                       'LeftGene' => $fusion->{geneA}, 
                       'LeftBreakpoint' => $fusion->{brkptA}, 
                       'RightGene' => $fusion->{geneB}, 
                       'RightBreakpoint' => $fusion->{brkptB},
-                      'JunctionReads' => $fusion->{junction_reads}, 
-                      'SpanningFrags' => $fusion->{spanning_frags},
+                      'JunctionReads' => $junction_reads,
+                      'SpanningFrags' => $spanning_frags,
                       'LargeAnchorSupport' => $fusion->{ldas},
             );
         
@@ -591,15 +606,17 @@ sub parse_read_mapping_counts {
     
 }
 
-sub penalize_nondominant_fusion_multimap_reads {
+sub reassign_reads_to_dominant_fusion_and_penalize_multimaps {
     my ($fusions_aref, $read_mapping_counts_href, $outfile_prefix) = @_;
-
+    
+    ## IMPORTANT: fusions should already be sorted by score before running this method.
+    
     open(my $ofh, ">$outfile_prefix.scores_adjusted_for_multimapping") or die "Error, cannot write to file: $outfile_prefix.scores_adjusted_for_multimapping";
         
     my %seen_reads;
 
     foreach my $fusion (@$fusions_aref) {
-                
+        
         my ($fusion_name, $orig_J, $orig_S) = ($fusion->{fusion_name}, $fusion->{J}, $fusion->{S});
         
         ## penalize multimapping reads
@@ -607,41 +624,43 @@ sub penalize_nondominant_fusion_multimap_reads {
         if ($junction_reads_string ne '.') {
             #print STDERR "-junction reads: $junction_reads_string\n";
             my $new_J_count = 0;
+            my @new_J_reads;
+            
             my @J_reads = split(/,/, $junction_reads_string);
+            
             foreach my $J_read (@J_reads) {
                 my $mapping_count = $read_mapping_counts_href->{$J_read};
                 unless ($mapping_count) {
                     confess "Error, missing mapping count for junction read: [$J_read] ";
                 }
-                if ( (! $seen_reads{$J_read}) || $seen_reads{$J_read} ne $fusion_name) {
-                    $new_J_count += 1;
-                    $seen_reads{$J_read} = $fusion_name;
-                }
-                else {
-                    #print STDERR "-discounting J read for $fusion_name\n";
+                if (! $seen_reads{$J_read}) {
                     $new_J_count +=  1/$mapping_count;
+                    $seen_reads{$J_read} = $fusion_name;
+                    push (@new_J_reads, $J_read);
                 }
+                
             }
             $fusion->{J} = int($new_J_count + 0.5);
+            $fusion->{junction_reads} = join(",", @new_J_reads);
         }
         
         my $spanning_frags_string = $fusion->{spanning_frags};
         if ($spanning_frags_string ne '.') {
             #print STDERR "-spanning frags string: $spanning_frags_string\n";
             my $new_S_count = 0;
+            my @new_S_reads;
+
             my @S_frags = split(/,/, $spanning_frags_string);
+            
             foreach my $S_frag (@S_frags) {
                 my $mapping_count = $read_mapping_counts_href->{$S_frag};
                 unless ($mapping_count) {
                     confess "Error, missing mapping count for spanning frag: [$S_frag] ";
                 }
-                if ( (! $seen_reads{$S_frag}) || $seen_reads{$S_frag} ne $fusion_name) {
-                    $new_S_count += 1;
-                    $seen_reads{$S_frag} = $fusion_name;
-                }
-                else {
-                    #print STDERR "-discounting S read for $fusion_name\n";
+                if ( ! $seen_reads{$S_frag} ) {
                     $new_S_count += 1/$mapping_count;
+                    $seen_reads{$S_frag} = $fusion_name;
+                    push(@new_S_reads, $S_frag);
                 }
             }
             $fusion->{S} = int($new_S_count + 0.5);
@@ -651,7 +670,7 @@ sub penalize_nondominant_fusion_multimap_reads {
 
         print $ofh join("\t", $fusion_name, "($orig_J,$orig_S)", "->", "($fusion->{J},$fusion->{S})") . "\n";
     }
-
+    
     close $ofh;
     
     return;
