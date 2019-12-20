@@ -5,6 +5,9 @@ use warnings;
 use Carp;
 use Data::Dumper;
 
+
+our $DEBUG = 0;
+
 ####
 sub new {
     my ($packagename) = shift;
@@ -109,8 +112,8 @@ sub run {
         my $fraction = $count/$total_counts;
         $fusion_isoform_expr{$isoform} = $fraction;
     }
-
-    print STDERR Dumper(\%fusion_isoform_expr);
+    
+    if ($DEBUG) { print STDERR Dumper(\%fusion_isoform_expr); }
 
     ## compute likelihood.
 
@@ -134,7 +137,7 @@ sub run {
         }
         $loglikelihood += $compat_class_count * log($sum_iso_expr);
     }
-    printf($STDERR, "Starting log likelihood: %f\n", $loglikelihood); 
+    printf STDERR ("EM: Starting log likelihood: %f\n", $loglikelihood); 
     
     my $MAX_ROUNDS = 1000;
     my $round = 0;
@@ -168,7 +171,7 @@ sub run {
             $fusion_isoform_expr{$isoform} = $fraction;
         }
         
-        print STDERR Dumper(\%fusion_isoform_expr);
+        if ($DEBUG) { print STDERR Dumper(\%fusion_isoform_expr); }
         
         $loglikelihood = 0;
         for my $compat_class (keys %compatibility_class_counter) {
@@ -182,11 +185,11 @@ sub run {
             }
             $loglikelihood += $compat_class_count * log($sum_iso_expr);
         }
-        printf("Round [$round] log likelihood: %f\n", $loglikelihood); 
+        printf STDERR ("EM: Round [$round] log likelihood: %f\n", $loglikelihood); 
         
         
         if ($loglikelihood - $prev_loglikelihood < 1e-4) { 
-            print("Stopping iterations at round $round due to insufficient improvement in likelihood.");
+            printf STDERR ("EM: Stopping iterations at round $round due to insufficient improvement in likelihood.\n");
             last;
         }
         
@@ -225,6 +228,14 @@ sub run {
         
 }
 
+####
+sub get_fusion_estimated_J_S {
+    my ($self, $fusion_name) = @_;
+
+    my $fusion_obj = $self->get_fusion_transcript($fusion_name);
+    
+    return($fusion_obj->{est_J}, $fusion_obj->{est_S});
+}
 
 
 
