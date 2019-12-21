@@ -166,17 +166,17 @@ main: {
     
     while (my $row = $tab_reader->get_row()) {
         
-        my $fusion_name = $row->{'#FusionName'};
-        my $J = $row->{JunctionReadCount};
-        my $S = $row->{SpanningFragCount};
-        my $splice_type = $row->{SpliceType};
-        my $geneA = $row->{LeftGene};
-        my $brkptA = $row->{LeftBreakpoint};
-        my $geneB = $row->{RightGene};
-        my $brkptB = $row->{RightBreakpoint};
-        my $junction_reads = $row->{JunctionReads};
-        my $spanning_frags = $row->{SpanningFrags};
-        my $long_double_anchor_support = $row->{LargeAnchorSupport};
+        my $fusion_name = $tab_reader->get_row_val($row, '#FusionName');
+        my $J = $tab_reader->get_row_val($row, "JunctionReadCount");
+        my $S = $tab_reader->get_row_val($row, "SpanningFragCount");
+        my $splice_type = $tab_reader->get_row_val($row, "SpliceType");
+        my $geneA = $tab_reader->get_row_val($row, "LeftGene");
+        my $brkptA = $tab_reader->get_row_val($row, "LeftBreakpoint");
+        my $geneB = $tab_reader->get_row_val($row, "RightGene");
+        my $brkptB = $tab_reader->get_row_val($row, "RightBreakpoint");
+        my $junction_reads = $tab_reader->get_row_val($row, "JunctionReads");
+        my $spanning_frags = $tab_reader->get_row_val($row, "SpanningFrags");
+        my $long_double_anchor_support = $tab_reader->get_row_val($row, "LargeAnchorSupport");
         
                 
         #TODO: use keys that match the column headers for sanity sake
@@ -278,13 +278,15 @@ main: {
         my $junction_read_count = 0;
         my $junction_reads = $fusion->{junction_reads};
         if ($junction_reads ne ".") {
-            $junction_read_count = scalar(split(/,/, $junction_reads));
+            my @junction_reads_array = split(/,/, $junction_reads);
+            $junction_read_count = scalar(@junction_reads_array);
         }
 
         my $spanning_frag_count = 0;
         my $spanning_frags = $fusion->{spanning_frags};
         if ($spanning_frags ne ".") {
-            $spanning_frag_count = scalar(split(/,/, $spanning_frags));
+            my @spanning_frags_array = split(/,/, $spanning_frags);
+            $spanning_frag_count = scalar(@spanning_frags_array);
         }
         
 
@@ -332,11 +334,11 @@ main: {
     exit(0);
 }
 
-        
+
 ####
 sub merge_neighboring_nonref_splice {
     my ($fusions_aref, $filter_tab_writer) = @_;
-
+    
     my @ret_fusions;
 
     my %fusion_name_to_nonref_splice;
@@ -368,6 +370,8 @@ sub merge_neighboring_nonref_splice {
                 if (&fusions_within_range($top_fusion, $f, $AGGREGATE_NOVEL_JUNCTION_DIST)) {
                     my %row = %{$f->{row}};
                     $row{Note} = "Merged"; # TODO: add more info here about how it was done.
+                    $row{est_J} = "NA";
+                    $row{est_S} = "NA";
                     $row{'#FusionName'} = '#' . $row{'#FusionName'};
                     $filter_tab_writer->write_row(\%row);
                     
@@ -396,6 +400,8 @@ sub merge_neighboring_nonref_splice {
 ####
 sub fusions_within_range {
     my ($fusionA, $fusionB, $max_dist) = @_;
+
+    
 
     my @pts_A_left = split(/:/, $fusionA->{brkptA});
     my $coordA_left = $pts_A_left[-2];
