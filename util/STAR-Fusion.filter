@@ -209,10 +209,12 @@ main: {
     }
 
     my @column_headers = $tab_reader->get_column_headers();
-    my @filter_col_headers = (@column_headers, "Note");
+    @column_headers = (@column_headers[0..2], "est_J", "est_S", @column_headers[3..$#column_headers]);
+    
+    my @filter_col_headers = (@column_headers[0..2], "est_J", "est_S", @column_headers[3..$#column_headers], "Note");
     my $filter_tab_writer = new DelimParser::Writer($filter_ofh, "\t", \@filter_col_headers);
     my $stage1_tab_writer = new DelimParser::Writer($stage1_ofh, "\t", \@column_headers);
-        
+    
     @fusions = reverse sort {$a->{score} <=> $b->{score}
                              ||
                                  $a->{brkptA} cmp $b->{brkptA}  # need deterministic ordering
@@ -230,7 +232,11 @@ main: {
     
     my %read_mapping_counts = &parse_read_mapping_counts($chimeric_out_junctions_file);
     
-    &reassign_reads_to_dominant_fusion_and_penalize_multimaps(\@fusions, \%read_mapping_counts, $intermediates_out_prefix);
+
+    #############################################
+    ## removing fusions with insufficient support.
+    
+    &EM_assign_reads_and_penalize_multimaps(\@fusions, \%read_mapping_counts, $intermediates_out_prefix);
     
     @fusions = reverse sort {$a->{score} <=> $b->{score} 
                              ||
@@ -242,6 +248,20 @@ main: {
                                                          $MIN_JUNCTION_READS, $MIN_SUM_FRAGS,
                                                          $MIN_SPANNING_FRAGS_ONLY);
     
+
+    
+    #################################
+    ## removing minor nonref isoforms
+
+    &EM_assign_reads_and_penalize_multimaps(\@fusions, \%read_mapping_counts, $intermediates_out_prefix);
+    
+    @fusions = reverse sort {$a->{score} <=> $b->{score} 
+                             ||
+                                 $a->{brkptA} cmp $b->{brkptA} # need deterministic ordering
+                             ||
+                                 $a->{brkptB} cmp $b->{brkptB} } @fusions;
+
+
     @fusions = &remove_minor_nonref_isoforms(\@fusions, $filter_tab_writer);
 
 
@@ -279,6 +299,8 @@ main: {
                       'JunctionReads' => $junction_reads,
                       'SpanningFrags' => $spanning_frags,
                       'LargeAnchorSupport' => $fusion->{ldas},
+                      'est_J' => $fusion->{est_J},
+                      'est_S' => $fusion->{est_S},
             );
         
         # now update original row.
@@ -504,7 +526,7 @@ sub remove_minor_nonref_isoforms {
     
     return(@ret_fusions);
 }
-            
+
 ####
 sub remove_fusions_with_insufficient_support {
     my ($fusions_aref, $filter_tab_writer, $min_J, $min_sum, $min_spanning_frags_only) = @_;
@@ -517,10 +539,12 @@ sub remove_fusions_with_insufficient_support {
         
         my $splice_type = $fusion->{splice_type};
 
-        my $sum = $fusion->{J} + $fusion->{S};
+        my $sum = $fusion->{est_J} + $fusion->{est_S};
         
         # in case it gets filtered
         my %row = %{$fusion->{row}};
+        $row{est_J} = $fusion->{est_J}; # these weren't in the original row, so we need to add them here.
+        $row{est_S} = $fusion->{est_S};
         $row{'#FusionName'} = '#' . $row{'#FusionName'};
         
         if ($sum < $min_sum) {
@@ -530,7 +554,7 @@ sub remove_fusions_with_insufficient_support {
         }
 
 
-        if ($splice_type eq 'INCL_NON_REF_SPLICE' && $fusion->{J} < $MIN_NOVEL_JUNCTION_SUPPORT) { 
+        if ($splice_type eq 'INCL_NON_REF_SPLICE' && $fusion->{est_J} < $MIN_NOVEL_JUNCTION_SUPPORT) { 
             # skip it
             $row{Note} = "FILTERED DUE TO *novel* junction support $fusion->{J} < $MIN_NOVEL_JUNCTION_SUPPORT";
             $filter_tab_writer->write_row(\%row);
@@ -538,20 +562,20 @@ sub remove_fusions_with_insufficient_support {
         }
 
         
-        if ($fusion->{J} < $min_J && ! &AnnotFilterRule::fusion_has_junction_reads_exception($fusion_name) ) {
+        if ($fusion->{est_J} < $min_J && ! &AnnotFilterRule::fusion_has_junction_reads_exception($fusion_name) ) {
             # skip it
             $row{Note} = "FILTERED DUE TO junction read support ($fusion->{J}) < $min_J";
             $filter_tab_writer->write_row(\%row);
             next;
         }
         
-        if ($fusion->{J} == 0 && $fusion->{S} < $min_spanning_frags_only) {
+        if ($fusion->{est_J} < 1 && $fusion->{est_S} < $min_spanning_frags_only) {
             $row{Note} = "FILTERED DUE TO only spanning reads and num spanning frags $fusion->{S} < $min_spanning_frags_only";
             $filter_tab_writer->write_row(\%row);
             next;
         }
         
-        if ($fusion->{S} == 0 && $REQUIRE_LDAS && $fusion->{ldas} !~ /YES/i) {
+        if ($fusion->{est_S} < 1 && $REQUIRE_LDAS && $fusion->{ldas} !~ /YES/i) {
             $row{Note} = "FILTERED DUE TO no spanning reads and no long double anchor support at breakpoint";
             $filter_tab_writer->write_row(\%row);
             next;
@@ -559,7 +583,7 @@ sub remove_fusions_with_insufficient_support {
         
 
         # passed requirements.
-
+        
         push (@ret_fusions, $fusion);
 
     }
@@ -571,11 +595,13 @@ sub remove_fusions_with_insufficient_support {
 sub score_fusion {
     my ($fusion) = @_;
 
-    my $J = $fusion->{J};
-    my $S = $fusion->{S};
+    ## preferably use the estimated values.
+
+    my $J = defined($fusion->{est_J}) ? $fusion->{est_J} : $fusion->{J};
+    my $S = defined($fusion->{est_S}) ? $fusion->{est_S} : $fusion->{S};
     
     my $score = $J*4 + $S;
-
+    
     $fusion->{score} = $score;
 }
 
@@ -607,15 +633,19 @@ sub parse_read_mapping_counts {
     
 }
 
-sub reassign_reads_to_dominant_fusion_and_penalize_multimaps {
+sub EM_assign_reads_and_penalize_multimaps {
     my ($fusions_aref, $read_mapping_counts_href, $outfile_prefix) = @_;
     
     my $fusion_em = new FusionEM();
     
     foreach my $fusion (@$fusions_aref) {
         
-        my ($fusion_name, $orig_J, $orig_S) = ($fusion->{fusion_name}, $fusion->{J}, $fusion->{S});
+        my ($fusion_name, $left_breakpoint, $right_breakpoint) = ($fusion->{fusion_name}, $fusion->{brkptA}, $fusion->{brkptB});
         
+        $fusion_name .= "::" . $left_breakpoint . "::" . $right_breakpoint;
+        
+        $fusion->{fusion_isoform_name} = $fusion_name;
+
         ## penalize multimapping reads
         my $junction_reads_string = $fusion->{junction_reads};
         my @junction_reads;
@@ -638,14 +668,18 @@ sub reassign_reads_to_dominant_fusion_and_penalize_multimaps {
     
     $fusion_em->run();
 
-    
 
-
-
+    foreach my $fusion (@$fusions_aref) { 
+        my $fusion_isoform_name = $fusion->{fusion_isoform_name};
+        my ($est_J, $est_S) = $fusion_em->get_fusion_estimated_J_S($fusion_isoform_name);
+        $fusion->{est_J} = $est_J;
+        $fusion->{est_S} = $est_S;
         
-    &score_fusion($fusion);
-    
+        # rescore it using the estimated J,S values.
+        &score_fusion($fusion);
         
+    }
+
     return;
 }
 
