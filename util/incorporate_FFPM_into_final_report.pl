@@ -24,8 +24,9 @@ main: {
     
     while (my $row = $tab_reader->get_row()) {
         
-        my $J = $row->{JunctionReadCount};
-        my $S = $row->{SpanningFragCount};
+        # using the estimated counts now
+        my $J = $row->{est_J}; # $row->{JunctionReadCount};
+        my $S = $row->{est_S}; #$row->{SpanningFragCount};
         
         my $J_FFPM = &compute_FFPM($J, $num_frags);
         my $S_FFPM = &compute_FFPM($S, $num_frags);
