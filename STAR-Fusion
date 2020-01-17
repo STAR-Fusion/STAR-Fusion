@@ -760,7 +760,6 @@ main: {
                 . " --min_junction_reads $MIN_JUNCTION_READS "
                 . " --min_novel_junction_support $MIN_NOVEL_JUNCTION_SUPPORT "
                 . " --min_spanning_frags_only $MIN_SPANNING_FRAGS_ONLY "
-                . " --STAR_max_mate_dist $STAR_MAX_MATE_DIST "
                 . " --vis "
                 . " --max_promiscuity $MAX_PROMISCUITY "
                 . " --output_dir $FI_outdir "
