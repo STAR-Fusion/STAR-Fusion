@@ -87,11 +87,25 @@ main: {
     open(my $filtered_ofh, ">$filtered_file") or die "Error, cannot write to $filtered_file";
     my $filtered_writer = new DelimParser::Writer($filtered_ofh, "\t", \@column_headers);
 
-    my $pass_counter = 0;
-    my $filtered_counter = 0;
+
+    my @rows;
     
     while (my $row = $delim_reader->get_row()) {
+        push (@rows, $row);
+    }
 
+    ## prioritize according to number of junction (split) reads:
+    @rows = reverse sort {$a->{JunctionReadCount} <=> $b->{JunctionReadCount}} @rows;
+    
+
+    my %passed;
+    my %failed;
+
+    my @passed_rows;
+    my @filtered_rows;
+    
+    foreach my $row (@rows) {
+        
         my $left_dinuc = uc $delim_reader->get_row_val($row, "LeftBreakDinuc");
         my $right_dinuc = uc $delim_reader->get_row_val($row, "RightBreakDinuc");
         
@@ -102,6 +116,11 @@ main: {
         #print STDERR "$annots";
         
         my $combo = $left_dinuc . $right_dinuc;
+
+        if (exists $failed{$fusion_name}) {
+            push(@filtered_rows, $row);
+            next;
+        }
 
         my $pass_flag = 0;
         
@@ -126,17 +145,31 @@ main: {
         
 
         if ($pass_flag) {
-        
-            $pass_writer->write_row($row);
-            $pass_counter++;
+            $passed{$fusion_name} = 1;
+            push (@passed_rows, $row);
         }
         else {
-            $filtered_writer->write_row($row);
-            $filtered_counter++;
+            # we only fail those that are dominant non-canonical splice.
+            if (! exists $passed{$fusion_name}) {
+                $failed{$fusion_name} = 1;
+            }
+            push (@filtered_rows, $row);
         }
-        
     }
 
+    ## write output files..
+
+    foreach my $row (@passed_rows) {
+        $pass_writer->write_row($row);
+    }
+
+    foreach my $row (@filtered_rows) {
+        $filtered_writer->write_row($row);
+    }
+
+    my $pass_counter = scalar(@passed_rows);
+    my $filtered_counter = scalar(@filtered_rows);
+    
     print STDERR "-filter_likely_RT_artifacts: (pass: $pass_counter, filtered: $filtered_counter)\n";
     
     exit(0);
