@@ -181,3 +181,5 @@ ENV PICARD_HOME $SRC
 
 
 COPY sam_readname_cleaner.py $BIN/
+
+RUN apt-get install -y pbzip2
