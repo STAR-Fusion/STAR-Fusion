@@ -424,15 +424,25 @@ sub get_chimeric_reads_to_genes {
         my $left_gene_json = $x[$#x-1];
         my @A_hits;
         if ($left_gene_json ne '.') {
-            my $A_hits_aref = $JSON_DECODER->decode($left_gene_json);
-            @A_hits = @$A_hits_aref;
+            eval {
+                my $A_hits_aref = $JSON_DECODER->decode($left_gene_json);
+                @A_hits = @$A_hits_aref;
+            };
+            if ($@) {
+                die "error, $@, json: $left_gene_json";
+            }
         }
         
         my $right_gene_json = $x[$#x];
         my @B_hits;
         if ($right_gene_json ne '.') {
-            my $B_hits_aref = $JSON_DECODER->decode($right_gene_json);
-            @B_hits = @$B_hits_aref;
+            eval {
+                my $B_hits_aref = $JSON_DECODER->decode($right_gene_json);
+                @B_hits = @$B_hits_aref;
+            };
+            if ($@) {
+                die "error, $@, json: $right_gene_json";
+            }
         }
         
         if ($DEBUG) {
