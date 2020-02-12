@@ -91,6 +91,7 @@ workflow star_fusion_workflow {
         Array[File]? fusion_inspector_validate_web =  star_fusion.fusion_inspector_validate_web
         Array[File]? fusion_inspector_inspect_web  =  star_fusion.fusion_inspector_inspect_web
         Array[File]? fusion_inspector_inspect_fusions_abridged = star_fusion.fusion_inspector_inspect_fusions_abridged
+        Array[File]? extract_fusion_reads = star_fusion.extract_fusion_reads
 
         File? fusion_predictions_kickstart = star_fusion_kickstart.fusion_predictions
         File? fusion_predictions_abridged_kickstart = star_fusion_kickstart.fusion_predictions_abridged
@@ -185,9 +186,12 @@ task star_fusion {
         --CPU ${cpu} \
         ${"--FusionInspector " + fusion_inspector} \
         ${"" + additional_flags}
+
     }
 
     output {
+
+        Array[File] extract_fusion_reads = glob("${sample_id}/star-fusion.fusion_evidence_*.fq")
         File fusion_predictions = "${sample_id}/star-fusion.fusion_predictions.tsv"
         File fusion_predictions_abridged = "${sample_id}/star-fusion.fusion_predictions.abridged.tsv"
         File bam="${sample_id}/Aligned.out.bam"
