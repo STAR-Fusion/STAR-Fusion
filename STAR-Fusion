@@ -551,7 +551,7 @@ main: {
 
     ## Get total number of rnaseq fragments reported by STAR:
     my $num_total_rnaseq_frags = &get_num_total_rnaseq_frags($chimeric_out_junctions_file);
-    print STDERR "-sample contains $num_total_rnaseq_frags\n";
+    print STDERR "-sample contains $num_total_rnaseq_frags rnaseq fragments\n";
     
 
     ########################################
