@@ -299,7 +299,7 @@ my $SHOW_FULL_USAGE_INFO;
               'min_junction_reads=i' => \$MIN_JUNCTION_READS,
               'min_sum_frags=i' => \$MIN_SUM_FRAGS,
               'max_promiscuity=i' => \$MAX_PROMISCUITY,
-              'min_pct_dom_promiscuity=i' => \$MIN_PCT_DOM_PROM,
+              'min_pct_dom_promiscuity=f' => \$MIN_PCT_DOM_PROM,
               'min_spanning_frags_only=i' => \$MIN_SPANNING_FRAGS_ONLY,
               
               'require_LDAS=i' => \$REQUIRE_LDAS,
