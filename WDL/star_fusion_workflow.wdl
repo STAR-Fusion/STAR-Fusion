@@ -1,4 +1,4 @@
-import "https://api.firecloud.org/ga4gh/v1/tools/CTAT_beta:star_fusion_tasks/versions/1/plain-WDL/descriptor" as star_fusion_tasks
+import "https://api.firecloud.org/ga4gh/v1/tools/CTAT:star_fusion_tasks/versions/1/plain-WDL/descriptor" as star_fusion_tasks
 
 workflow star_fusion_workflow {
     File? left_fq
