@@ -711,8 +711,8 @@ sub EM_assign_reads_and_penalize_multimaps {
     foreach my $fusion (@$fusions_aref) { 
         my $fusion_isoform_name = $fusion->{fusion_isoform_name};
         my ($est_J, $est_S) = $fusion_em->get_fusion_estimated_J_S($fusion_isoform_name);
-        $fusion->{est_J} = $est_J;
-        $fusion->{est_S} = $est_S;
+        $fusion->{est_J} = sprintf("%.2f", $est_J);
+        $fusion->{est_S} = sprintf("%.2f", $est_S);
         
         # rescore it using the estimated J,S values.
         &score_fusion($fusion);
