@@ -856,7 +856,7 @@ sub run_STAR {
     my $cmd = "$STAR_PROG --genomeDir $star_index_dir "
         . " --outReadsUnmapped None "
         . " --chimSegmentMin 12 "
-        . " --chimJunctionOverhangMin 12 "
+        . " --chimJunctionOverhangMin 8 "
         . " --chimOutJunctionFormat 1 "  # new option for STAR 2.6.1a
         . " --alignSJDBoverhangMin 10 "   
         . " --alignMatesGapMax $STAR_MAX_MATE_DIST "
@@ -866,7 +866,14 @@ sub run_STAR {
         . " --runThreadN $CPU"
         . $maybe_tmpdir
         . " --outSAMstrandField intronMotif "
-        . " --outSAMunmapped Within ";
+        . " --outSAMunmapped Within "
+        
+        . " --alignInsertionFlush Right "
+        . " --alignSplicedMateMapLminOverLmate 0 "
+        . " --alignSplicedMateMapLmin 30 "
+        
+
+        ;
     
     if ($STAR_SortedByCoordinate) {
                 

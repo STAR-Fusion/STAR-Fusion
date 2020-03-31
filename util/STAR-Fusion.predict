@@ -119,6 +119,9 @@ main: {
         ## get the span support
         my $spanning_reads_href = $spans_to_read_names{$fusion_complex_name};
         my @spanning_reads;
+
+        #print Dumper($spanning_reads_href);
+        
         
         if (ref $spanning_reads_href) {
             @spanning_reads = keys %$spanning_reads_href;
@@ -134,6 +137,8 @@ main: {
         
         my $breakpoint_info_href = $junction_breakpoint_to_read_names{$fusion_complex_name};
         
+        #die Dumper($breakpoint_info_href);
+
         if ($breakpoint_info_href) {
             
             # sort by number of reads supporting the breakpoints
@@ -142,12 +147,12 @@ main: {
             while (@fusion_breakpoints) {
                 my $best_breakpoint = shift @fusion_breakpoints;
                 
-                my ($left_coords, $left_delta, $right_coords, $right_delta) = split(/;/, $best_breakpoint);
-                my $splice_type = ($left_delta == 0 && $right_delta == 0) ? "ONLY_REF_SPLICE" : "INCL_NON_REF_SPLICE"; 
+                my ($left_coords, $right_coords) = split(/;/, $best_breakpoint);
+                my $splice_type = $breakpoint_info_href->{$best_breakpoint}->{ONLY_REF_SPLICE_FLAG} ? "ONLY_REF_SPLICE" : "INCL_NON_REF_SPLICE"; 
                 
-                my $junction_reads_href = $breakpoint_info_href->{$best_breakpoint};
+                my $junction_reads_href = $breakpoint_info_href->{$best_breakpoint}->{reads};
                 my @junc_reads = keys %$junction_reads_href;
-                                
+                
                 my $breakpoint_count = scalar(@junc_reads);
 
                 my ($left_chr, $left_brkpt, $left_orient) = split(/:/, $left_coords);
@@ -194,11 +199,9 @@ main: {
                                          
                                          left_gene => $left_gene_id,
                                          left_coords => $left_coords,
-                                         left_delta => $left_delta, # dist to ref splice junction
                                          
                                          right_gene => $right_gene_id,
                                          right_coords => $right_coords,
-                                         right_delta => $right_delta, # dist to ref splice junction
                                          
                                          splice_type => $splice_type,
                                          
@@ -234,11 +237,9 @@ main: {
                                      
                                      left_gene => $left_gene_id,
                                      left_coords => $fusion_info_struct->{left_coord},
-                                     left_delta => '.', # dist to ref splice junction
                                      
                                      right_gene => $right_gene_id,
                                      right_coords => $fusion_info_struct->{right_coord},
-                                     right_delta => '.',
                                      
                                      splice_type => "NO_JUNCTION_READS_IDENTIFIED",
                                      
@@ -464,10 +465,17 @@ sub get_chimeric_reads_to_genes {
                     next;
                 }
 
+
+                
+                my $left_read_span_coords_aref = [$A_span_lend, $A_span_rend];
+                my $right_read_span_coords_aref = [$B_span_lend, $B_span_rend];
                 
                 if ($left_entry->{sense_or_antisense} eq 'antisense') {
                     # swap em
                     ($left_entry, $right_entry) = ($right_entry, $left_entry);
+                    
+                    ($left_read_span_coords_aref, $right_read_span_coords_aref) = ($right_read_span_coords_aref, $left_read_span_coords_aref);
+                    
                 }
                 
                 my $left_gene_id = $left_entry->{gene_id};
@@ -479,6 +487,8 @@ sub get_chimeric_reads_to_genes {
                 my $fusion_simple_name = join("--", $left_gene_name, $right_gene_name);
                 my $fusion_complex_name = join("--", $left_gene_id, $right_gene_id);
 
+                #print STDERR "FCN: $fusion_complex_name\n";
+                
                 $all_fusion_candidate_complex_names_href->{$fusion_complex_name} = { left_gene_id => $left_gene_id,
                                                                                      right_gene_id => $right_gene_id,
                                                                                      fusion_complex_name => $fusion_complex_name,
@@ -491,28 +501,32 @@ sub get_chimeric_reads_to_genes {
                 if ($junction_type == -1) { 
                     # Not a split read, but rather a split pair
                     
-                    $spans_to_read_names_href->{$fusion_complex_name}->{$read_name} = { left_span => [$A_span_lend, $A_span_rend],
-                                                                                        right_span => [$B_span_lend, $B_span_rend] };
+                    $spans_to_read_names_href->{$fusion_complex_name}->{$read_name} = { left_span => [$left_read_span_coords_aref->[0], $left_read_span_coords_aref->[1] ],
+                                                                                        right_span => [$right_read_span_coords_aref->[0], $right_read_span_coords_aref->[1] ] 
+                                                                                      };
                     
                     push (@x, $fusion_complex_name);
                 }
                 else {
 
-                    # include breakpoint info and distance of exon coordinates from breakpoints
+                                        
+
+                    my $ONLY_REF_SPLICE_FLAG = ($left_entry->{delta} + $right_entry->{delta} == 0) ? 1 : 0;
+       
                     
                     my @at_exon_junctions = ($left_entry->{chr} . ":" . $left_entry->{pt_align} . ":" . $left_entry->{exon}->{orient},
-                                             $left_entry->{delta}, 
                                              $right_entry->{chr} . ":" . $right_entry->{pt_align} . ":" . $right_entry->{exon}->{orient},
-                                             $right_entry->{delta}, 
                         );
                     
                     
                     my $junction_text = join(";", @at_exon_junctions);
-                    push (@x, $junction_text, $fusion_complex_name);
+                                                            
+                    $junction_breakpoint_to_read_names_href->{$fusion_complex_name}->{$junction_text}->{reads}->{$read_name}++; # track junction read name to fusion name
+                    if ($ONLY_REF_SPLICE_FLAG) {
+                        $junction_breakpoint_to_read_names_href->{$fusion_complex_name}->{$junction_text}->{ONLY_REF_SPLICE_FLAG} = 1;
+                    }
                     
-                    # both at exon junctions
-                                        
-                    $junction_breakpoint_to_read_names_href->{$fusion_complex_name}->{$junction_text}->{$read_name}++; # track junction read name to fusion name
+                    #print STDERR Dumper($junction_breakpoint_to_read_names_href);
 
                     #########################
                     ## examine anchor support.
@@ -564,10 +578,14 @@ sub spanning_read_consistent_with_LEFT_breakpoint {
     if ( ($orient eq "+" && $read_rend - $FUZZ_DISTANCE <= $brkpt)
          ||
          ($orient eq "-" && $read_lend + $FUZZ_DISTANCE >= $brkpt) ) {
+
         
         return(1); # ok
     }
     else {
+
+        #print "LEFT SPAN CHECK: ($read_lend - $read_rend) vs. $brkpt - Nope\n";
+
         return(0); # nope
     }
 }
@@ -592,6 +610,9 @@ sub spanning_read_consistent_with_RIGHT_breakpoint {
         return(1); # ok
     }
     else {
+        
+        #print "RIGHT SPAN CHECK: ($read_lend - $read_rend) vs. $brkpt - Nope\n";
+
         return(0); # nope
     }
 }

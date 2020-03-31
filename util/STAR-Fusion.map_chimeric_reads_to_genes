@@ -260,6 +260,8 @@ sub find_exon_junction_matches {
         @exon_hits = sort {
             
                 $a->{delta} <=> $b->{delta}
+                ||
+                $a->{gene_id} cmp $b->{gene_id} # for consistency
             
         } @exon_hits;
         

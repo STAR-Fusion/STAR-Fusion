@@ -194,6 +194,7 @@ sub run {
         }
         
     }
+
     
     # fractionally assign reads according to fusion expression estimates.
     # go through each compatibility class
@@ -228,6 +229,9 @@ sub run {
         
 }
 
+
+
+
 ####
 sub get_fusion_estimated_J_S {
     my ($self, $fusion_name) = @_;
@@ -245,6 +249,7 @@ package Fusion_transcript;
 use strict;
 use warnings;
 use Carp;
+use Data::Dumper;
 
 ####
 sub new {
@@ -288,7 +293,7 @@ sub add_read_support_value {
         $self->{est_S} += $value;
     }
     else {
-        confess "Error, not finding readname $readname stored as J or S for fusion $self->{fusion_name} ";
+        confess "Error, not finding readname $readname stored as J or S for fusion $self->{fusion_name} " . Dumper($self);
     }
     
     return;

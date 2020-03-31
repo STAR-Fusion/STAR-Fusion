@@ -13,6 +13,7 @@ use File::Basename;
 use Pipeliner;
 use DelimParser;
 use FusionEM;
+use Data::Dumper;
 
 my $tmpdir = "/tmp";
 
@@ -211,7 +212,7 @@ main: {
     my @column_headers = $tab_reader->get_column_headers();
     @column_headers = (@column_headers[0..2], "est_J", "est_S", @column_headers[3..$#column_headers]);
     
-    my @filter_col_headers = (@column_headers[0..2], "est_J", "est_S", @column_headers[3..$#column_headers], "Note");
+    my @filter_col_headers = (@column_headers, "Note");
     my $filter_tab_writer = new DelimParser::Writer($filter_ofh, "\t", \@filter_col_headers);
     my $stage1_tab_writer = new DelimParser::Writer($stage1_ofh, "\t", \@column_headers);
     
@@ -261,10 +262,11 @@ main: {
                              ||
                                  $a->{brkptB} cmp $b->{brkptB} } @fusions;
 
+    
 
     @fusions = &remove_minor_nonref_isoforms(\@fusions, $filter_tab_writer);
 
-
+    
     
     foreach my $fusion (@fusions) {
         # regenerating 'line' here, since merged entries will now have updated stats.        
@@ -313,8 +315,8 @@ main: {
 
         $stage1_tab_writer->write_row(\%row);
             
-            $row{Note} = "Retained";
-            $filter_tab_writer->write_row(\%row);
+        $row{Note} = "Retained";
+        $filter_tab_writer->write_row(\%row);
     }
 
     close $filter_ofh;
@@ -487,9 +489,9 @@ sub merge_fusions {
 sub remove_minor_nonref_isoforms {
     my ($fusions_aref, $filter_tab_writer) = @_;
     
-    my @fusions = reverse sort { $a->{J}<=>$b->{J} 
+    my @fusions = reverse sort { $a->{est_J}<=>$b->{est_J} 
                                  ||
-                                     $a->{S} <=> $b->{S} } @$fusions_aref;
+                                     $a->{est_S} <=> $b->{est_S} } @$fusions_aref;
     
     my %dominant_isoform_junc_support;
     my @ret_fusions;
@@ -499,11 +501,14 @@ sub remove_minor_nonref_isoforms {
     foreach my $fusion (@fusions) {
         
         my $fusion_name = $fusion->{fusion_name};
-        my $junction_support = $fusion->{J};
-        my $span_support = $fusion->{S};
+        my $junction_support = $fusion->{est_J};
+        my $span_support = $fusion->{est_S};
         
         # in case we filter
         my %row = %{$fusion->{row}};
+        $row{est_J} = $junction_support;
+        $row{est_S} = $span_support;
+        
         $row{'#FusionName'} = '#' . $row{'#FusionName'};
         
         my $dominant_isoform_support = $dominant_isoform_junc_support{$fusion_name};
@@ -647,11 +652,16 @@ sub EM_assign_reads_and_penalize_multimaps {
     foreach my $fusion (@$fusions_aref) {
         
         my ($fusion_name, $left_breakpoint, $right_breakpoint) = ($fusion->{fusion_name}, $fusion->{brkptA}, $fusion->{brkptB});
+        my $left_trans = $fusion->{geneA};
+        my $right_trans = $fusion->{geneB};
         
-        $fusion_name .= "::" . $left_breakpoint . "::" . $right_breakpoint;
+
+        $fusion_name .= "::" . join("::",  
+                                    $left_trans, $left_breakpoint,
+                                    $right_trans, $right_breakpoint);
         
         $fusion->{fusion_isoform_name} = $fusion_name;
-
+        
         ## penalize multimapping reads
         my $junction_reads_string = $fusion->{junction_reads};
         my @junction_reads;
