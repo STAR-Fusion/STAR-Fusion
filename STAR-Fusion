@@ -615,6 +615,10 @@ main: {
             . " --genome_lib_dir $genome_lib_dir "
             . " --out_prefix $preliminary_outdir/$out_prefix";
         
+        unless ($NO_SINGLE_FUSION_PER_BREAKPOINT) {
+            $cmd .= " --no_single_fusion_per_breakpoint ";
+        }
+        
         $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/STAR-Fusion.filter.ok"));
         
 
@@ -669,16 +673,7 @@ main: {
         $prelim_fusion_file = "$prelim_fusion_file.RTartifact.pass";
         
     }
-     
-    unless ($NO_SINGLE_FUSION_PER_BREAKPOINT) {
-        
-        ## report best candidates per breakpoint.
-        $cmd = "$UTILDIR/remove_lesser_candidates_at_breakpoint.pl $prelim_fusion_file";
-        $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/remove_lesser_at_brkpt.ok"));
-        $prelim_fusion_file = "$prelim_fusion_file.brkptselect.pass";
-                
-    }
-    
+
     
     if ($MIN_FFPM > 0) { 
 

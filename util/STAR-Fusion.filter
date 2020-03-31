@@ -74,6 +74,9 @@ my $usage = <<__EOUSAGE__;
 #
 #  --aggregate_novel_junction_dist <int>  default: $AGGREGATE_NOVEL_JUNCTION_DIST (non-ref junctions within $AGGREGATE_NOVEL_JUNCTION_DIST are merged into single calls)
 #
+#  --no_single_fusion_per_breakpoint     exclude filtering of potentially superfluous fusions involving different gene 
+#                                          annotations overlapping the same fusion breakpoint.
+#
 ####################################################################################################
 
 
@@ -87,7 +90,7 @@ my $fusion_preds_file;
 my $out_prefix;
 my $genome_lib_dir;
 my $chimeric_out_junctions_file;
-
+my $NO_SINGLE_FUSION_PER_BREAKPOINT = 0;
 
 &GetOptions ( 'h' => \$help_flag, 
               
@@ -112,8 +115,8 @@ my $chimeric_out_junctions_file;
               'min_pct_dom_promiscuity=i' => \$MIN_PCT_DOM_PROM,
               
               'genome_lib_dir=s' => \$genome_lib_dir,
-              
-              
+                            
+              'no_single_fusion_per_breakpoint' => \$NO_SINGLE_FUSION_PER_BREAKPOINT,
               
     );
 
@@ -237,7 +240,7 @@ main: {
     #############################################
     ## removing fusions with insufficient support.
     
-    &EM_assign_reads_and_penalize_multimaps(\@fusions, \%read_mapping_counts, $intermediates_out_prefix);
+    ## initial filter removes the lions share of fusions not of interest.
     
     @fusions = reverse sort {$a->{score} <=> $b->{score} 
                              ||
@@ -250,9 +253,13 @@ main: {
                                                          $MIN_SPANNING_FRAGS_ONLY);
     
 
+    unless ($NO_SINGLE_FUSION_PER_BREAKPOINT) {
+        @fusions = &select_highest_scoring_fusion_per_breakpoint(\@fusions, $filter_tab_writer);
+    }
+    
     
     #################################
-    ## removing minor nonref isoforms
+    ## removing minor nonref isoforms - after first EM adjusting read support values.
 
     &EM_assign_reads_and_penalize_multimaps(\@fusions, \%read_mapping_counts, $intermediates_out_prefix);
     
@@ -263,9 +270,12 @@ main: {
                                  $a->{brkptB} cmp $b->{brkptB} } @fusions;
 
     
-
-    @fusions = &remove_minor_nonref_isoforms(\@fusions, $filter_tab_writer);
-
+    my $removed_flag = 0;
+    @fusions = &remove_minor_nonref_isoforms(\@fusions, $filter_tab_writer, \$removed_flag);
+    if ($removed_flag) {
+        ## must redo the quant
+        &EM_assign_reads_and_penalize_multimaps(\@fusions, \%read_mapping_counts, $intermediates_out_prefix);
+    }
     
     
     foreach my $fusion (@fusions) {
@@ -291,7 +301,6 @@ main: {
             $spanning_frag_count = scalar(@spanning_frags_array);
         }
         
-
         my %rowadj = ('#FusionName' => $fusion->{fusion_name}, 
                       'JunctionReadCount' => $junction_read_count,
                       'SpanningFragCount' => $spanning_frag_count,
@@ -378,8 +387,7 @@ sub merge_neighboring_nonref_splice {
                     $filter_tab_writer->write_row(\%row);
                     
                     $top_fusion = &merge_fusions($top_fusion, $f);
-                    
-                    
+                                        
                 }
                 else {
                     push (@remaining_fusions, $f);
@@ -487,7 +495,7 @@ sub merge_fusions {
 
 ####
 sub remove_minor_nonref_isoforms {
-    my ($fusions_aref, $filter_tab_writer) = @_;
+    my ($fusions_aref, $filter_tab_writer, $removed_flag_sref) = @_;
     
     my @fusions = reverse sort { $a->{est_J}<=>$b->{est_J} 
                                  ||
@@ -518,6 +526,7 @@ sub remove_minor_nonref_isoforms {
             if ($pct_dom_iso_support < $MIN_ALT_PCT_JUNCTION) {
                 $row{Note} = "FILTERED DUE TO ONLY $pct_dom_iso_support % of dominant isoform support ($dominant_isoform_support)";
                 $filter_tab_writer->write_row(\%row);
+                $$removed_flag_sref = 1;
                 next; 
             }
             
@@ -542,6 +551,9 @@ sub remove_minor_nonref_isoforms {
 sub remove_fusions_with_insufficient_support {
     my ($fusions_aref, $filter_tab_writer, $min_J, $min_sum, $min_spanning_frags_only) = @_;
 
+
+    ## preferentially use est_J and est_S if present. Otherwise, using J and S values.
+
     my @ret_fusions;
 
     foreach my $fusion (@$fusions_aref) {
@@ -550,12 +562,23 @@ sub remove_fusions_with_insufficient_support {
         
         my $splice_type = $fusion->{splice_type};
 
-        my $sum = $fusion->{est_J} + $fusion->{est_S};
+        my $est_J = "NA";
+        my $est_S = "NA";
+        
+        my $J = $fusion->{J};
+        my $S = $fusion->{S};
+        
+        if (defined ($fusion->{est_J})) {
+            $J = $est_J = $fusion->{est_J};
+            $S = $est_S = $fusion->{est_S};
+        }
+
+        my $sum = $J + $S;
         
         # in case it gets filtered
         my %row = %{$fusion->{row}};
-        $row{est_J} = $fusion->{est_J}; # these weren't in the original row, so we need to add them here.
-        $row{est_S} = $fusion->{est_S};
+        $row{est_J} = $est_J; # these weren't in the original row, so we need to add them here.
+        $row{est_S} = $est_S;
         $row{'#FusionName'} = '#' . $row{'#FusionName'};
         
         if ($sum < $min_sum) {
@@ -565,7 +588,7 @@ sub remove_fusions_with_insufficient_support {
         }
 
 
-        if ($splice_type eq 'INCL_NON_REF_SPLICE' && $fusion->{est_J} < $MIN_NOVEL_JUNCTION_SUPPORT) { 
+        if ($splice_type eq 'INCL_NON_REF_SPLICE' && $J < $MIN_NOVEL_JUNCTION_SUPPORT) { 
             # skip it
             $row{Note} = "FILTERED DUE TO *novel* junction support $fusion->{J} < $MIN_NOVEL_JUNCTION_SUPPORT";
             $filter_tab_writer->write_row(\%row);
@@ -573,20 +596,20 @@ sub remove_fusions_with_insufficient_support {
         }
 
         
-        if ($fusion->{est_J} < $min_J && ! &AnnotFilterRule::fusion_has_junction_reads_exception($fusion_name) ) {
+        if ($J < $min_J && ! &AnnotFilterRule::fusion_has_junction_reads_exception($fusion_name) ) {
             # skip it
-            $row{Note} = "FILTERED DUE TO junction read support ($fusion->{J}) < $min_J";
+            $row{Note} = "FILTERED DUE TO junction read support $J < $min_J";
             $filter_tab_writer->write_row(\%row);
             next;
         }
         
-        if ($fusion->{est_J} < 1 && $fusion->{est_S} < $min_spanning_frags_only) {
-            $row{Note} = "FILTERED DUE TO only spanning reads and num spanning frags $fusion->{S} < $min_spanning_frags_only";
+        if ($J < 0.5 && $S < $min_spanning_frags_only) {
+            $row{Note} = "FILTERED DUE TO only spanning reads and num spanning frags $S < $min_spanning_frags_only";
             $filter_tab_writer->write_row(\%row);
             next;
         }
         
-        if ($fusion->{est_S} < 1 && $REQUIRE_LDAS && $fusion->{ldas} !~ /YES/i) {
+        if ($S < 0.5 && $REQUIRE_LDAS && $fusion->{ldas} !~ /YES/i) {
             $row{Note} = "FILTERED DUE TO no spanning reads and no long double anchor support at breakpoint";
             $filter_tab_writer->write_row(\%row);
             next;
@@ -698,4 +721,36 @@ sub EM_assign_reads_and_penalize_multimaps {
 
     return;
 }
+
+####
+sub select_highest_scoring_fusion_per_breakpoint {
+    my ($fusions_aref, $filter_tab_writer) = @_;
+    
+    ## fusions should already be sorted by score desc.
+
+    my @fusions_ret;
+    
+    my %seen;
+    
+    foreach my $fusion (@$fusions_aref) {
+        
+        my $brkpt_token = join("^^^", $fusion->{brkptA}, $fusion->{brkptB});
+        if ($seen{$brkpt_token}) {
+            my %row = %{$fusion->{row}}; 
+            $row{Note} = "better scoring fusion selected for this breakpoint";
+            $row{est_J} = "NA";
+            $row{est_S} = "NA";
+            $row{'#FusionName'} = '#' . $row{'#FusionName'}; 
+            $filter_tab_writer->write_row(\%row);
+        }
+        else {
+            $seen{$brkpt_token} = 1;
+            push(@fusions_ret, $fusion);
+        }
+    }
+
+    return(@fusions_ret);
+}
+
+
 
