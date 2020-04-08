@@ -22,7 +22,7 @@ RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
 RUN pip install numpy requests igv-reports
 
 
-RUN curl -L https://cpanmin.us | perl - App::cpanminus
+RUN cpan App::cpanminus
 
 ## set up tool config and deployment area:
 
@@ -155,8 +155,8 @@ RUN wget https://dfam.org/releases/current/infrastructure/dfamscan.pl.gz && \
 ## STAR-Fusion:
 WORKDIR $SRC
 
-ENV STAR_FUSION_VERSION=1.8.1
-ENV STARF_CHECKOUT=54f608e57300398e6cffb881521f66613add2f46
+ENV STAR_FUSION_VERSION=1.9.0test
+ENV STARF_CHECKOUT=be78102e1302e279ea886afede026676f11f79ef
 
 RUN apt-get update && apt-get install -y git
 
