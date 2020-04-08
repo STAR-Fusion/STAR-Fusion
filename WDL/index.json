@@ -1,0 +1,12 @@
+{
+  "grch38_gencode_v32_1.8": {
+    "url": "gs://regev-lab/resources/ctat/star_fusion/1.8/GRCh38_gencode_v32_CTAT_lib_Dec062019.plug-n-play.tar.bz2",
+    "cpu": 12,
+    "memory": "42G"
+  },
+  "mouse_gencode_m23_1.8": {
+    "url": "gs://regev-lab/resources/ctat/star_fusion/1.8/Mouse_gencode_M23_CTAT_lib_Dec062019.plug-n-play.tar.bz2",
+    "cpu": 12,
+    "memory": "42G"
+  }
+}

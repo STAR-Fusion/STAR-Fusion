@@ -1,3 +1,10 @@
+STAR-Fusion Release v1.9.0, Apr 8, 2020
+	-incorporates EM for assigning spanning reads to alt splice fusion isoforms
+	-by default, yields single fusion call per breakpoint (matters when genes overlap)
+	-incorporates FusionInspector v2.3.0 w/ pfam domain visualizations.
+	-ctat genome lib improvements for IGH fusion calls
+
+
 STAR-Fusion Release v1.8.1, Oct 18, 2019
 	-upgraded FusionInspector to v2.2.1, reduced RAM usage
 

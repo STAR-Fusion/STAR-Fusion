@@ -12,6 +12,8 @@ use Process_cmd;
 use File::Basename;
 use Pipeliner;
 use DelimParser;
+use FusionEM;
+use Data::Dumper;
 
 my $tmpdir = "/tmp";
 
@@ -72,6 +74,9 @@ my $usage = <<__EOUSAGE__;
 #
 #  --aggregate_novel_junction_dist <int>  default: $AGGREGATE_NOVEL_JUNCTION_DIST (non-ref junctions within $AGGREGATE_NOVEL_JUNCTION_DIST are merged into single calls)
 #
+#  --no_single_fusion_per_breakpoint     exclude filtering of potentially superfluous fusions involving different gene 
+#                                          annotations overlapping the same fusion breakpoint.
+#
 ####################################################################################################
 
 
@@ -85,7 +90,7 @@ my $fusion_preds_file;
 my $out_prefix;
 my $genome_lib_dir;
 my $chimeric_out_junctions_file;
-
+my $NO_SINGLE_FUSION_PER_BREAKPOINT = 0;
 
 &GetOptions ( 'h' => \$help_flag, 
               
@@ -110,8 +115,8 @@ my $chimeric_out_junctions_file;
               'min_pct_dom_promiscuity=i' => \$MIN_PCT_DOM_PROM,
               
               'genome_lib_dir=s' => \$genome_lib_dir,
-              
-              
+                            
+              'no_single_fusion_per_breakpoint' => \$NO_SINGLE_FUSION_PER_BREAKPOINT,
               
     );
 
@@ -165,17 +170,17 @@ main: {
     
     while (my $row = $tab_reader->get_row()) {
         
-        my $fusion_name = $row->{'#FusionName'};
-        my $J = $row->{JunctionReadCount};
-        my $S = $row->{SpanningFragCount};
-        my $splice_type = $row->{SpliceType};
-        my $geneA = $row->{LeftGene};
-        my $brkptA = $row->{LeftBreakpoint};
-        my $geneB = $row->{RightGene};
-        my $brkptB = $row->{RightBreakpoint};
-        my $junction_reads = $row->{JunctionReads};
-        my $spanning_frags = $row->{SpanningFrags};
-        my $long_double_anchor_support = $row->{LargeAnchorSupport};
+        my $fusion_name = $tab_reader->get_row_val($row, '#FusionName');
+        my $J = $tab_reader->get_row_val($row, "JunctionReadCount");
+        my $S = $tab_reader->get_row_val($row, "SpanningFragCount");
+        my $splice_type = $tab_reader->get_row_val($row, "SpliceType");
+        my $geneA = $tab_reader->get_row_val($row, "LeftGene");
+        my $brkptA = $tab_reader->get_row_val($row, "LeftBreakpoint");
+        my $geneB = $tab_reader->get_row_val($row, "RightGene");
+        my $brkptB = $tab_reader->get_row_val($row, "RightBreakpoint");
+        my $junction_reads = $tab_reader->get_row_val($row, "JunctionReads");
+        my $spanning_frags = $tab_reader->get_row_val($row, "SpanningFrags");
+        my $long_double_anchor_support = $tab_reader->get_row_val($row, "LargeAnchorSupport");
         
                 
         #TODO: use keys that match the column headers for sanity sake
@@ -208,10 +213,12 @@ main: {
     }
 
     my @column_headers = $tab_reader->get_column_headers();
+    @column_headers = (@column_headers[0..2], "est_J", "est_S", @column_headers[3..$#column_headers]);
+    
     my @filter_col_headers = (@column_headers, "Note");
     my $filter_tab_writer = new DelimParser::Writer($filter_ofh, "\t", \@filter_col_headers);
     my $stage1_tab_writer = new DelimParser::Writer($stage1_ofh, "\t", \@column_headers);
-        
+    
     @fusions = reverse sort {$a->{score} <=> $b->{score}
                              ||
                                  $a->{brkptA} cmp $b->{brkptA}  # need deterministic ordering
@@ -229,8 +236,12 @@ main: {
     
     my %read_mapping_counts = &parse_read_mapping_counts($chimeric_out_junctions_file);
     
-    &penalize_nondominant_fusion_multimap_reads(\@fusions, \%read_mapping_counts, $intermediates_out_prefix);
 
+    #############################################
+    ## removing fusions with insufficient support.
+    
+    ## initial filter removes the lions share of fusions not of interest.
+    
     @fusions = reverse sort {$a->{score} <=> $b->{score} 
                              ||
                                  $a->{brkptA} cmp $b->{brkptA} # need deterministic ordering
@@ -241,9 +252,31 @@ main: {
                                                          $MIN_JUNCTION_READS, $MIN_SUM_FRAGS,
                                                          $MIN_SPANNING_FRAGS_ONLY);
     
-    @fusions = &remove_minor_nonref_isoforms(\@fusions, $filter_tab_writer);
 
+    unless ($NO_SINGLE_FUSION_PER_BREAKPOINT) {
+        @fusions = &select_highest_scoring_fusion_per_breakpoint(\@fusions, $filter_tab_writer);
+    }
+    
+    
+    #################################
+    ## removing minor nonref isoforms - after first EM adjusting read support values.
 
+    &EM_assign_reads_and_penalize_multimaps(\@fusions, \%read_mapping_counts, $intermediates_out_prefix);
+    
+    @fusions = reverse sort {$a->{score} <=> $b->{score} 
+                             ||
+                                 $a->{brkptA} cmp $b->{brkptA} # need deterministic ordering
+                             ||
+                                 $a->{brkptB} cmp $b->{brkptB} } @fusions;
+
+    
+    my $removed_flag = 0;
+    @fusions = &remove_minor_nonref_isoforms(\@fusions, $filter_tab_writer, \$removed_flag);
+    if ($removed_flag) {
+        ## must redo the quant
+        &EM_assign_reads_and_penalize_multimaps(\@fusions, \%read_mapping_counts, $intermediates_out_prefix);
+    }
+    
     
     foreach my $fusion (@fusions) {
         # regenerating 'line' here, since merged entries will now have updated stats.        
@@ -251,18 +284,36 @@ main: {
         my %row = %{$fusion->{row}}; # init to initial info
         
         # now update it
+        
+        ## and readjust the fusion read counts based on what remains assigned.
+        
+        my $junction_read_count = 0;
+        my $junction_reads = $fusion->{junction_reads};
+        if ($junction_reads ne ".") {
+            my @junction_reads_array = split(/,/, $junction_reads);
+            $junction_read_count = scalar(@junction_reads_array);
+        }
 
+        my $spanning_frag_count = 0;
+        my $spanning_frags = $fusion->{spanning_frags};
+        if ($spanning_frags ne ".") {
+            my @spanning_frags_array = split(/,/, $spanning_frags);
+            $spanning_frag_count = scalar(@spanning_frags_array);
+        }
+        
         my %rowadj = ('#FusionName' => $fusion->{fusion_name}, 
-                      'JunctionReadCount' => $fusion->{J}, 
-                      'SpanningFragCount' => $fusion->{S}, 
+                      'JunctionReadCount' => $junction_read_count,
+                      'SpanningFragCount' => $spanning_frag_count,
                       'SpliceType' => $fusion->{splice_type},
                       'LeftGene' => $fusion->{geneA}, 
                       'LeftBreakpoint' => $fusion->{brkptA}, 
                       'RightGene' => $fusion->{geneB}, 
                       'RightBreakpoint' => $fusion->{brkptB},
-                      'JunctionReads' => $fusion->{junction_reads}, 
-                      'SpanningFrags' => $fusion->{spanning_frags},
+                      'JunctionReads' => $junction_reads,
+                      'SpanningFrags' => $spanning_frags,
                       'LargeAnchorSupport' => $fusion->{ldas},
+                      'est_J' => $fusion->{est_J},
+                      'est_S' => $fusion->{est_S},
             );
         
         # now update original row.
@@ -273,8 +324,8 @@ main: {
 
         $stage1_tab_writer->write_row(\%row);
             
-            $row{Note} = "Retained";
-            $filter_tab_writer->write_row(\%row);
+        $row{Note} = "Retained";
+        $filter_tab_writer->write_row(\%row);
     }
 
     close $filter_ofh;
@@ -294,11 +345,11 @@ main: {
     exit(0);
 }
 
-        
+
 ####
 sub merge_neighboring_nonref_splice {
     my ($fusions_aref, $filter_tab_writer) = @_;
-
+    
     my @ret_fusions;
 
     my %fusion_name_to_nonref_splice;
@@ -330,12 +381,13 @@ sub merge_neighboring_nonref_splice {
                 if (&fusions_within_range($top_fusion, $f, $AGGREGATE_NOVEL_JUNCTION_DIST)) {
                     my %row = %{$f->{row}};
                     $row{Note} = "Merged"; # TODO: add more info here about how it was done.
+                    $row{est_J} = "NA";
+                    $row{est_S} = "NA";
                     $row{'#FusionName'} = '#' . $row{'#FusionName'};
                     $filter_tab_writer->write_row(\%row);
                     
                     $top_fusion = &merge_fusions($top_fusion, $f);
-                    
-                    
+                                        
                 }
                 else {
                     push (@remaining_fusions, $f);
@@ -358,6 +410,8 @@ sub merge_neighboring_nonref_splice {
 ####
 sub fusions_within_range {
     my ($fusionA, $fusionB, $max_dist) = @_;
+
+    
 
     my @pts_A_left = split(/:/, $fusionA->{brkptA});
     my $coordA_left = $pts_A_left[-2];
@@ -441,11 +495,11 @@ sub merge_fusions {
 
 ####
 sub remove_minor_nonref_isoforms {
-    my ($fusions_aref, $filter_tab_writer) = @_;
+    my ($fusions_aref, $filter_tab_writer, $removed_flag_sref) = @_;
     
-    my @fusions = reverse sort { $a->{J}<=>$b->{J} 
+    my @fusions = reverse sort { $a->{est_J}<=>$b->{est_J} 
                                  ||
-                                     $a->{S} <=> $b->{S} } @$fusions_aref;
+                                     $a->{est_S} <=> $b->{est_S} } @$fusions_aref;
     
     my %dominant_isoform_junc_support;
     my @ret_fusions;
@@ -455,11 +509,14 @@ sub remove_minor_nonref_isoforms {
     foreach my $fusion (@fusions) {
         
         my $fusion_name = $fusion->{fusion_name};
-        my $junction_support = $fusion->{J};
-        my $span_support = $fusion->{S};
+        my $junction_support = $fusion->{est_J};
+        my $span_support = $fusion->{est_S};
         
         # in case we filter
         my %row = %{$fusion->{row}};
+        $row{est_J} = $junction_support;
+        $row{est_S} = $span_support;
+        
         $row{'#FusionName'} = '#' . $row{'#FusionName'};
         
         my $dominant_isoform_support = $dominant_isoform_junc_support{$fusion_name};
@@ -469,6 +526,7 @@ sub remove_minor_nonref_isoforms {
             if ($pct_dom_iso_support < $MIN_ALT_PCT_JUNCTION) {
                 $row{Note} = "FILTERED DUE TO ONLY $pct_dom_iso_support % of dominant isoform support ($dominant_isoform_support)";
                 $filter_tab_writer->write_row(\%row);
+                $$removed_flag_sref = 1;
                 next; 
             }
             
@@ -488,10 +546,13 @@ sub remove_minor_nonref_isoforms {
     
     return(@ret_fusions);
 }
-            
+
 ####
 sub remove_fusions_with_insufficient_support {
     my ($fusions_aref, $filter_tab_writer, $min_J, $min_sum, $min_spanning_frags_only) = @_;
+
+
+    ## preferentially use est_J and est_S if present. Otherwise, using J and S values.
 
     my @ret_fusions;
 
@@ -501,10 +562,23 @@ sub remove_fusions_with_insufficient_support {
         
         my $splice_type = $fusion->{splice_type};
 
-        my $sum = $fusion->{J} + $fusion->{S};
+        my $est_J = "NA";
+        my $est_S = "NA";
+        
+        my $J = $fusion->{J};
+        my $S = $fusion->{S};
+        
+        if (defined ($fusion->{est_J})) {
+            $J = $est_J = $fusion->{est_J};
+            $S = $est_S = $fusion->{est_S};
+        }
+
+        my $sum = $J + $S;
         
         # in case it gets filtered
         my %row = %{$fusion->{row}};
+        $row{est_J} = $est_J; # these weren't in the original row, so we need to add them here.
+        $row{est_S} = $est_S;
         $row{'#FusionName'} = '#' . $row{'#FusionName'};
         
         if ($sum < $min_sum) {
@@ -514,7 +588,7 @@ sub remove_fusions_with_insufficient_support {
         }
 
 
-        if ($splice_type eq 'INCL_NON_REF_SPLICE' && $fusion->{J} < $MIN_NOVEL_JUNCTION_SUPPORT) { 
+        if ($splice_type eq 'INCL_NON_REF_SPLICE' && $J < $MIN_NOVEL_JUNCTION_SUPPORT) { 
             # skip it
             $row{Note} = "FILTERED DUE TO *novel* junction support $fusion->{J} < $MIN_NOVEL_JUNCTION_SUPPORT";
             $filter_tab_writer->write_row(\%row);
@@ -522,20 +596,20 @@ sub remove_fusions_with_insufficient_support {
         }
 
         
-        if ($fusion->{J} < $min_J && ! &AnnotFilterRule::fusion_has_junction_reads_exception($fusion_name) ) {
+        if ($J < $min_J && ! &AnnotFilterRule::fusion_has_junction_reads_exception($fusion_name) ) {
             # skip it
-            $row{Note} = "FILTERED DUE TO junction read support ($fusion->{J}) < $min_J";
+            $row{Note} = "FILTERED DUE TO junction read support $J < $min_J";
             $filter_tab_writer->write_row(\%row);
             next;
         }
         
-        if ($fusion->{J} == 0 && $fusion->{S} < $min_spanning_frags_only) {
-            $row{Note} = "FILTERED DUE TO only spanning reads and num spanning frags $fusion->{S} < $min_spanning_frags_only";
+        if ($J < 0.5 && $S < $min_spanning_frags_only) {
+            $row{Note} = "FILTERED DUE TO only spanning reads and num spanning frags $S < $min_spanning_frags_only";
             $filter_tab_writer->write_row(\%row);
             next;
         }
         
-        if ($fusion->{S} == 0 && $REQUIRE_LDAS && $fusion->{ldas} !~ /YES/i) {
+        if ($S < 0.5 && $REQUIRE_LDAS && $fusion->{ldas} !~ /YES/i) {
             $row{Note} = "FILTERED DUE TO no spanning reads and no long double anchor support at breakpoint";
             $filter_tab_writer->write_row(\%row);
             next;
@@ -543,7 +617,7 @@ sub remove_fusions_with_insufficient_support {
         
 
         # passed requirements.
-
+        
         push (@ret_fusions, $fusion);
 
     }
@@ -555,11 +629,13 @@ sub remove_fusions_with_insufficient_support {
 sub score_fusion {
     my ($fusion) = @_;
 
-    my $J = $fusion->{J};
-    my $S = $fusion->{S};
+    ## preferably use the estimated values.
+
+    my $J = defined($fusion->{est_J}) ? $fusion->{est_J} : $fusion->{J};
+    my $S = defined($fusion->{est_S}) ? $fusion->{est_S} : $fusion->{S};
     
     my $score = $J*4 + $S;
-
+    
     $fusion->{score} = $score;
 }
 
@@ -591,69 +667,90 @@ sub parse_read_mapping_counts {
     
 }
 
-sub penalize_nondominant_fusion_multimap_reads {
+sub EM_assign_reads_and_penalize_multimaps {
     my ($fusions_aref, $read_mapping_counts_href, $outfile_prefix) = @_;
-
-    open(my $ofh, ">$outfile_prefix.scores_adjusted_for_multimapping") or die "Error, cannot write to file: $outfile_prefix.scores_adjusted_for_multimapping";
-        
-    my %seen_reads;
-
+    
+    my $fusion_em = new FusionEM();
+    
     foreach my $fusion (@$fusions_aref) {
-                
-        my ($fusion_name, $orig_J, $orig_S) = ($fusion->{fusion_name}, $fusion->{J}, $fusion->{S});
+        
+        my ($fusion_name, $left_breakpoint, $right_breakpoint) = ($fusion->{fusion_name}, $fusion->{brkptA}, $fusion->{brkptB});
+        my $left_trans = $fusion->{geneA};
+        my $right_trans = $fusion->{geneB};
+        
+
+        $fusion_name .= "::" . join("::",  
+                                    $left_trans, $left_breakpoint,
+                                    $right_trans, $right_breakpoint);
+        
+        $fusion->{fusion_isoform_name} = $fusion_name;
         
         ## penalize multimapping reads
         my $junction_reads_string = $fusion->{junction_reads};
+        my @junction_reads;
         if ($junction_reads_string ne '.') {
-            #print STDERR "-junction reads: $junction_reads_string\n";
-            my $new_J_count = 0;
-            my @J_reads = split(/,/, $junction_reads_string);
-            foreach my $J_read (@J_reads) {
-                my $mapping_count = $read_mapping_counts_href->{$J_read};
-                unless ($mapping_count) {
-                    confess "Error, missing mapping count for junction read: [$J_read] ";
-                }
-                if ( (! $seen_reads{$J_read}) || $seen_reads{$J_read} ne $fusion_name) {
-                    $new_J_count += 1;
-                    $seen_reads{$J_read} = $fusion_name;
-                }
-                else {
-                    #print STDERR "-discounting J read for $fusion_name\n";
-                    $new_J_count +=  1/$mapping_count;
-                }
+            foreach my $junction_read (split(/,/, $junction_reads_string)) {
+                $junction_read =~ s|/[12]$||;
+                push (@junction_reads, $junction_read);
             }
-            $fusion->{J} = int($new_J_count + 0.5);
         }
         
         my $spanning_frags_string = $fusion->{spanning_frags};
+        my @spanning_frags;
         if ($spanning_frags_string ne '.') {
-            #print STDERR "-spanning frags string: $spanning_frags_string\n";
-            my $new_S_count = 0;
-            my @S_frags = split(/,/, $spanning_frags_string);
-            foreach my $S_frag (@S_frags) {
-                my $mapping_count = $read_mapping_counts_href->{$S_frag};
-                unless ($mapping_count) {
-                    confess "Error, missing mapping count for spanning frag: [$S_frag] ";
-                }
-                if ( (! $seen_reads{$S_frag}) || $seen_reads{$S_frag} ne $fusion_name) {
-                    $new_S_count += 1;
-                    $seen_reads{$S_frag} = $fusion_name;
-                }
-                else {
-                    #print STDERR "-discounting S read for $fusion_name\n";
-                    $new_S_count += 1/$mapping_count;
-                }
-            }
-            $fusion->{S} = int($new_S_count + 0.5);
+            push(@spanning_frags, split(/,/, $spanning_frags_string));
         }
         
-        &score_fusion($fusion);
+        $fusion_em->add_fusion_transcript($fusion_name, \@junction_reads, \@spanning_frags);
+        
+    }
+    
+    $fusion_em->run();
 
-        print $ofh join("\t", $fusion_name, "($orig_J,$orig_S)", "->", "($fusion->{J},$fusion->{S})") . "\n";
+
+    foreach my $fusion (@$fusions_aref) { 
+        my $fusion_isoform_name = $fusion->{fusion_isoform_name};
+        my ($est_J, $est_S) = $fusion_em->get_fusion_estimated_J_S($fusion_isoform_name);
+        $fusion->{est_J} = sprintf("%.2f", $est_J);
+        $fusion->{est_S} = sprintf("%.2f", $est_S);
+        
+        # rescore it using the estimated J,S values.
+        &score_fusion($fusion);
+        
     }
 
-    close $ofh;
-    
     return;
 }
+
+####
+sub select_highest_scoring_fusion_per_breakpoint {
+    my ($fusions_aref, $filter_tab_writer) = @_;
+    
+    ## fusions should already be sorted by score desc.
+
+    my @fusions_ret;
+    
+    my %seen;
+    
+    foreach my $fusion (@$fusions_aref) {
+        
+        my $brkpt_token = join("^^^", $fusion->{brkptA}, $fusion->{brkptB});
+        if ($seen{$brkpt_token}) {
+            my %row = %{$fusion->{row}}; 
+            $row{Note} = "better scoring fusion selected for this breakpoint";
+            $row{est_J} = "NA";
+            $row{est_S} = "NA";
+            $row{'#FusionName'} = '#' . $row{'#FusionName'}; 
+            $filter_tab_writer->write_row(\%row);
+        }
+        else {
+            $seen{$brkpt_token} = 1;
+            push(@fusions_ret, $fusion);
+        }
+    }
+
+    return(@fusions_ret);
+}
+
+
 

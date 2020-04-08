@@ -8,10 +8,46 @@ use FindBin;
 use lib ("$FindBin::Bin/../PerlLib");
 use DelimParser;
 
+use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
-my $usage = "\n\n\tusage: $0 fusion_preds.tsv\n\n\t\t(writes .RTartifact.pass and .RTartifact.filtered files)\n\n\n";
+my $genome_lib_dir = $ENV{CTAT_GENOME_LIB};
 
-my $fusion_preds_file = $ARGV[0] or die $usage;
+
+
+my $usage = <<__EOUSAGE__;
+
+#############################################################################
+ 
+   writes .RTartifact.pass and .RTartifact.filtered files)
+
+#############################################################################
+#
+#  --fusions <string>               preliminary fusion predictions
+#
+#  --genome_lib_dir <string>        genome lib dir (default: ${genome_lib_dir})       
+#
+#############################################################################
+
+__EOUSAGE__
+    
+    ;
+
+
+my $fusion_preds_file;
+my $help_flag;
+
+&GetOptions ( 'help|h' => \$help_flag,
+              'fusions=s' => \$fusion_preds_file,
+              'genome_lib_dir=s' => \$genome_lib_dir,
+    );
+
+if ($help_flag) {
+    die $usage;
+}
+
+unless ($genome_lib_dir && $fusion_preds_file) {
+    die $usage;
+}
 
 my @FREE_PASS = qw(Mitelman chimerdb_omim chimerdb_pubmed ChimerKB ChimerPub
                    Cosmic HaasMedCancer); # TODO: put in config, currently sharing this here and w/ AnnotFilterRule
@@ -24,8 +60,6 @@ my $FREE_PASS_REGEX = join("|", @FREE_PASS);
 
 ############################################################
 ## Need AnnotFilterRule for organism-specific exceptions to filtering rules based on genes
-
-my $genome_lib_dir = $ENV{CTAT_GENOME_LIB} || confess "Error, must have env var CTAT_GENOME_LIB set";
 
 my $annot_filt_module = "$genome_lib_dir/AnnotFilterRule.pm";
 unless (-s $annot_filt_module) {
@@ -53,11 +87,25 @@ main: {
     open(my $filtered_ofh, ">$filtered_file") or die "Error, cannot write to $filtered_file";
     my $filtered_writer = new DelimParser::Writer($filtered_ofh, "\t", \@column_headers);
 
-    my $pass_counter = 0;
-    my $filtered_counter = 0;
+
+    my @rows;
     
     while (my $row = $delim_reader->get_row()) {
+        push (@rows, $row);
+    }
 
+    ## prioritize according to number of junction (split) reads:
+    @rows = reverse sort {$a->{JunctionReadCount} <=> $b->{JunctionReadCount}} @rows;
+    
+
+    my %passed;
+    my %failed;
+
+    my @passed_rows;
+    my @filtered_rows;
+    
+    foreach my $row (@rows) {
+        
         my $left_dinuc = uc $delim_reader->get_row_val($row, "LeftBreakDinuc");
         my $right_dinuc = uc $delim_reader->get_row_val($row, "RightBreakDinuc");
         
@@ -68,6 +116,11 @@ main: {
         #print STDERR "$annots";
         
         my $combo = $left_dinuc . $right_dinuc;
+
+        if (exists $failed{$fusion_name}) {
+            push(@filtered_rows, $row);
+            next;
+        }
 
         my $pass_flag = 0;
         
@@ -92,17 +145,31 @@ main: {
         
 
         if ($pass_flag) {
-        
-            $pass_writer->write_row($row);
-            $pass_counter++;
+            $passed{$fusion_name} = 1;
+            push (@passed_rows, $row);
         }
         else {
-            $filtered_writer->write_row($row);
-            $filtered_counter++;
+            # we only fail those that are dominant non-canonical splice.
+            if (! exists $passed{$fusion_name}) {
+                $failed{$fusion_name} = 1;
+            }
+            push (@filtered_rows, $row);
         }
-        
     }
 
+    ## write output files..
+
+    foreach my $row (@passed_rows) {
+        $pass_writer->write_row($row);
+    }
+
+    foreach my $row (@filtered_rows) {
+        $filtered_writer->write_row($row);
+    }
+
+    my $pass_counter = scalar(@passed_rows);
+    my $filtered_counter = scalar(@filtered_rows);
+    
     print STDERR "-filter_likely_RT_artifacts: (pass: $pass_counter, filtered: $filtered_counter)\n";
     
     exit(0);

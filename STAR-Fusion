@@ -12,10 +12,9 @@ use Process_cmd;
 
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
-
-
-my $VERSION = "1.8.1";
+my $VERSION = "1.9.0";
 #my $VERSION = "__BLEEDING_EDGE__ Do not use - pull versioned release from: https://github.com/STAR-Fusion/STAR-Fusion/releases";
+
 
 my @MIN_STAR_MAJOR_MINOR_VERSION = (2, 7, 2, 'b');
 
@@ -300,7 +299,7 @@ my $SHOW_FULL_USAGE_INFO;
               'min_junction_reads=i' => \$MIN_JUNCTION_READS,
               'min_sum_frags=i' => \$MIN_SUM_FRAGS,
               'max_promiscuity=i' => \$MAX_PROMISCUITY,
-              'min_pct_dom_promiscuity=i' => \$MIN_PCT_DOM_PROM,
+              'min_pct_dom_promiscuity=f' => \$MIN_PCT_DOM_PROM,
               'min_spanning_frags_only=i' => \$MIN_SPANNING_FRAGS_ONLY,
               
               'require_LDAS=i' => \$REQUIRE_LDAS,
@@ -335,7 +334,7 @@ my $SHOW_FULL_USAGE_INFO;
               'STAR_LoadAndExit' => \$STAR_LOAD_AND_EXIT,
               'STAR_Remove' => \$STAR_REMOVE,
               
-              'STAR_MAX_MATE_DIST=i' => \$STAR_MAX_MATE_DIST,
+              'STAR_max_mate_dist=i' => \$STAR_MAX_MATE_DIST,
 
               'STAR_SortedByCoordinate' => \$STAR_SortedByCoordinate,
               'STAR_limitBAMsortRAM=s' => \$STAR_limitBAMsortRAM,
@@ -440,7 +439,7 @@ unless (-d $genome_lib_dir) {
 }
 
 ## reset it just in case it's different or unset to begin with:
-$ENV{CTAT_GENOME_LIB} = $genome_lib_dir;
+$ENV{CTAT_GENOME_LIB} = &ensure_full_path($genome_lib_dir);
 
 ## ensure that we can locate the AnnotFilterRule in the CTAT_GENOME_LIB
 my $annot_filt_module = "$genome_lib_dir/AnnotFilterRule.pm";
@@ -616,6 +615,10 @@ main: {
             . " --genome_lib_dir $genome_lib_dir "
             . " --out_prefix $preliminary_outdir/$out_prefix";
         
+        unless ($NO_SINGLE_FUSION_PER_BREAKPOINT) {
+            $cmd .= " --no_single_fusion_per_breakpoint ";
+        }
+        
         $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/STAR-Fusion.filter.ok"));
         
 
@@ -665,21 +668,12 @@ main: {
     unless ($NO_RT_ARTIFACT_FILTER) {
 
         ## filter out likely RT artifacts
-        $cmd = "$UTILDIR/filter_likely_RT_artifacts.pl $prelim_fusion_file";
+        $cmd = "$UTILDIR/filter_likely_RT_artifacts.pl --fusions $prelim_fusion_file --genome_lib_dir $genome_lib_dir";
         $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/RTartifact_filter.ok"));
         $prelim_fusion_file = "$prelim_fusion_file.RTartifact.pass";
         
     }
-     
-    unless ($NO_SINGLE_FUSION_PER_BREAKPOINT) {
-        
-        ## report best candidates per breakpoint.
-        $cmd = "$UTILDIR/remove_lesser_candidates_at_breakpoint.pl $prelim_fusion_file";
-        $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/remove_lesser_at_brkpt.ok"));
-        $prelim_fusion_file = "$prelim_fusion_file.brkptselect.pass";
-                
-    }
-    
+
     
     if ($MIN_FFPM > 0) { 
 
@@ -761,7 +755,6 @@ main: {
                 . " --min_junction_reads $MIN_JUNCTION_READS "
                 . " --min_novel_junction_support $MIN_NOVEL_JUNCTION_SUPPORT "
                 . " --min_spanning_frags_only $MIN_SPANNING_FRAGS_ONLY "
-                . " --STAR_max_mate_dist $STAR_MAX_MATE_DIST "
                 . " --vis "
                 . " --max_promiscuity $MAX_PROMISCUITY "
                 . " --output_dir $FI_outdir "
@@ -858,7 +851,7 @@ sub run_STAR {
     my $cmd = "$STAR_PROG --genomeDir $star_index_dir "
         . " --outReadsUnmapped None "
         . " --chimSegmentMin 12 "
-        . " --chimJunctionOverhangMin 12 "
+        . " --chimJunctionOverhangMin 8 "
         . " --chimOutJunctionFormat 1 "  # new option for STAR 2.6.1a
         . " --alignSJDBoverhangMin 10 "   
         . " --alignMatesGapMax $STAR_MAX_MATE_DIST "
@@ -868,7 +861,14 @@ sub run_STAR {
         . " --runThreadN $CPU"
         . $maybe_tmpdir
         . " --outSAMstrandField intronMotif "
-        . " --outSAMunmapped Within ";
+        . " --outSAMunmapped Within "
+        
+        . " --alignInsertionFlush Right "
+        . " --alignSplicedMateMapLminOverLmate 0 "
+        . " --alignSplicedMateMapLmin 30 "
+        
+
+        ;
     
     if ($STAR_SortedByCoordinate) {
                 

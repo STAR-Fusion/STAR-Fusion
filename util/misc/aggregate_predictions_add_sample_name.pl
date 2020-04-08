@@ -30,7 +30,13 @@ main: {
             next;
         }
         
-        open (my $fh2, $filename) or die "Error, cannot open filename: $filename";
+        my $fh2;
+        if ($filename =~ /\.gz$/) {
+            open($fh2, "gunzip -c $filename |") or die "error, cannot read from $filename";
+        }
+        else {
+            open ($fh2, $filename) or die "Error, cannot open filename: $filename";
+        }
         print STDERR "-processing $filename\n";
         my $tab_reader = new DelimParser::Reader($fh2, "\t");
         if (! $seen_header_flag) {
@@ -40,7 +46,6 @@ main: {
             $seen_header_flag = 1;
         }
         while (my $row = $tab_reader->get_row()) {
-            
             $row->{'#sample'} = $sample_name;
             $tab_writer->write_row($row);
         }
