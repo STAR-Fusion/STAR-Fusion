@@ -151,12 +151,26 @@ RUN wget https://dfam.org/releases/current/infrastructure/dfamscan.pl.gz && \
      mv dfamscan.pl $BIN/
 
 
+## add Picard tools
+## Picard
+WORKDIR $SRC
+
+RUN wget https://github.com/broadinstitute/picard/releases/download/2.20.3/picard.jar
+
+ENV PICARD_HOME $SRC
+
+
+COPY sam_readname_cleaner.py $BIN/
+
+RUN apt-get install -y pbzip2
+
+
 ###############
 ## STAR-Fusion:
 WORKDIR $SRC
 
-ENV STAR_FUSION_VERSION=1.9.0test
-ENV STARF_CHECKOUT=be78102e1302e279ea886afede026676f11f79ef
+ENV STAR_FUSION_VERSION=1.9.0
+ENV STARF_CHECKOUT=36ed7468942d84baa44e1b973bf354d3d653d344
 
 RUN apt-get update && apt-get install -y git
 
@@ -171,15 +185,3 @@ ENV STAR_FUSION_HOME $SRC/STAR-Fusion
 
 
 
-## add Picard tools
-## Picard
-WORKDIR $SRC
-
-RUN wget https://github.com/broadinstitute/picard/releases/download/2.20.3/picard.jar
-
-ENV PICARD_HOME $SRC
-
-
-COPY sam_readname_cleaner.py $BIN/
-
-RUN apt-get install -y pbzip2
