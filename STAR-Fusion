@@ -246,6 +246,11 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #
 #    --verbose_level <int>                 verbosity (default: $verbose_level, max=2)
 #
+#    --max_sensitivity                     includes options: --min_junction_reads 0 --min_sum_frags 1 --require_LDAS 0 --min_spanning_frags_only 1 --min_novel_junction_support 1 --min_FFPM 0 --no_single_fusion_per_breakpoint
+#
+#    --full_Monty                          includes max sensitivity and disables filters via: --max_promiscuity 1000000 --min_pct_dom_promiscuity 1e-3 --min_alt_pct_junction 1e-3 --no_annotation_filter --no_RT_artifact_filter
+#
+#
 ###################################################################################
 
 
@@ -255,7 +260,8 @@ __EXTENDED_USAGE__
 
 
 my $no_filter = 0;
-
+my $MAX_SENSITIVITY_FLAG = 0;
+my $FULL_MONTY_FLAG = 0;
 
 my $left_fq_filename = "";
 my $right_fq_filename = "";
@@ -360,6 +366,12 @@ my $SHOW_FULL_USAGE_INFO;
               'show_full_usage_info' => \$SHOW_FULL_USAGE_INFO,
 
               'run_STAR_only' => \$RUN_STAR_ONLY_FLAG,
+
+              'max_sensitivity' => \$MAX_SENSITIVITY_FLAG,
+
+              'full_Monty' => \$FULL_MONTY_FLAG,
+              
+
     );
 
 
@@ -377,6 +389,30 @@ if ($REPORT_VERSION) {
     print "\n\nSTAR-Fusion version: $VERSION\n\n";
     exit(0);
 }
+
+
+if ($FULL_MONTY_FLAG) {
+    $MAX_SENSITIVITY_FLAG = 1;
+    # includes max sensitivity and disables filters via: --max_promiscuity 1000000 --min_pct_dom_promiscuity 1e-3 --min_alt_pct_junction 1e-3 --no_annotation_filter --no_RT_artifact_filter
+    
+    $MAX_PROMISCUITY = 1000000;
+    $MIN_PCT_DOM_PROM = 1e-3;
+    $MIN_ALT_PCT_JUNCTION = 1e-3;
+    $NO_ANNOTATION_FILTER = 1;
+    $NO_RT_ARTIFACT_FILTER = 1;
+
+}
+if ($MAX_SENSITIVITY_FLAG) {
+    # includes options: --min_junction_reads 0 --min_sum_frags 1 --require_LDAS 0 --min_spanning_frags_only 1 --min_novel_junction_support 1 --min_FFPM 0 --no_single_fusion_per_breakpoint
+    $MIN_JUNCTION_READS = 0;
+    $MIN_SUM_FRAGS = 1;
+    $REQUIRE_LDAS = 0;
+    $MIN_SPANNING_FRAGS_ONLY = 1;
+    $MIN_NOVEL_JUNCTION_SUPPORT = 1;
+    $MIN_FFPM = 0;
+    $NO_SINGLE_FUSION_PER_BREAKPOINT = 1;
+}
+
 
 if ($STAR_PROG) {
     unless (-e $STAR_PROG) {
