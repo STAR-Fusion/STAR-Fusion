@@ -22,6 +22,8 @@ main: {
     my @out_col_headers = @column_headers;
 
     @out_col_headers = ($out_col_headers[0], 'Cell', @out_col_headers[1..$#out_col_headers]);
+
+    @out_col_headers = grep { $_ !~ /est_[JS]|FFPM/ } @out_col_headers; # stick w/ raw counts for single cell reporting.
     
     my $delim_writer = new DelimParser::Writer(*STDOUT, "\t", \@out_col_headers);
 
@@ -55,8 +57,6 @@ main: {
             $cellrow{SpanningFragCount} = $cell_spanning_frags_count;
             $cellrow{SpanningFrags} = $cell_spanning_frags_string;
 
-            $cellrow{FFPM} = "NA"; # dont have the per cell read counts here.
-            
             $delim_writer->write_row(\%cellrow);
             
         }
