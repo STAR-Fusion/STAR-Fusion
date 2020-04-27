@@ -1,25 +1,35 @@
-workflow star_fusion_tasks {
+version 1.0
 
+workflow star_fusion_tasks {
 }
 
 task star_fusion_config {
+  input {
     String genome
     File acronym_file
     Int? cpus
     String? memory
     String docker
     Int preemptible
+  }
 
-    command {
+  output {
+    String star_genome = read_string("genome.txt")
+    Int star_cpus_output = read_int("cpu.txt")
+    String star_memory_output = read_string("memory.txt")
+  }
+
+  command <<<
+
         set -e
 
         python <<CODE
 
         import json
-        genome = '${genome}'
-        acronym_file = '${acronym_file}'
-        cpu = '${cpus}'
-        memory = '${memory}'
+        genome = '~{genome}'
+        acronym_file = '~{acronym_file}'
+        cpu = '~{cpus}'
+        memory = '~{memory}'
         genome_lc = genome.lower()
         is_url = genome_lc.startswith('gs://')
 
@@ -43,21 +53,16 @@ task star_fusion_config {
             w2.write(memory)
             w3.write(genome)
         CODE
-    }
+    
+  >>>
+  runtime {
+    preemptible: "${preemptible}"
+    bootDiskSizeGb: 12
+    disks: "local-disk 1 HDD"
+    docker: "${docker}"
+    cpu: 1
+    memory: "1GB"
+  }
 
-    output {
-        String star_genome = read_string('genome.txt')
-        Int star_cpus_output = read_int('cpu.txt')
-        String star_memory_output = read_string('memory.txt')
-
-    }
-
-    runtime {
-        cpu:1
-        bootDiskSizeGb: 12
-        disks: "local-disk 1 HDD"
-        memory:"1GB"
-        docker: "${docker}"
-        preemptible: "${preemptible}"
-    }
 }
+
