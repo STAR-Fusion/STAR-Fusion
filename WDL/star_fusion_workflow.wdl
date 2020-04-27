@@ -1,6 +1,6 @@
 version 1.0
-#import "https://api.firecloud.org/ga4gh/v1/tools/CTAT:star_fusion_tasks/versions/1/plain-WDL/descriptor" as star_fusion_tasks
-import "./star_fusion_tasks.wdl" as star_fusion_tasks
+import "https://api.firecloud.org/ga4gh/v1/tools/CTAT:star_fusion_tasks/versions/2/plain-WDL/descriptor" as star_fusion_tasks
+
 
 workflow star_fusion_workflow {
   input {
