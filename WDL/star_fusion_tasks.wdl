@@ -3,6 +3,99 @@ version 1.0
 workflow star_fusion_tasks {
 }
 
+struct SplitOutput {
+  Array[Array[String]] cell
+  Array[Array[String]] read1
+  Array[Array[String]] read2
+}
+
+
+task split_sample_sheet {
+    input {
+        File sample_sheet
+        Int cells_per_job
+        String docker
+        Int preemptible
+    }
+
+    command <<<
+        set -e
+
+        python <<CODE
+
+        import pandas as pd
+        import json
+
+        sample_sheet = "~{sample_sheet}"
+        # headers Cell,Read1,Read2
+        df = pd.read_csv(sample_sheet, sep=None, engine='python', dtype=str)
+        paired = 'Read2' in df
+        ncells = len(df)
+        step = min(ncells, ~{cells_per_job})
+        output_json = dict(cell=[], read1=[], read2=[])
+        for i in range(0, ncells, step):
+            end = min(ncells, i+step)
+            subset = df[i:end]
+            output_json['cell'].append(subset['Cell'].values.tolist())
+            output_json['read1'].append(subset['Read1'].values.tolist())
+            if paired:
+                output_json['read2'].append(subset['Read2'].values.tolist())
+            else:
+                output_json['read2'].append([])
+        with open('output.json', 'wt') as f:
+            f.write(json.dumps(output_json))
+        CODE
+    >>>
+
+    output {
+        SplitOutput split_output = read_json('output.json')
+    }
+
+    runtime {
+        cpu:1
+        bootDiskSizeGb: 12
+        disks: "local-disk 1 HDD"
+        memory:"1GB"
+        docker: "~{docker}"
+        preemptible: "~{preemptible}"
+    }
+}
+
+task concatentate {
+    input {
+        Array[File] input_files
+        String output_name
+        String docker
+        Int preemptible
+    }
+
+    command <<<
+        set -e
+        output_name="~{output_name}"
+        input_files="~{sep="," input_files}"
+        IFS=','
+        read -ra files <<< "$input_files"
+        nfiles=${#files[@]}
+        cat ${files[0]} > $output_name
+        for (( i=1; i<${nfiles}; i++ )); do
+            tail -n +2 ${files[$i]} | cat >> $output_name
+        done
+    >>>
+
+    output {
+        File output_file = "~{output_name}"
+    }
+
+    runtime {
+        cpu:1
+        bootDiskSizeGb: 12
+        disks: "local-disk 1 HDD"
+        memory:"1GB"
+        docker: "~{docker}"
+        preemptible: "~{preemptible}"
+    }
+}
+
 task star_fusion_config {
   input {
     String genome

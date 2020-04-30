@@ -1,7 +1,7 @@
 version 1.0
 
-import "https://api.firecloud.org/ga4gh/v1/tools/CTAT:star_fusion_tasks/versions/2/plain-WDL/descriptor" as star_fusion_tasks
-#import "./star_fusion_tasks.wdl" as star_fusion_tasks
+#import "https://api.firecloud.org/ga4gh/v1/tools/CTAT:star_fusion_tasks/versions/2/plain-WDL/descriptor" as star_fusion_tasks
+import "./star_fusion_tasks.wdl" as star_fusion_tasks
 
 workflow star_fusion_smartseq2_workflow {
     input {
@@ -47,7 +47,7 @@ workflow star_fusion_smartseq2_workflow {
             preemptible = preemptible_or_default
     }
 
-    call split_sample_sheet {
+    call star_fusion_tasks.split_sample_sheet {
         input:
             sample_sheet=sample_sheet,
             cells_per_job=cells_per_job_or_default,
@@ -58,11 +58,11 @@ workflow star_fusion_smartseq2_workflow {
      scatter(idx in range(length(split_sample_sheet.split_output["read1"]))) {
         call star_fusion {
                 input:
-                    additional_flags=additional_flags,
                     left_fq=split_sample_sheet.split_output.read1[idx],
                     right_fq=split_sample_sheet.split_output.read2[idx],
                     cell_name=split_sample_sheet.split_output.cell[idx],
                     sample_id=sample_id,
+                    additional_flags=additional_flags,
                     extra_disk_space=extra_disk_space,
                     fastq_disk_space_multiplier=fastq_disk_space_multiplier,
                     genome_disk_space_multiplier=genome_disk_space_multiplier,
@@ -74,14 +74,14 @@ workflow star_fusion_smartseq2_workflow {
                     use_ssd=use_ssd_or_default
          }
     }
-    call concatentate as concatentate_fusion_predictions {
+    call star_fusion_tasks.concatentate as concatentate_fusion_predictions {
         input:
          input_files=star_fusion.fusion_predictions,
          output_name="fusion_predictions.tsv",
          docker=config_docker_or_default,
          preemptible = preemptible_or_default
     }
-    call concatentate as concatentate_fusion_predictions_abridged {
+    call star_fusion_tasks.concatentate as concatentate_fusion_predictions_abridged {
         input:
          input_files=star_fusion.fusion_predictions_abridged,
          output_name="fusion_predictions.abridged.tsv",
@@ -90,7 +90,7 @@ workflow star_fusion_smartseq2_workflow {
     }
 
 
-    call concatentate as concatentate_fusion_predictions_samples_deconvolved {
+    call star_fusion_tasks.concatentate as concatentate_fusion_predictions_samples_deconvolved {
         input:
          input_files=star_fusion.fusion_predictions_samples_deconvolved,
          output_name="fusion_predictions_samples_deconvolved.tsv",
@@ -98,7 +98,7 @@ workflow star_fusion_smartseq2_workflow {
          preemptible = preemptible_or_default
     }
 
-     call concatentate as concatentate_fusion_predictions_abridged_samples_deconvolved {
+     call star_fusion_tasks.concatentate as concatentate_fusion_predictions_abridged_samples_deconvolved {
             input:
              input_files=star_fusion.fusion_predictions_abridged_samples_deconvolved,
              output_name="fusion_predictions_abridged_samples_deconvolved.tsv",
@@ -120,97 +120,7 @@ workflow star_fusion_smartseq2_workflow {
     }
 }
 
-struct SplitOutput {
-  Array[Array[String]] cell
-  Array[Array[String]] read1
-  Array[Array[String]] read2
-}
 
-task concatentate {
-    input {
-        Array[File] input_files
-        String output_name
-        String docker
-        Int preemptible
-    }
-
-    command <<<
-        set -e
-        output_name="~{output_name}"
-        input_files="~{sep="," input_files}"
-        IFS=','
-        read -ra files <<< "$input_files"
-        nfiles=${#files[@]}
-        cat ${files[0]} > $output_name
-        for (( i=1; i<${nfiles}; i++ )); do
-            tail -n +2 ${files[$i]} | cat >> $output_name
-        done
-    >>>
-
-    output {
-        File output_file = "~{output_name}"
-    }
-
-    runtime {
-        cpu:1
-        bootDiskSizeGb: 12
-        disks: "local-disk 1 HDD"
-        memory:"1GB"
-        docker: "~{docker}"
-        preemptible: "~{preemptible}"
-    }
-}
-
-task split_sample_sheet {
-    input {
-        File sample_sheet
-        Int cells_per_job
-        String docker
-        Int preemptible
-    }
-
-    command <<<
-        set -e
-
-        python <<CODE
-
-        import pandas as pd
-        import json
-
-        sample_sheet = "~{sample_sheet}"
-        # headers Cell,Read1,Read2
-        df = pd.read_csv(sample_sheet, sep=None, engine='python', dtype=str)
-        paired = 'Read2' in df
-        ncells = len(df)
-        step = min(ncells, ~{cells_per_job})
-        output_json = dict(cell=[], read1=[], read2=[])
-        for i in range(0, ncells, step):
-            end = min(ncells, i+step)
-            subset = df[i:end]
-            output_json['cell'].append(subset['Cell'].values.tolist())
-            output_json['read1'].append(subset['Read1'].values.tolist())
-            if paired:
-                output_json['read2'].append(subset['Read2'].values.tolist())
-            else:
-                output_json['read2'].append([])
-        with open('output.json', 'wt') as f:
-            f.write(json.dumps(output_json))
-        CODE
-    >>>
-
-    output {
-        SplitOutput split_output = read_json('output.json')
-    }
-
-    runtime {
-        cpu:1
-        bootDiskSizeGb: 12
-        disks: "local-disk 1 HDD"
-        memory:"1GB"
-        docker: "~{docker}"
-        preemptible: "~{preemptible}"
-    }
-}
 
 task star_fusion {
     input {
