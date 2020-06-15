@@ -1,7 +1,7 @@
 version 1.0
 
-#import "https://api.firecloud.org/ga4gh/v1/tools/CTAT:star_fusion_tasks/versions/2/plain-WDL/descriptor" as star_fusion_tasks
-import "./star_fusion_tasks.wdl" as star_fusion_tasks
+import "https://api.firecloud.org/ga4gh/v1/tools/CTAT:star_fusion_tasks/versions/2/plain-WDL/descriptor" as star_fusion_tasks
+
 
 workflow star_fusion_smartseq2_workflow {
     input {
@@ -18,7 +18,7 @@ workflow star_fusion_smartseq2_workflow {
         String? memory
 
         String? docker
-        Float extra_disk_space = 10
+        Float extra_disk_space = 30
         Float fastq_disk_space_multiplier = 3.25
         Float genome_disk_space_multiplier = 2.5
 
