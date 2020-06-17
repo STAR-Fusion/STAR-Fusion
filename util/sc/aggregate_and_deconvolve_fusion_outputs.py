@@ -42,8 +42,8 @@ def main():
         
         for batch in fh:
             batch = batch.rstrip()
-
-            output_dir = batch.replace(".sample_sheet", "star-fusion.outdir")
+            
+            output_dir = batch.replace(".sample_sheet", ".star-fusion.outdir")
             star_fusion_output_file = os.path.join(output_dir, "star-fusion.fusion_predictions.tsv")
 
             counter += 1

@@ -27,7 +27,7 @@ def main():
         for batch in fh:
             batch = batch.rstrip()
 
-            output_dir = batch.replace(".sample_sheet", "star-fusion.outdir")
+            output_dir = batch.replace(".sample_sheet", ".star-fusion.outdir")
             
             cmd = str(starF_prog +
                       " --genome_lib_dir {} ".format(ctat_genome_lib_dir) +
