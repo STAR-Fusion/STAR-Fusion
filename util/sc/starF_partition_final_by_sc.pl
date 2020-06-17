@@ -25,7 +25,10 @@ main: {
 
     @out_col_headers = grep { $_ !~ /est_[JS]|FFPM/ } @out_col_headers; # stick w/ raw counts for single cell reporting.
     
-    my $delim_writer = new DelimParser::Writer(*STDOUT, "\t", \@out_col_headers);
+
+
+
+    my %cell_to_fusion_results;
 
     while(my $row = $delim_parser->get_row()) {
 
@@ -57,12 +60,35 @@ main: {
             $cellrow{SpanningFragCount} = $cell_spanning_frags_count;
             $cellrow{SpanningFrags} = $cell_spanning_frags_string;
 
-            $delim_writer->write_row(\%cellrow);
+            
+            push (@{$cell_to_fusion_results{$cell}}, {%cellrow} );
             
         }
         
     }
 
+
+    my $delim_writer = new DelimParser::Writer(*STDOUT, "\t", \@out_col_headers);
+    foreach my $cell_fusions_aref (values %cell_to_fusion_results) {
+        
+        my @fusion_rows = @$cell_fusions_aref;
+
+        @fusion_rows = sort {$b->{JunctionReadCount} <=> $a->{JunctionReadCount}} @fusion_rows;
+
+        my %seen;
+        foreach my $fusion_row (@fusion_rows) {
+            my $fusion_name = $fusion_row->{'#FusionName'} or die "Error, no #FusionName for " . Dumper($fusion_row);
+            if ($fusion_row->{JunctionReadCount} > 0) {
+                $seen{$fusion_name} = 1;
+            }
+            elsif ($seen{$fusion_name}) {
+                # not reporting cell-found fusions w/ span-only reads if the fusion is already reported with breakpoint reads.
+                next;
+            }
+            
+            $delim_writer->write_row($fusion_row);
+        }
+    }
     
     exit(0);
 }
