@@ -20,7 +20,8 @@ def main():
     cells_per_job = args.cells_per_job
     output_dir = args.output_dir
 
-
+    output_dir = os.path.abspath(output_dir)
+    
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
