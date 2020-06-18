@@ -69,6 +69,10 @@ my $NO_REMOVE_DUPS = 0;
 
 my $RUN_STAR_ONLY_FLAG = 0;
 
+my $SKIP_EM_FLAG = 0;
+my $SKIP_FFPM_FLAG = 0;
+
+
 my $logo='
 ############################################################################################
 #
@@ -192,7 +196,9 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #
 #    --no_remove_dups                      do not remove duplicate reads
 #    
-
+#    --skip_EM                             skips expectation maximization based fractional assignment of spanning fragments across multiple splice breakpoint fusion calls.
+#
+#    --skip_FFPM                           skip FFPM computation.  FFPM is only computed correctly and meaningfully on per-sample analysis, or use of --samples_file where all entries in the samples file correspond to a single biological sample (ie. multiple lanes of seq, or replicates that are to be run as a single entity).
 #
 #   **  Turn off specific fusion filters:
 #
@@ -246,7 +252,7 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #
 #    --verbose_level <int>                 verbosity (default: $verbose_level, max=2)
 #
-#    --max_sensitivity                     includes options: --min_junction_reads 0 --min_sum_frags 1 --require_LDAS 0 --min_spanning_frags_only 1 --min_novel_junction_support 1 --min_FFPM 0 --no_single_fusion_per_breakpoint
+#    --max_sensitivity                     includes options: --min_junction_reads 0 --min_sum_frags 1 --require_LDAS 0 --min_spanning_frags_only 1 --min_novel_junction_support 1 --skip_FFPM --no_single_fusion_per_breakpoint --skip_EM
 #
 #    --full_Monty                          includes max sensitivity and disables filters via: --max_promiscuity 1000000 --min_pct_dom_promiscuity 1e-3 --min_alt_pct_junction 1e-3 --no_annotation_filter --no_RT_artifact_filter
 #
@@ -371,6 +377,8 @@ my $SHOW_FULL_USAGE_INFO;
 
               'full_Monty' => \$FULL_MONTY_FLAG,
               
+              'skip_EM' => \$SKIP_EM_FLAG,
+              'skip_FFPM' => \$SKIP_FFPM_FLAG,
 
     );
 
@@ -411,6 +419,8 @@ if ($MAX_SENSITIVITY_FLAG) {
     $MIN_NOVEL_JUNCTION_SUPPORT = 1;
     $MIN_FFPM = 0;
     $NO_SINGLE_FUSION_PER_BREAKPOINT = 1;
+    $SKIP_EM_FLAG = 1;
+    $SKIP_FFPM_FLAG = 1;
 }
 
 
@@ -654,6 +664,9 @@ main: {
         unless ($NO_SINGLE_FUSION_PER_BREAKPOINT) {
             $cmd .= " --no_single_fusion_per_breakpoint ";
         }
+        if ($SKIP_EM_FLAG) {
+            $cmd .= " --skip_EM ";
+        }
         
         $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/STAR-Fusion.filter.ok"));
         
@@ -663,12 +676,14 @@ main: {
         
     }
     
-    ## convert vals to FFPM
-    $cmd = "$UTILDIR/incorporate_FFPM_into_final_report.pl $prelim_fusion_file $num_total_rnaseq_frags > $prelim_fusion_file.FFPM";
-    $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/FFPM.ok") );
     
-    $prelim_fusion_file = "$prelim_fusion_file.FFPM";
-    
+    unless ($SKIP_FFPM_FLAG) {
+        ## convert vals to FFPM
+        $cmd = "$UTILDIR/incorporate_FFPM_into_final_report.pl $prelim_fusion_file $num_total_rnaseq_frags > $prelim_fusion_file.FFPM";
+        $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/FFPM.ok") );
+        
+        $prelim_fusion_file = "$prelim_fusion_file.FFPM";
+    }
     
     ## add breakpoint / splice junction info
 
@@ -711,7 +726,7 @@ main: {
     }
 
     
-    if ($MIN_FFPM > 0) { 
+    if ( (! $SKIP_FFPM_FLAG) && $MIN_FFPM > 0) { 
 
         # filter based on min FFPM value
         
@@ -720,7 +735,7 @@ main: {
 
         $prelim_fusion_file = "$prelim_fusion_file.minFFPM.$MIN_FFPM.pass";
     }
-        
+    
         
     # generate final fusion prediction output files:
     my $final_output_fusions = "$out_prefix.fusion_predictions.tsv";

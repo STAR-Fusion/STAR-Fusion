@@ -116,6 +116,7 @@ clean:
 	rm -rf ./star_fusion_samplesPE_outdir
 	rm -rf ./star_fusion_outdir_starOnly
 	rm -rf ./test_singularity_outdir
+	rm -rf ./star_fusion_SingleCellPE*
 
 purge:
 	../STAR-Fusion --STAR_Remove

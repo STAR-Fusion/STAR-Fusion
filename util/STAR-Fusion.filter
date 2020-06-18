@@ -77,6 +77,8 @@ my $usage = <<__EOUSAGE__;
 #  --no_single_fusion_per_breakpoint     exclude filtering of potentially superfluous fusions involving different gene 
 #                                          annotations overlapping the same fusion breakpoint.
 #
+#  --skip_EM                             skip expectation maximization assignment of fusion evidence spanning frags
+#
 ####################################################################################################
 
 
@@ -91,6 +93,8 @@ my $out_prefix;
 my $genome_lib_dir;
 my $chimeric_out_junctions_file;
 my $NO_SINGLE_FUSION_PER_BREAKPOINT = 0;
+
+my $SKIP_EM_FLAG = 0;
 
 &GetOptions ( 'h' => \$help_flag, 
               
@@ -117,6 +121,8 @@ my $NO_SINGLE_FUSION_PER_BREAKPOINT = 0;
               'genome_lib_dir=s' => \$genome_lib_dir,
                             
               'no_single_fusion_per_breakpoint' => \$NO_SINGLE_FUSION_PER_BREAKPOINT,
+              
+              'skip_EM' => \$SKIP_EM_FLAG,
               
     );
 
@@ -258,23 +264,32 @@ main: {
     }
     
     
-    #################################
-    ## removing minor nonref isoforms - after first EM adjusting read support values.
 
-    &EM_assign_reads_and_penalize_multimaps(\@fusions, \%read_mapping_counts, $intermediates_out_prefix);
+    unless ($SKIP_EM_FLAG) {
+
+        #################################
+        ## removing minor nonref isoforms - after first EM adjusting read support values.
+        
+        &EM_assign_reads_and_penalize_multimaps(\@fusions, \%read_mapping_counts, $intermediates_out_prefix);
+        
+    }
     
     @fusions = reverse sort {$a->{score} <=> $b->{score} 
                              ||
                                  $a->{brkptA} cmp $b->{brkptA} # need deterministic ordering
                              ||
                                  $a->{brkptB} cmp $b->{brkptB} } @fusions;
-
     
-    my $removed_flag = 0;
-    @fusions = &remove_minor_nonref_isoforms(\@fusions, $filter_tab_writer, \$removed_flag);
-    if ($removed_flag) {
-        ## must redo the quant
-        &EM_assign_reads_and_penalize_multimaps(\@fusions, \%read_mapping_counts, $intermediates_out_prefix);
+    
+    unless ($SKIP_EM_FLAG) {
+        my $removed_flag = 0;
+        @fusions = &remove_minor_nonref_isoforms(\@fusions, $filter_tab_writer, \$removed_flag);
+    
+
+        if ($removed_flag) {
+            ## must redo the quant
+            &EM_assign_reads_and_penalize_multimaps(\@fusions, \%read_mapping_counts, $intermediates_out_prefix);
+        }
     }
     
     
@@ -312,8 +327,8 @@ main: {
                       'JunctionReads' => $junction_reads,
                       'SpanningFrags' => $spanning_frags,
                       'LargeAnchorSupport' => $fusion->{ldas},
-                      'est_J' => $fusion->{est_J},
-                      'est_S' => $fusion->{est_S},
+                      'est_J' => defined($fusion->{est_J}) ? $fusion->{est_J} : "NA",
+                      'est_S' => defined($fusion->{est_S}) ? $fusion->{est_S} : "NA",
             );
         
         # now update original row.
