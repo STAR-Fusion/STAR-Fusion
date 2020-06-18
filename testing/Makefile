@@ -81,6 +81,16 @@ samples_PE_FI_validate: samples_PE
 
 
 
+###############################
+## single-cell fusion analysis
+
+single_cell_PE:
+	../util/sc/prep_distributed_jobs.py --sample_sheet data/samples.txt --cells_per_job 1 --output_dir star_fusion_SingleCellPE # cells_per_job set to 1 just for this smallt est. Default is actually 24
+	../util/sc/write_sc_starF_cmds.py --batches_list_file star_fusion_SingleCellPE.batches.list --genome_lib_dir ${CTAT_GENOME_LIB} --use_shared_mem > star_fusion_SingleCellPE.batches.starF.cmds
+	../util/sc/run_distributed_jobs_locally.py --cmds_file star_fusion_SingleCellPE.batches.starF.cmds --num_parallel_exec 4 --genome_lib_dir ${CTAT_GENOME_LIB}
+	../util/sc/aggregate_and_deconvolve_fusion_outputs.py --batches_list_file star_fusion_SingleCellPE.batches.list --output_prefix star_fusion_SingleCellPE
+
+
 
 
 ##################################

@@ -73,7 +73,7 @@ def main():
 
     logger.info("-writing abridged version now...")
     # make abridged version
-    abridged_fusions_file = args.output_prefix + ".abridged.tsv"
+    abridged_fusions_file = args.output_prefix + ".fusions.abridged.tsv"
     cmd = str( os.path.join(UTILDIR, "$UTILDIR/column_exclusions.pl {} JunctionReads,SpanningFrags > {}".format(output_filename, abridged_fusions_file)))
     subprocess.check_call(cmd, shell=True)
 
