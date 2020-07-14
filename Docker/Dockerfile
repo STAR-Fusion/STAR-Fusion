@@ -169,8 +169,8 @@ RUN apt-get install -y pbzip2
 ## STAR-Fusion:
 WORKDIR $SRC
 
-ENV STAR_FUSION_VERSION=1.9.0
-ENV STARF_CHECKOUT=36ed7468942d84baa44e1b973bf354d3d653d344
+ENV STAR_FUSION_VERSION=1.10.0-devc
+ENV STARF_CHECKOUT=b55c8082396880e7f8211da367173d07baa240c3
 
 RUN apt-get update && apt-get install -y git
 
@@ -184,4 +184,6 @@ RUN git clone https://github.com/STAR-Fusion/STAR-Fusion.git && \
 ENV STAR_FUSION_HOME $SRC/STAR-Fusion
 
 
+ENV PATH="$SRC/STAR-Fusion:$SRC/STAR-Fusion/FusionInspector:${PATH}"
 
+ENTRYPOINT ["/usr/local/src/STAR-Fusion/STAR-Fusion"]
