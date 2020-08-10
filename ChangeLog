@@ -1,3 +1,12 @@
+STAR-Fusion Release v1.9.1, Aug 10, 2020
+	-includes FusionInspector v2.3.1
+	-improvements for single cell data processing
+	-sync max mate distance info w/ FusionInspector
+	-added --max_sensitivity  and --full_Monty settings
+	
+
+
+
 STAR-Fusion Release v1.9.0, Apr 8, 2020
 	-incorporates EM for assigning spanning reads to alt splice fusion isoforms
 	-by default, yields single fusion call per breakpoint (matters when genes overlap)
