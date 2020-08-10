@@ -145,7 +145,7 @@ RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" 
 
 ## Dfam scan
 WORKDIR $SRC
-RUN wget https://dfam.org/releases/current/infrastructure/dfamscan.pl.gz && \
+RUN wget https://dfam.org/releases/Dfam_3.1/infrastructure/dfamscan.pl.gz && \
      gunzip dfamscan.pl.gz && \
      chmod 755 dfamscan.pl && \
      mv dfamscan.pl $BIN/
@@ -186,4 +186,4 @@ ENV STAR_FUSION_HOME $SRC/STAR-Fusion
 
 ENV PATH="$SRC/STAR-Fusion:$SRC/STAR-Fusion/FusionInspector:${PATH}"
 
-ENTRYPOINT ["/usr/local/src/STAR-Fusion/STAR-Fusion"]
+
