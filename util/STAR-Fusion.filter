@@ -30,6 +30,9 @@ my $MIN_PCT_DOM_PROM = 20;
 
 my $REQUIRE_LDAS = 1;
 
+my $NON_REF_SPLICE_SCORE_PENALTY_FACTOR = 0.5;
+
+
 my $usage = <<__EOUSAGE__;
 
 ###################################################################################################
@@ -210,6 +213,8 @@ main: {
 
                        score => undef, # assigned below
                        
+                       SpliceType => $splice_type,
+
                        row => $row,
         };
 
@@ -650,6 +655,10 @@ sub score_fusion {
     my $S = defined($fusion->{est_S}) ? $fusion->{est_S} : $fusion->{S};
     
     my $score = $J*4 + $S;
+    
+    if ($fusion->{SpliceType} ne "ONLY_REF_SPLICE") {
+        $score *= $NON_REF_SPLICE_SCORE_PENALTY_FACTOR;
+    }
     
     $fusion->{score} = $score;
 }
