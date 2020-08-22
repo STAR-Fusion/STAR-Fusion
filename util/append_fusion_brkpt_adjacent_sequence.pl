@@ -44,7 +44,7 @@ main : {
 
         my $right_half_seq = &get_breakpoint_seq($break_right, 'right', $half_length);
         
-        $row->{FusionSeq} = uc $left_half_seq . lc $right_half_seq;
+        $row->{FusionSeq} = uc($left_half_seq) . lc($right_half_seq);
         
         $tab_writer->write_row($row);
     }
