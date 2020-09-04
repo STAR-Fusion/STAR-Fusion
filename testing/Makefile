@@ -103,6 +103,16 @@ kickstart_hg19_SE:
 	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB} -J __kickstart_data/hg19.Chimeric.out.junction  --FusionInspector inspect --examine_coding_effect --left_fq ${left_fq} -O star_fusion_SE_outdir_kickstart_hg19  --STAR_use_shared_memory 
 
 
+#### max sensitivity and full monty modes
+
+max_sensitivity:
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir.max_sens --max_sensitivity
+
+
+full_Monty:
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir.full_Monty --full_Monty  
+
+
 ######################
 ## Cleanup
 

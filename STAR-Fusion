@@ -254,7 +254,7 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #
 #    --max_sensitivity                     includes options: --min_junction_reads 0 --min_sum_frags 1 --require_LDAS 0 --min_spanning_frags_only 1 --min_novel_junction_support 1 --skip_FFPM --no_single_fusion_per_breakpoint --skip_EM
 #
-#    --full_Monty                          includes max sensitivity and disables filters via: --max_promiscuity 1000000 --min_pct_dom_promiscuity 1e-3 --min_alt_pct_junction 1e-3 --no_annotation_filter --no_RT_artifact_filter
+#    --full_Monty                          includes max sensitivity and disables filters via: --max_promiscuity 1000000 --min_pct_dom_promiscuity 1 --min_alt_pct_junction 1e-3 --no_annotation_filter --no_RT_artifact_filter
 #
 #
 ###################################################################################
@@ -401,10 +401,10 @@ if ($REPORT_VERSION) {
 
 if ($FULL_MONTY_FLAG) {
     $MAX_SENSITIVITY_FLAG = 1;
-    # includes max sensitivity and disables filters via: --max_promiscuity 1000000 --min_pct_dom_promiscuity 1e-3 --min_alt_pct_junction 1e-3 --no_annotation_filter --no_RT_artifact_filter
+    # includes max sensitivity and disables filters via: --max_promiscuity 1000000 --min_pct_dom_promiscuity 1 --min_alt_pct_junction 1e-3 --no_annotation_filter --no_RT_artifact_filter
     
     $MAX_PROMISCUITY = 1000000;
-    $MIN_PCT_DOM_PROM = 1e-3;
+    $MIN_PCT_DOM_PROM = 1;
     $MIN_ALT_PCT_JUNCTION = 1e-3;
     $NO_ANNOTATION_FILTER = 1;
     $NO_RT_ARTIFACT_FILTER = 1;
