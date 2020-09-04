@@ -31,7 +31,9 @@ all: standard \
      kickstart_hg19_SE \
      standard_run_star_only \
 	 samples_PE \
-     samples_PE_FI
+     samples_PE_FI \
+	 max_sensitivity \
+     full_Monty
 
 
 
