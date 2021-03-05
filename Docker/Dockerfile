@@ -131,18 +131,6 @@ RUN wget http://eddylab.org/software/hmmer3/3.1b2/hmmer-3.1b2-linux-intel-x86_64
 
 
 
-##############
-## STAR
-
-ENV STAR_VERSION=2.7.2b
-RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" &&\
-    wget -P $SRC $STAR_URL &&\
-    tar -xvf $SRC/${STAR_VERSION}.tar.gz -C $SRC && \
-    mv $SRC/STAR-${STAR_VERSION}/bin/Linux_x86_64_static/STAR /usr/local/bin
-
-
-
-
 ## Dfam scan
 WORKDIR $SRC
 RUN wget https://dfam.org/releases/Dfam_3.1/infrastructure/dfamscan.pl.gz && \
@@ -163,6 +151,17 @@ ENV PICARD_HOME $SRC
 COPY sam_readname_cleaner.py $BIN/
 
 RUN apt-get install -y pbzip2
+
+
+##############
+## STAR
+
+ENV STAR_VERSION=2.7.8a
+RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" &&\
+    wget -P $SRC $STAR_URL &&\
+    tar -xvf $SRC/${STAR_VERSION}.tar.gz -C $SRC && \
+    mv $SRC/STAR-${STAR_VERSION}/bin/Linux_x86_64_static/STAR /usr/local/bin
+
 
 
 ###############
