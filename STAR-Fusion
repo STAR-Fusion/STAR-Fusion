@@ -12,11 +12,11 @@ use Process_cmd;
 
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
-my $VERSION = "1.9.1";
+my $VERSION = "1.10.0";
 #my $VERSION = "__BLEEDING_EDGE__ Do not use - pull versioned release from: https://github.com/STAR-Fusion/STAR-Fusion/releases";
 
 
-my @MIN_STAR_MAJOR_MINOR_VERSION = (2, 7, 2, 'b');
+my @MIN_STAR_MAJOR_MINOR_VERSION = (2, 7, 8, 'a');
 
 
 my $BASEDIR = "$FindBin::Bin";
@@ -43,7 +43,7 @@ my $MAX_PROMISCUITY = 10;
 my $MIN_PCT_DOM_PROM = 20;
 
 my $genome_lib_dir = $ENV{CTAT_GENOME_LIB};
-my $CPU = 4; 
+my $CPU = 4;
 my $outTmpDir=undef;
 my $REQUIRE_LDAS = 1;
 
@@ -53,12 +53,14 @@ my $STAR_peOverlapMMp = 0.1; # the max proportion of mismatches in the overlap
 
 
 my $STAR_chimMultimapScoreRange = 3;
-my $STAR_chimMultimapNmax = 20; 
+my $STAR_chimMultimapNmax = 20;
 my $STAR_chimNonchimScoreDropMin = 10;
 my $STAR_chimScoreJunctionNonGTAG = -4;
 
 
 my $STAR_MAX_MATE_DIST = 100000;
+
+my $STAR_SJDB_OVERHANG_MIN = 10;
 
 my $MIN_PCT_MM_NONSPECIFIC = 50;
 
@@ -81,7 +83,7 @@ my $logo='
 #     \_____  \   |    | /  /_\  \|       _/  ______ |    __)|  |  \/  ___/  |/  _ \ /    \
 #     /        \  |    |/    |    \    |   \ /_____/ |     \ |  |  /\___ \|  (  <_> )   |  \
 #    /_______  /  |____|\____|__  /____|_  /         \___  / |____//____  >__|\____/|___|  /
-#            \/                 \/       \/              \/             \/               \/ 
+#            \/                 \/       \/              \/             \/               \/
 #
 #
 ############################################################################################';
@@ -106,14 +108,14 @@ $logo
 #
 #    --genome_lib_dir <string>             directory containing genome lib (see http://STAR-Fusion.github.io)
 #                                          (required to specify, unless env var CTAT_GENOME_LIB is set to it)
-#                                          Easiest - get plug-n-play version from: 
-#                                            < https://data.broadinstitute.org/Trinity/CTAT_RESOURCE_LIB/ > 
+#                                          Easiest - get plug-n-play version from:
+#                                            < https://data.broadinstitute.org/Trinity/CTAT_RESOURCE_LIB/ >
 #
 #  Optional:
 #
 #    --CPU <int>                           number of threads for running STAR (default: $CPU)
 #
-#    --output_dir|O <string>               output directory  (default: $output_dir) 
+#    --output_dir|O <string>               output directory  (default: $output_dir)
 #
 #    --show_full_usage_info                provide full usage info.
 #
@@ -134,31 +136,33 @@ __EOUSAGE__
 my $extended_usage_info = <<__EXTENDED_USAGE__
 #
 # STAR program configurations:
-#    
+#
 #    --STAR_max_mate_dist <int>            maximum distance between mates  (also used for the maximum intron length value)  default:  $STAR_MAX_MATE_DIST
 #
+#    --STAR_SJDBoverhangMin <int>          minimum overhang for annotated junctions default:  $STAR_SJDB_OVERHANG_MIN
+#
 #    --STAR_SortedByCoordinate             have STAR sort resulting bam file by coordinate
-#         --STAR_limitBAMsortRAM <string>       num GB of RAM, default:  ${STAR_limitBAMsortRAM}
+#    --STAR_limitBAMsortRAM <string>       num GB of RAM, default:  ${STAR_limitBAMsortRAM}
 #
 #    --STAR_PATH <string>                  /path/to/STAR  (default: uses STAR found in PATH setting).
 #
 #    --run_STAR_only                       stop after running STAR aligner (essentially just generating the Chimeric.out.junction file)
-#    
-#   Stitching overlapping reads settings:    
+#
+#   Stitching overlapping reads settings:
 #          --STAR_peOverlapNbasesMin <int>    minimum number of bases in the overlap (default: $STAR_peOverlapNbasesMin)
 #          --STAR_peOverlapMMp <int>          the max proportion of mismatches in the overlap (default: $STAR_peOverlapMMp)
 #
-#   STAR chim multi-map opts:    
-#          --STAR_chimMultimapScoreRange <int>     the score range for multi-mapping chimeras below the best chimeric score. (default: $STAR_chimMultimapScoreRange)     
+#   STAR chim multi-map opts:
+#          --STAR_chimMultimapScoreRange <int>     the score range for multi-mapping chimeras below the best chimeric score. (default: $STAR_chimMultimapScoreRange)
 #          --STAR_chimMultimapNmax <int>           maximum number of multi-alignments for the chimera (default: $STAR_chimMultimapNmax)
 #          --STAR_chimNonchimScoreDropMin <int>    to trigger chimeric detection, the drop in the best non-chimeric alignment score with respect to the read length has to be smaller than this value (default: $STAR_chimNonchimScoreDropMin)
-#    
+#
 # Chimeric read filtering parameters:
 #
 #    --min_pct_MM_nonspecific|M <int>     min pct of multimapping reads that should map to 2 genes
 #                                         (avoids multimapping reads that lack specificity)
 #                                           value must be between [1,100] (default: $MIN_PCT_MM_NONSPECIFIC)
-##  
+##
 # Fusion transcript filtering:
 #
 #    --no_filter                           do not filter predictions. (stops execution prior to the filtering stage).
@@ -171,7 +175,7 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #
 #    --require_LDAS 0|1                    require long double anchor support for split reads
 #                                           when no spanning frags are found (default: 1)
-#                                           
+#
 #
 #    --max_promiscuity <int>               maximum number of partners allowed for a given fusion. Default: $MAX_PROMISCUITY
 #
@@ -179,40 +183,40 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #                                          are filtered prior to applying the max_promiscuity filter.
 #                                          (default: $MIN_PCT_DOM_PROM)
 #
-#    --aggregate_novel_junction_dist <int>  default: $AGGREGATE_NOVEL_JUNCTION_DIST (non-ref junctions within $AGGREGATE_NOVEL_JUNCTION_DIST 
+#    --aggregate_novel_junction_dist <int>  default: $AGGREGATE_NOVEL_JUNCTION_DIST (non-ref junctions within $AGGREGATE_NOVEL_JUNCTION_DIST
 #                                           are merged into single calls)
-#    
-#    --min_novel_junction_support <int>    default: $MIN_NOVEL_JUNCTION_SUPPORT  (minimum of $MIN_NOVEL_JUNCTION_SUPPORT 
+#
+#    --min_novel_junction_support <int>    default: $MIN_NOVEL_JUNCTION_SUPPORT  (minimum of $MIN_NOVEL_JUNCTION_SUPPORT
 #                                          junction reads required if breakpoint
 #                                                        lacks involvement of only reference junctions)
 #
 #    --min_spanning_frags_only <int>        minimum number of rna-seq fragments required as fusion evidence if
 #                                          there are no junction reads (default: $MIN_SPANNING_FRAGS_ONLY)
 #
-#    --min_alt_pct_junction <float>        default: $MIN_ALT_PCT_JUNCTION  ($MIN_ALT_PCT_JUNCTION % of the dominant isoform 
+#    --min_alt_pct_junction <float>        default: $MIN_ALT_PCT_JUNCTION  ($MIN_ALT_PCT_JUNCTION % of the dominant isoform
 #                                          junction support)
 #
 #    --min_FFPM <float>                    minimum FFPM (fusion fragments per million rna-seq frags)  (default: $MIN_FFPM)
 #
 #    --no_remove_dups                      do not remove duplicate reads
-#    
+#
 #    --skip_EM                             skips expectation maximization based fractional assignment of spanning fragments across multiple splice breakpoint fusion calls.
 #
 #    --skip_FFPM                           skip FFPM computation.  FFPM is only computed correctly and meaningfully on per-sample analysis, or use of --samples_file where all entries in the samples file correspond to a single biological sample (ie. multiple lanes of seq, or replicates that are to be run as a single entity).
 #
 #   **  Turn off specific fusion filters:
 #
-#    --no_annotation_filter                exclude filtering of fusion predictions based on annotations 
+#    --no_annotation_filter                exclude filtering of fusion predictions based on annotations
 #                                               (ie. by default, removing fusions found in normal (non-cancer) samples))
 #
 #    --no_RT_artifact_filter               exclude filtering of likely RT artifacts
 #                                               (by default, fusions w/o GT-AG, GC-AG, or AT-AC splice junctions at fusion breakpoint are excluded
 #                                                as likely artifacts, with few exceptions of known fusions that involve intra-exon breakpoints. ie. IGH-fusions)
 #
-#    --no_single_fusion_per_breakpoint     exclude filtering of potentially superfluous fusions involving different gene 
+#    --no_single_fusion_per_breakpoint     exclude filtering of potentially superfluous fusions involving different gene
 #                                                annotations overlapping the same fusion breakpoint.
 #
-# Downstream analysis of fusion candidates: 
+# Downstream analysis of fusion candidates:
 #
 #    --examine_coding_effect               explore impact of fusions on coding sequences
 #
@@ -220,7 +224,7 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #
 #    --FusionInspector <inspect|validate>  include FusionInspector, options:
 #                                               'inspect' - considers only StarFusion-identified fusion reads in context of identified fusions (fast)
-#                                               'validate' - examines all reads, recovers evidence, computes fusion allele fractions (slow) 
+#                                               'validate' - examines all reads, recovers evidence, computes fusion allele fractions (slow)
 #
 #    --denovo_reconstruct                  attempt to reconstruct fusion transcripts using Trinity de novo assembly (requires --FusionInspector)
 #
@@ -254,7 +258,7 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #
 #    --max_sensitivity                     includes options: --min_junction_reads 0 --min_sum_frags 1 --require_LDAS 0 --min_spanning_frags_only 1 --min_novel_junction_support 1 --skip_FFPM --no_single_fusion_per_breakpoint --skip_EM
 #
-#    --full_Monty                          includes max sensitivity and disables filters via: --max_promiscuity 1000000 --min_pct_dom_promiscuity 1e-3 --min_alt_pct_junction 1e-3 --no_annotation_filter --no_RT_artifact_filter
+#    --full_Monty                          includes max sensitivity and disables filters via: --max_promiscuity 1000000 --min_pct_dom_promiscuity 1 --min_alt_pct_junction 1e-3 --no_annotation_filter --no_RT_artifact_filter
 #
 #
 ###################################################################################
@@ -301,11 +305,11 @@ my $SHOW_FULL_USAGE_INFO;
 
 
 &GetOptions ( 'help|h' => \$help_flag,
-              
+
               'left_fq=s' => \$left_fq_filename,
               'right_fq=s' => \$right_fq_filename,
               'samples_file=s' => \$samples_file,
-                            
+
               'chimeric_junction|J=s' => \$chimeric_out_junctions_file,
 
               'min_junction_reads=i' => \$MIN_JUNCTION_READS,
@@ -313,31 +317,31 @@ my $SHOW_FULL_USAGE_INFO;
               'max_promiscuity=i' => \$MAX_PROMISCUITY,
               'min_pct_dom_promiscuity=f' => \$MIN_PCT_DOM_PROM,
               'min_spanning_frags_only=i' => \$MIN_SPANNING_FRAGS_ONLY,
-              
+
               'require_LDAS=i' => \$REQUIRE_LDAS,
-              
+
               'min_novel_junction_support=i' => \$MIN_NOVEL_JUNCTION_SUPPORT,
               'min_alt_pct_junction=f' => \$MIN_ALT_PCT_JUNCTION,
               'aggregate_novel_junction_dist=i' => \$AGGREGATE_NOVEL_JUNCTION_DIST,
               'output_dir|O=s' => \$output_dir,
-              
+
               'tmpdir=s' => \$tmpdir,
               'verbose_level=i' => \$verbose_level,
 
               'examine_coding_effect' => \$EXAMINE_CODING_EFFECT,
 
               'min_FFPM=f' => \$MIN_FFPM,
-              
+
               'no_filter' => \$no_filter,
-              
+
               'no_annotation_filter' => \$NO_ANNOTATION_FILTER,
               'no_RT_artifact_filter' => \$NO_RT_ARTIFACT_FILTER,
               'no_single_fusion_per_breakpoint' => \$NO_SINGLE_FUSION_PER_BREAKPOINT,
-              
+
               'genome_lib_dir=s' => \$genome_lib_dir,
-              
+
               'version' => \$REPORT_VERSION,
-              
+
               'CPU=i' => \$CPU,
               'outTmpDir=s' => \$outTmpDir,
 
@@ -345,12 +349,14 @@ my $SHOW_FULL_USAGE_INFO;
               'STAR_use_shared_memory' => \$USE_SHARED_MEMORY,
               'STAR_LoadAndExit' => \$STAR_LOAD_AND_EXIT,
               'STAR_Remove' => \$STAR_REMOVE,
-              
+
               'STAR_max_mate_dist=i' => \$STAR_MAX_MATE_DIST,
+              'STAR_SJDBoverhangMin=i' => \$STAR_SJDB_OVERHANG_MIN,
+
 
               'STAR_SortedByCoordinate' => \$STAR_SortedByCoordinate,
               'STAR_limitBAMsortRAM=s' => \$STAR_limitBAMsortRAM,
-              
+
               'STAR_PATH=s' => \$STAR_PROG,
 
               # other STAR settings
@@ -360,15 +366,15 @@ my $SHOW_FULL_USAGE_INFO;
               'STAR_chimMultimapScoreRange=i' => \$STAR_chimMultimapScoreRange,
               'STAR_chimMultimapNmax=i' => \$STAR_chimMultimapNmax,
               'STAR_chimNonchimScoreDropMin=i' => \$STAR_chimNonchimScoreDropMin,
-                            
+
               'extract_fusion_reads' => \$EXTRACT_FUSION_READS,
               'FusionInspector=s' => \$FUSIONINSPECTOR_MODE,
               'denovo_reconstruct' => \$DENOVO_RECONSTRUCT,
-              
+
               'no_remove_dups' => \$NO_REMOVE_DUPS,
-              
+
               'DEVEL_STAR' => \$DEVEL_STAR,
-    
+
               'show_full_usage_info' => \$SHOW_FULL_USAGE_INFO,
 
               'run_STAR_only' => \$RUN_STAR_ONLY_FLAG,
@@ -376,7 +382,7 @@ my $SHOW_FULL_USAGE_INFO;
               'max_sensitivity' => \$MAX_SENSITIVITY_FLAG,
 
               'full_Monty' => \$FULL_MONTY_FLAG,
-              
+
               'skip_EM' => \$SKIP_EM_FLAG,
               'skip_FFPM' => \$SKIP_FFPM_FLAG,
 
@@ -387,7 +393,7 @@ my $SHOW_FULL_USAGE_INFO;
 if ($SHOW_FULL_USAGE_INFO) {
     die "$usage$extended_usage_info";
 }
-    
+
 
 if ($help_flag) {
     die $usage;
@@ -401,10 +407,10 @@ if ($REPORT_VERSION) {
 
 if ($FULL_MONTY_FLAG) {
     $MAX_SENSITIVITY_FLAG = 1;
-    # includes max sensitivity and disables filters via: --max_promiscuity 1000000 --min_pct_dom_promiscuity 1e-3 --min_alt_pct_junction 1e-3 --no_annotation_filter --no_RT_artifact_filter
-    
+    # includes max sensitivity and disables filters via: --max_promiscuity 1000000 --min_pct_dom_promiscuity 1 --min_alt_pct_junction 1e-3 --no_annotation_filter --no_RT_artifact_filter
+
     $MAX_PROMISCUITY = 1000000;
-    $MIN_PCT_DOM_PROM = 1e-3;
+    $MIN_PCT_DOM_PROM = 1;
     $MIN_ALT_PCT_JUNCTION = 1e-3;
     $NO_ANNOTATION_FILTER = 1;
     $NO_RT_ARTIFACT_FILTER = 1;
@@ -536,10 +542,10 @@ my $read_group_ids = "";
 
 main: {
 
-    
+
     &validate_ctat_genome_lib($genome_lib_dir);
-    
-            
+
+
     unless (-d $output_dir) {
         &process_cmd("mkdir -p $output_dir");
     }
@@ -547,44 +553,44 @@ main: {
     if ($samples_file) {
         ($read_group_ids, $left_fq_filename, $right_fq_filename) = &parse_samples_file($samples_file);
 
-        # in case there are relative paths 
+        # in case there are relative paths
         my $new_samples_file = "$output_dir/starF.target_samples.txt";
         &write_new_samples_file($new_samples_file, $read_group_ids, $left_fq_filename, $right_fq_filename);
         $samples_file = $new_samples_file;
     }
-    
 
-    
+
+
     chdir $output_dir or die "Error, cannot cd to $output_dir";
 
     unless (-d $checkpoints_dir) {
         &process_cmd("mkdir -p $checkpoints_dir");
     }
-    
+
     my $preliminary_outdir = "$output_dir/star-fusion.preliminary";
     unless (-d $preliminary_outdir) {
         &process_cmd("mkdir -p $preliminary_outdir");
     }
-    
+
     if ($out_prefix =~ m|/$|) {
         # not allowing to end as a directory, must be a filename
         die "Error, --out_prefix must be a file name and not a directory name, although you can include directories in the path to the file name to be created.";
     }
-    
+
     my $out_prefix_basename = basename($out_prefix);
-    
+
     my $pipeliner = new Pipeliner(-verbose => $verbose_level);
-    
+
     unless ($chimeric_out_junctions_file) {
         $chimeric_out_junctions_file = "Chimeric.out.junction";
-        
+
 
         unless (-d $star_index_dir) {
             die "Error, cannot locate star index at $star_index_dir";
         }
-        
+
         &run_STAR($pipeliner, $left_fq_filename, $right_fq_filename, $read_group_ids);
-        
+
     }
 
 
@@ -597,11 +603,11 @@ main: {
     ## Get total number of rnaseq fragments reported by STAR:
     my $num_total_rnaseq_frags = &get_num_total_rnaseq_frags($chimeric_out_junctions_file);
     print STDERR "-sample contains $num_total_rnaseq_frags rnaseq fragments\n";
-    
+
 
     ########################################
     ## Map chimeric reads to genome features
-    
+
     my $cmd = "$UTILDIR/STAR-Fusion.map_chimeric_reads_to_genes "
         . " --genome_lib_dir $genome_lib_dir "
         . " -J $chimeric_out_junctions_file "
@@ -619,13 +625,13 @@ main: {
         . " --filt_file $preliminary_outdir/star-fusion.junction_breakpts_to_genes.txt.fail "
         . " -M $MIN_PCT_MM_NONSPECIFIC "
         . " > $preliminary_outdir/star-fusion.junction_breakpts_to_genes.txt.pass ";
-    
+
     $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/$out_prefix.handle_multimappers.ok"));
-    
-    
+
+
     ###################################
     ## predict preliminary fusion pairs
-    
+
     $cmd = "$UTILDIR/STAR-Fusion.predict "
         . " -J $preliminary_outdir/star-fusion.junction_breakpts_to_genes.txt.pass "
         . " -O $preliminary_outdir/$out_prefix ";
@@ -633,18 +639,18 @@ main: {
     if ($NO_REMOVE_DUPS) {
         $cmd .= " --no_remove_dups ";
     }
-    
+
     $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/$out_prefix.STAR-Fusion.predict.ok"));
-    
+
     my $predicted_fusions_file = "$preliminary_outdir/$out_prefix.fusion_candidates.preliminary";
-    
-    
+
+
     my $prelim_fusion_file = $predicted_fusions_file;
-    
+
     unless ($no_filter) {
-           
+
         ## filter fusions
-        
+
         $cmd = "$UTILDIR/STAR-Fusion.filter "
             . " --fusion_preds $prelim_fusion_file "
             . " -J $chimeric_out_junctions_file "
@@ -660,56 +666,56 @@ main: {
             . " --min_spanning_frags_only $MIN_SPANNING_FRAGS_ONLY "
             . " --genome_lib_dir $genome_lib_dir "
             . " --out_prefix $preliminary_outdir/$out_prefix";
-        
+
         if ($NO_SINGLE_FUSION_PER_BREAKPOINT) {
             $cmd .= " --no_single_fusion_per_breakpoint ";
         }
         if ($SKIP_EM_FLAG) {
             $cmd .= " --skip_EM ";
         }
-        
+
         $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/STAR-Fusion.filter.ok"));
-        
+
 
         $prelim_fusion_file = "$preliminary_outdir/$out_prefix.fusion_candidates.preliminary.filtered";
-        
-        
+
+
     }
-    
-    
+
+
     unless ($SKIP_FFPM_FLAG) {
         ## convert vals to FFPM
         $cmd = "$UTILDIR/incorporate_FFPM_into_final_report.pl $prelim_fusion_file $num_total_rnaseq_frags > $prelim_fusion_file.FFPM";
         $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/FFPM.ok") );
-        
+
         $prelim_fusion_file = "$prelim_fusion_file.FFPM";
     }
-    
+
     ## add breakpoint / splice junction info
 
     my $predicted_fusions_with_splice_info = "$predicted_fusions_file.wSpliceInfo";
 
     $cmd = "$UTILDIR/append_breakpoint_junction_info.pl $prelim_fusion_file $genome_lib_dir > $predicted_fusions_with_splice_info";
-    
+
     $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/predicted_fusions_with_splice_info.ok"));
 
 
-    
-    
+
+
     ## annotate fusions.
-    
+
     my $annotated_fusions_filename = "$predicted_fusions_with_splice_info.wAnnot";
     $cmd = "$BASEDIR/FusionAnnotator/FusionAnnotator --genome_lib_dir $genome_lib_dir --annotate $predicted_fusions_with_splice_info > $annotated_fusions_filename";
     $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/fusion_annotator.ok"));
-    
+
 
 
     ## various downstream fusion filters
     $prelim_fusion_file = $annotated_fusions_filename;
-    
+
     # filter based on annotations
     unless ($NO_ANNOTATION_FILTER) {
-            
+
         ## filter by annotations
         $cmd = "$BASEDIR/FusionFilter/util/filter_by_annotation_rules.pl --fusions $annotated_fusions_filename --genome_lib_dir $genome_lib_dir";
         $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/annot_filter.ok"));
@@ -722,21 +728,21 @@ main: {
         $cmd = "$UTILDIR/filter_likely_RT_artifacts.pl --fusions $prelim_fusion_file --genome_lib_dir $genome_lib_dir";
         $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/RTartifact_filter.ok"));
         $prelim_fusion_file = "$prelim_fusion_file.RTartifact.pass";
-        
+
     }
 
-    
-    if ( (! $SKIP_FFPM_FLAG) && $MIN_FFPM > 0) { 
+
+    if ( (! $SKIP_FFPM_FLAG) && $MIN_FFPM > 0) {
 
         # filter based on min FFPM value
-        
+
         $cmd = "$UTILDIR/filter_by_min_FFPM.pl $prelim_fusion_file $MIN_FFPM";
         $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/FFPM_filter.ok") );
 
         $prelim_fusion_file = "$prelim_fusion_file.minFFPM.$MIN_FFPM.pass";
     }
-    
-        
+
+
     # generate final fusion prediction output files:
     my $final_output_fusions = "$out_prefix.fusion_predictions.tsv";
     $pipeliner->add_commands(new Command("cp $prelim_fusion_file $final_output_fusions", "$checkpoints_dir/cp_final.ok"));
@@ -750,25 +756,25 @@ main: {
         ## make abridged version.
         $pipeliner->add_commands(new Command("$UTILDIR/column_exclusions.pl $final_output_fusions.samples_deconvolved.tsv JunctionReads,SpanningFrags > $final_output_fusions.samples_deconvolved.abridged.tsv",
                                              "$checkpoints_dir/samples_deconvolved.abridged.ok") );
-        
+
     }
-    
-    
+
+
     ## make abridged versions:
     my $abridged_final_output = $final_output_fusions;
     $abridged_final_output =~ s/\.tsv$/.abridged.tsv/;
     $pipeliner->add_commands(new Command("$UTILDIR/column_exclusions.pl $final_output_fusions JunctionReads,SpanningFrags > $abridged_final_output", "$checkpoints_dir/abridged_final"));
-        
+
     if ($EXAMINE_CODING_EFFECT) {
-        
+
         my $coding_eff_filename = $abridged_final_output;
-        $coding_eff_filename =~ s/\.tsv$/.coding_effect.tsv/; 
-        
+        $coding_eff_filename =~ s/\.tsv$/.coding_effect.tsv/;
+
         $cmd = "$BASEDIR/FusionAnnotator/util/fusion_to_coding_region_effect.pl  --fusions $abridged_final_output --genome_lib_dir $genome_lib_dir > $coding_eff_filename";
         $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/coding_eff.ok"));
         $abridged_final_output = $coding_eff_filename;
     }
-    
+
     if ($EXTRACT_FUSION_READS) {
         my $cmd = "$UTILDIR/get_FUSION_EVIDENCE_fastqs.pl --fusions $out_prefix.fusion_predictions.tsv --output_prefix $out_prefix ";
         if ($samples_file) {
@@ -782,24 +788,24 @@ main: {
         }
         $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/extract_fusion_reads.ok"));
     }
-    
+
     $pipeliner->run();
-    
+
     if ($no_filter) {
-         
+
         print STDERR "\n\n *** Note: --no_filtering in effect, so outputs have not been filtered for likely false positives.\n";
         print STDERR "\n\tSee output: $prelim_fusion_file\n\n";
     }
     else {
-        
+
         print STDERR "\n\n\t* STAR-Fusion complete.  See output: $output_dir/$out_prefix.fusion_predictions.tsv (or .abridged.tsv version)\n\n\n";
     }
-    
-    
+
+
     if ($FUSIONINSPECTOR_MODE) {
-        
+
         my $FI_outdir = "$output_dir/FusionInspector-${FUSIONINSPECTOR_MODE}";
-        
+
         my $FI_cmd = "";
         $FI_cmd = "$BASEDIR/FusionInspector/FusionInspector --fusions $abridged_final_output "
                 . " --out_prefix finspector "
@@ -812,15 +818,15 @@ main: {
                 . " --output_dir $FI_outdir "
                 . " --genome_lib_dir $genome_lib_dir "
                 .  " --CPU $CPU ";
-        
+
         if ($FUSIONINSPECTOR_MODE eq 'inspect') {
             ## use the extracted fusion evidence reads
             my $FI_left_fq = "$out_prefix.fusion_evidence_reads_1.fq";
-        
+
             $FI_cmd .= " --only_fusion_reads "
                     .  "--fusion_contigs_only "
                     .  " --left_fq $FI_left_fq";
-            
+
             if ($right_fq_filename) {
                 my $FI_right_fq = "$out_prefix.fusion_evidence_reads_2.fq";
                 $FI_cmd .= " --right_fq $FI_right_fq ";
@@ -830,25 +836,25 @@ main: {
         else {
             # validate mode
             # use all original reads.
-            
+
             if ($samples_file) {
                 $FI_cmd .= " --samples_file $samples_file ";
             }
             else {
-                
+
                 $FI_cmd .=  " --left_fq $left_fq_filename";
                 if ($right_fq_filename) {
                     $FI_cmd .= " --right_fq $right_fq_filename ";
                 }
             }
         }
-        
+
         if ($DENOVO_RECONSTRUCT) {
             $FI_cmd .= " --include_Trinity ";
         }
-        
+
         $FI_cmd .= " --annotate "; # just do it by default
-        
+
         if ($EXAMINE_CODING_EFFECT) {
             $FI_cmd .= " --examine_coding_effect ";
         }
@@ -856,16 +862,16 @@ main: {
         if ($NO_REMOVE_DUPS) {
             $FI_cmd .= " --no_remove_dups ";
         }
-        
+
         $pipeliner->add_commands(new Command($FI_cmd, "_fi_${FUSIONINSPECTOR_MODE}_" . length($FI_cmd) . ".ok"));
-        
-        
+
+
         $pipeliner->run();
     }
-    
-    
+
+
     exit(0);
-    
+
 }
 
 
@@ -874,7 +880,7 @@ sub missing_required_program_installed {
     my (@required_progs) = @_;
 
     my $missing = 0;
-    
+
     foreach my $prog (@required_progs) {
 
         my $path = `which $prog`;
@@ -887,7 +893,7 @@ sub missing_required_program_installed {
             print STDERR "-found prog $prog at $path\n";
         }
     }
-    
+
     return($missing);
 }
 
@@ -898,35 +904,35 @@ sub run_STAR {
     my ($pipeliner, $left_fq_filename, $right_fq_filename, $read_group_ids) = @_;
 
     my $maybe_tmpdir= defined($outTmpDir)? " --outTmpDir $outTmpDir " : "";
-    
+
     ## run STAR to align reads:
     my $cmd = "$STAR_PROG --genomeDir $star_index_dir "
         . " --outReadsUnmapped None "
         . " --chimSegmentMin 12 "
         . " --chimJunctionOverhangMin 8 "
         . " --chimOutJunctionFormat 1 "  # new option for STAR 2.6.1a
-        . " --alignSJDBoverhangMin 10 "   
+        . " --alignSJDBoverhangMin $STAR_SJDB_OVERHANG_MIN "
         . " --alignMatesGapMax $STAR_MAX_MATE_DIST "
         . " --alignIntronMax $STAR_MAX_MATE_DIST "
         . " --alignSJstitchMismatchNmax 5 -1 5 5 "  #which allows for up to 5 mismatches for non-canonical GC/AG, and AT/AC junctions, and any number of mismatches for canonical junctions (the default values 0 -1 0 0 replicate the old behavior (from AlexD)
-        
+
         . " --runThreadN $CPU"
         . $maybe_tmpdir
         . " --outSAMstrandField intronMotif "
         . " --outSAMunmapped Within "
-        
+
         . " --alignInsertionFlush Right "
         . " --alignSplicedMateMapLminOverLmate 0 "
         . " --alignSplicedMateMapLmin 30 "
-        
+
 
         ;
-    
+
     if ($STAR_SortedByCoordinate) {
-                
+
         $cmd .= " --limitBAMsortRAM $STAR_limitBAMsortRAM "
             . " --outSAMtype BAM SortedByCoordinate ";
-        
+
     }
     else {
         $cmd .= " --outSAMtype BAM Unsorted "; # default, don't spend time and RAM sorting the data as not required for fusion-finding
@@ -956,17 +962,17 @@ sub run_STAR {
             $cmd .= " --outSAMattrRGline ID:GRPundef ";
         }
     }
-    
+
     # chim read multimapping settings
     $cmd .= " --chimMultimapScoreRange $STAR_chimMultimapScoreRange "
-          . " --chimScoreJunctionNonGTAG $STAR_chimScoreJunctionNonGTAG " 
+          . " --chimScoreJunctionNonGTAG $STAR_chimScoreJunctionNonGTAG "
           . " --chimMultimapNmax $STAR_chimMultimapNmax "
           . " --chimNonchimScoreDropMin $STAR_chimNonchimScoreDropMin ";
-    
+
     # merge overlapping reads
     $cmd .= " --peOverlapNbasesMin $STAR_peOverlapNbasesMin --peOverlapMMp $STAR_peOverlapMMp ";
-    
-    
+
+
     if ($USE_SHARED_MEMORY) {
         $cmd .= " --genomeLoad LoadAndKeep ";
     }
@@ -975,20 +981,20 @@ sub run_STAR {
         $cmd .= " --genomeLoad NoSharedMemory ";
         $cmd .= " --twopassMode Basic ";
     }
-    
+
     if ($left_fq_filename =~ /\.gz$/) {
         $cmd .= " --readFilesCommand 'gunzip -c' ";
     }
 
     $cmd .= " --quantMode GeneCounts";
-    
+
     #$cmd .=  " --limitOutSJcollapsed 10000000 ";
-    
+
     $pipeliner->add_commands(Command->new($cmd, "$checkpoints_dir/run_star_aligner.ok"));
-    
+
     $pipeliner->run();
-    
-    
+
+
     return;
 }
 
@@ -1003,12 +1009,12 @@ sub run_BBMerge {
     my @read_groups = split(/ , /, $read_group_ids);
 
     my @bbmerged_files;
-    
+
     while (@left_fq_files) {
 
         my $left_fq_filename = shift @left_fq_files;
         my $right_fq_filename = shift @right_fq_files;
-        
+
 
         unless ($right_fq_filename) {
             confess "Error, need right fq filename corresponding to left fq file: $left_fq_filename";
@@ -1020,27 +1026,27 @@ sub run_BBMerge {
         else {
             $read_group = "singlesample";
         }
-        
+
         my $cmd = "$PLUGINSDIR/bbmap/bbmerge.sh in1=$left_fq_filename in2=$right_fq_filename out=$read_group.bbmerge.fq";
 
         $pipeliner->add_commands(Command->new($cmd, "$checkpoints_dir/$read_group.bbmerge.ok"));
-        
+
         # adjust the fq record names so we know these are the merged records later on.
         #$pipeliner->add_commands(Command->new("$UTILDIR/make_merged_prefix_fq.pl bbmerged.fq > bbmerged.adj.fq", "$checkpoints_dir/bbmerge.add_merged_token.ok"));
 
         push (@bbmerged_files, "$read_group.bbmerge.fq");
     }
-    
+
     my $bbmerged_fq_files = join(",", @bbmerged_files);
-    
+
     return($bbmerged_fq_files);
 }
 
-    
+
 ####
 sub parse_samples_file {
     my ($samples_file) = @_;
-    
+
     my @read_groups;
     my @left_read_files;
     my @right_read_files;
@@ -1054,7 +1060,7 @@ sub parse_samples_file {
         }
         push (@read_groups, "ID:$sample_name");
         push (@left_read_files, &ensure_full_path($left_path));
-        
+
         if ($right_path) {
             unless (-s $right_path) {
                 die "Error, cannot find non-empty file: $right_path";
@@ -1085,9 +1091,9 @@ sub write_new_samples_file {
         my $read_group = shift @read_group_ids;
         my $left_fq = shift @left_fq_files;
         my $right_fq = shift @right_fq_files;
-        
+
         $read_group =~ s/^ID://;
-        
+
         my $outline = join("\t", $read_group, $left_fq);
         if ($right_fq) {
             $outline .= "\t$right_fq";
@@ -1111,26 +1117,26 @@ sub check_compatible_STAR_version {
 
     my @MIN_VERSION = @$min_star_major_minor_aref;
     my $min_letter = pop @MIN_VERSION;
-    
+
     my $errmsg = "\n\n\tSorry, version [$star_version_info] is not supported. Please use at least STAR version " . join(".", @MIN_VERSION) . "$min_letter\n";
     $errmsg .= "\tTo upgrade, obtain the latest STAR here: https://github.com/alexdobin/STAR/releases\n\n";
-    
+
     if ($star_version_info =~ /^(\d+)\.(\d+)\.(\d+)([a-z]?)/) {
 
         my $major_ver = $1;
         my $minor_ver = $2;
         my $patch_ver = $3;
         my $letter_ver = $4;
-        
-        if ($major_ver < $min_star_major_minor_aref->[0] 
-            || 
+
+        if ($major_ver < $min_star_major_minor_aref->[0]
+            ||
             ($major_ver == $min_star_major_minor_aref->[0] && $minor_ver < $min_star_major_minor_aref->[1])
             ||
             ($major_ver == $min_star_major_minor_aref->[0] && $minor_ver == $min_star_major_minor_aref->[1] && $patch_ver < $min_star_major_minor_aref->[2])
             ||
             ($major_ver == $min_star_major_minor_aref->[0] && $minor_ver == $min_star_major_minor_aref->[1] && $patch_ver == $min_star_major_minor_aref->[2] && ord($letter_ver) < ord($min_star_major_minor_aref->[3]))
             ) {
-            
+
             print STDERR $errmsg;
             exit(1);
         }
@@ -1152,7 +1158,7 @@ sub get_num_total_rnaseq_frags {
     my ($chimeric_out_junctions_file) = @_;
 
     my $read_count_line = `tail -n1 $chimeric_out_junctions_file`;
-    
+
     if ($read_count_line =~ /^\# Nreads (\d+)/) {
         return($1);
     }
@@ -1168,12 +1174,12 @@ sub validate_ctat_genome_lib {
     my ($genome_lib_dir) = @_;
 
     my $cmd = "$UTILDIR/validate_ctat_genome_lib.pl $genome_lib_dir";
-    
+
     my $ret = system($cmd);
     if ($ret) {
         die "\n\n\tERROR, ctat genome lib: $genome_lib_dir does not validate and may require indices to be rebuilt.\n\n"
             . "\tVisit: https://github.com/STAR-Fusion/STAR-Fusion/wiki/rebuild_ctat_genome_lib_indices\n\tfor details.\n\n";
     }
-    
+
     return;
 }

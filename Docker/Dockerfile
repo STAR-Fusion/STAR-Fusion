@@ -169,8 +169,9 @@ RUN apt-get install -y pbzip2
 ## STAR-Fusion:
 WORKDIR $SRC
 
-ENV STAR_FUSION_VERSION=1.9.1
-ENV STARF_CHECKOUT=9938b46ec80260319ae7c70ffb676077eb32738e
+ENV STAR_FUSION_VERSION=1.10.0-devg
+ENV STARF_CHECKOUT=8cfab6ed82e084f21b6e7abac2c1c5096d4c7bf6
+
 
 RUN apt-get update && apt-get install -y git
 
