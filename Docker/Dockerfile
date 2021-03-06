@@ -156,7 +156,7 @@ RUN apt-get install -y pbzip2
 ##############
 ## STAR
 
-ENV STAR_VERSION=2.7.8a
+ENV STAR_VERSION=2.7.2b
 RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" &&\
     wget -P $SRC $STAR_URL &&\
     tar -xvf $SRC/${STAR_VERSION}.tar.gz -C $SRC && \
