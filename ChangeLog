@@ -1,3 +1,11 @@
+
+STAR-Fusion Release v1.10.0, Mar 6, 2021
+	-includes FusionInspector v2.5.0
+	-incorporates STAR 2.7.8a and updated ctat genome libs.
+		-FusionAnnotator includes DEEPEST-fusion catalog
+	
+
+
 STAR-Fusion Release v1.9.1, Aug 10, 2020
 	-includes FusionInspector v2.3.1
 	-improvements for single cell data processing
