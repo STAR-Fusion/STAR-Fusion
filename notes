@@ -18,4 +18,7 @@ testing and release prep:
 
 	starF singularity sims and ccle tests
 
+	ensure AnnotFilterRule.pm has human-specific fusion filtering enabled.
+
+
 
