@@ -317,7 +317,8 @@ my $SHOW_FULL_USAGE_INFO;
               'max_promiscuity=i' => \$MAX_PROMISCUITY,
               'min_pct_dom_promiscuity=f' => \$MIN_PCT_DOM_PROM,
               'min_spanning_frags_only=i' => \$MIN_SPANNING_FRAGS_ONLY,
-
+              'min_pct_MM_nonspecific|M=i' => \$MIN_PCT_MM_NONSPECIFIC,
+              
               'require_LDAS=i' => \$REQUIRE_LDAS,
 
               'min_novel_junction_support=i' => \$MIN_NOVEL_JUNCTION_SUPPORT,
