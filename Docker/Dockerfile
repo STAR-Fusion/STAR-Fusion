@@ -48,8 +48,8 @@ ENV PICARD_HOME $SRC
 ## STAR-Fusion:
 WORKDIR $SRC
 
-ENV STAR_FUSION_VERSION=1.10.0
-ENV STARF_CHECKOUT=3eec3272bd141fe0c4f1be4ce9c449959dcddd26
+ENV STAR_FUSION_VERSION=1.10.1
+ENV STARF_CHECKOUT=95837ee8df6a4fb6e79a7df5d7a5149e79228b07
 
 
 RUN apt-get update && apt-get install -y git
@@ -59,7 +59,7 @@ RUN git clone https://github.com/STAR-Fusion/STAR-Fusion.git && \
      git checkout $STARF_CHECKOUT && \
      git submodule init && git submodule update && \
      cd FusionInspector && \
-     git submodule init && git submodule update
+     git submodule init && git submodule update && make
 
 ENV STAR_FUSION_HOME $SRC/STAR-Fusion
 

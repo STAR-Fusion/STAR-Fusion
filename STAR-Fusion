@@ -12,8 +12,8 @@ use Process_cmd;
 
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
-#my $VERSION = "1.10.0";
-my $VERSION = "__BLEEDING_EDGE__ Do not use - pull versioned release from: https://github.com/STAR-Fusion/STAR-Fusion/releases";
+my $VERSION = "1.10.1";
+#my $VERSION = "__BLEEDING_EDGE__ Do not use - pull versioned release from: https://github.com/STAR-Fusion/STAR-Fusion/releases";
 
 
 my @MIN_STAR_MAJOR_MINOR_VERSION = (2, 7, 8, 'a');
@@ -228,6 +228,8 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #
 #    --denovo_reconstruct                  attempt to reconstruct fusion transcripts using Trinity de novo assembly (requires --FusionInspector)
 #
+#    --misc_FI_opts <string>               additional FI-specific options to pass on to FusionInspector
+#
 #    --version                             report version ($VERSION)
 #
 # STAR shared memory parameters (see STAR-Fusion usage documentation for details):
@@ -301,7 +303,7 @@ my $NO_SINGLE_FUSION_PER_BREAKPOINT = 0;
 
 my $SHOW_FULL_USAGE_INFO;
 
-
+my $MISC_FI_OPTS = "";
 
 
 &GetOptions ( 'help|h' => \$help_flag,
@@ -387,6 +389,8 @@ my $SHOW_FULL_USAGE_INFO;
               'skip_EM' => \$SKIP_EM_FLAG,
               'skip_FFPM' => \$SKIP_FFPM_FLAG,
 
+              'misc_FI_opts=s' => \$MISC_FI_OPTS,
+              
     );
 
 
@@ -864,6 +868,10 @@ main: {
             $FI_cmd .= " --no_remove_dups ";
         }
 
+        if ($MISC_FI_OPTS) {
+            $FI_cmd .= " $MISC_FI_OPTS ";
+        }
+        
         $pipeliner->add_commands(new Command($FI_cmd, "_fi_${FUSIONINSPECTOR_MODE}_" . length($FI_cmd) . ".ok"));
 
 

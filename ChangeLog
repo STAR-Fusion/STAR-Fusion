@@ -1,4 +1,8 @@
+STAR-Fusion Release v1.10.1, July 23, 2021
+	-incorporates FusionInspector v2.6.0
+	-added option --misc_FI_opts to allow passing additional FI-specific options on to FusionInspector
 
+	
 STAR-Fusion Release v1.10.0, Mar 6, 2021
 	-includes FusionInspector v2.5.0
 	-incorporates STAR 2.7.8a and updated ctat genome libs.
