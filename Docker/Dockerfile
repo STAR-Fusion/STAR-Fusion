@@ -131,21 +131,9 @@ RUN wget http://eddylab.org/software/hmmer3/3.1b2/hmmer-3.1b2-linux-intel-x86_64
 
 
 
-##############
-## STAR
-
-ENV STAR_VERSION=2.7.2b
-RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" &&\
-    wget -P $SRC $STAR_URL &&\
-    tar -xvf $SRC/${STAR_VERSION}.tar.gz -C $SRC && \
-    mv $SRC/STAR-${STAR_VERSION}/bin/Linux_x86_64_static/STAR /usr/local/bin
-
-
-
-
 ## Dfam scan
 WORKDIR $SRC
-RUN wget https://dfam.org/releases/current/infrastructure/dfamscan.pl.gz && \
+RUN wget https://dfam.org/releases/Dfam_3.1/infrastructure/dfamscan.pl.gz && \
      gunzip dfamscan.pl.gz && \
      chmod 755 dfamscan.pl && \
      mv dfamscan.pl $BIN/
@@ -165,12 +153,24 @@ COPY sam_readname_cleaner.py $BIN/
 RUN apt-get install -y pbzip2
 
 
+##############
+## STAR
+
+ENV STAR_VERSION=2.7.8a
+RUN STAR_URL="https://github.com/alexdobin/STAR/archive/${STAR_VERSION}.tar.gz" &&\
+    wget -P $SRC $STAR_URL &&\
+    tar -xvf $SRC/${STAR_VERSION}.tar.gz -C $SRC && \
+    mv $SRC/STAR-${STAR_VERSION}/bin/Linux_x86_64_static/STAR /usr/local/bin
+
+
+
 ###############
 ## STAR-Fusion:
 WORKDIR $SRC
 
-ENV STAR_FUSION_VERSION=1.10.0-devg
-ENV STARF_CHECKOUT=8cfab6ed82e084f21b6e7abac2c1c5096d4c7bf6
+ENV STAR_FUSION_VERSION=1.10.0
+ENV STARF_CHECKOUT=3eec3272bd141fe0c4f1be4ce9c449959dcddd26
+
 
 RUN apt-get update && apt-get install -y git
 
@@ -186,4 +186,4 @@ ENV STAR_FUSION_HOME $SRC/STAR-Fusion
 
 ENV PATH="$SRC/STAR-Fusion:$SRC/STAR-Fusion/FusionInspector:${PATH}"
 
-ENTRYPOINT ["/usr/local/src/STAR-Fusion/STAR-Fusion"]
+
