@@ -1,8 +1,8 @@
 
-all: plugins
+all: plugins_only
 	cd FusionInspector && make
 
-plugins:
+plugins_only:
 	cd plugins && make
 
 clean:
