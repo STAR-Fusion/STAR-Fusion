@@ -937,6 +937,14 @@ sub run_STAR {
 
         ;
 
+
+    # from: https://github.com/alexdobin/STAR/issues/744
+    # --chimSegmentMin controls the minimum total length of the chimeric segment, which is calculated as a sum of alignment blocks of the segment.
+    #  --chimJunctionOverhangMin, on the other hand, controls the minimum length of the block adjacent to the chimeric junction. This prevents chimeric junction from happening very close to the normal junction.
+
+
+
+    
     if ($STAR_SortedByCoordinate) {
 
         $cmd .= " --limitBAMsortRAM $STAR_limitBAMsortRAM "
