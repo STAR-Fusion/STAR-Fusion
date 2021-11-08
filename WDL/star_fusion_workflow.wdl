@@ -12,7 +12,6 @@ workflow star_fusion_workflow {
     File? left_fq
     File? right_fq
     File? fastq_pair_tar_gz
-    File? chimeric_out_junction
     
 
     # STAR-Fusion parameters
@@ -31,28 +30,12 @@ workflow star_fusion_workflow {
 
   }
 
-  if (defined(chimeric_out_junction)) {
-    call star_fusion_kickstart {
-      input:
-        chimeric_out_junction = chimeric_out_junction,
-        genome = genome_plug_n_play_tar_gz,
-        sample_id = sample_id,
-        preemptible = preemptible,
-        docker = docker,
-        cpu = num_cpu,
-        memory = memory,
-        extra_disk_space = extra_disk_space,
-        fastq_disk_space_multiplier = fastq_disk_space_multiplier,
-        genome_disk_space_multiplier = genome_disk_space_multiplier,
-        additional_flags = additional_flags,
-        use_ssd = use_ssd
-    }
-  }
-  if (!defined(chimeric_out_junction)) {
-    call star_fusion {
+    
+  call star_fusion {
       input:
         left_fq = left_fq,
         right_fq = right_fq,
+        fastq_pair_tar_gz = fastq_pair_tar_gz,
         genome = genome_plug_n_play_tar_gz,
         sample_id = sample_id,
         preemptible = preemptible,
@@ -65,7 +48,7 @@ workflow star_fusion_workflow {
         fusion_inspector = fusion_inspector,
         additional_flags = additional_flags,
         use_ssd = use_ssd
-    }
+    
   }
 
   output {
@@ -73,7 +56,6 @@ workflow star_fusion_workflow {
     File? coding_effect = star_fusion.coding_effect
     Array[File]? fusion_inspector_inspect_web = star_fusion.fusion_inspector_inspect_web
     Array[File]? extract_fusion_reads = star_fusion.extract_fusion_reads
-    File? fusion_predictions_kickstart = star_fusion_kickstart.fusion_predictions
     Array[File]? fusion_inspector_inspect_fusions_abridged = star_fusion.fusion_inspector_inspect_fusions_abridged
     File? sj = star_fusion.sj
     File? bam = star_fusion.bam
@@ -83,62 +65,24 @@ workflow star_fusion_workflow {
     File? fusion_predictions = star_fusion.fusion_predictions
     Array[File]? fusion_inspector_validate_web = star_fusion.fusion_inspector_validate_web
     File? fusion_predictions_abridged = star_fusion.fusion_predictions_abridged
-    File? fusion_predictions_abridged_kickstart = star_fusion_kickstart.fusion_predictions_abridged
+
   }
 }
 
-task star_fusion_kickstart {
-  input {
-    File? chimeric_out_junction
-    File genome
-    String sample_id
-    Int preemptible
-    String docker
-    Int cpu
-    String memory
-    Float extra_disk_space
-    Float fastq_disk_space_multiplier
-    Float genome_disk_space_multiplier
-    String? additional_flags
-    Boolean use_ssd
-  }
-
-  command <<<
-    set -e
-
-    mkdir -p ~{sample_id}
-    mkdir -p genome_dir
-
-    pbzip2 -dc ~{genome} | tar x -C genome_dir --strip-components 1
-
-    /usr/local/src/STAR-Fusion/STAR-Fusion \
-    --genome_lib_dir `pwd`/genome_dir/ctat_genome_lib_build_dir \
-    -J ~{chimeric_out_junction} \
-    --output_dir ~{sample_id} \
-    --CPU ~{cpu} \
-    ~{"" + additional_flags}
-  >>>
-
-  output {
-    File fusion_predictions = "~{sample_id}/star-fusion.fusion_predictions.tsv"
-    File fusion_predictions_abridged = "~{sample_id}/star-fusion.fusion_predictions.abridged.tsv"
-  }
-
-  runtime {
-    preemptible: preemptible
-    disks: "local-disk " + ceil((fastq_disk_space_multiplier * (size(chimeric_out_junction, "GB"))) + size(genome, "GB") * genome_disk_space_multiplier + extra_disk_space) + " " + (if use_ssd then "SSD" else "HDD")
-    docker: docker
-    cpu: cpu
-    memory: memory
-  }
-}
 
 task star_fusion {
   input {
+    String sample_id
+
     File? left_fq
     File? right_fq
+    File? fastq_pair_tar_gz
+
     File genome
-    String sample_id
+    
+    String? fusion_inspector
+    String? additional_flags
+    
     Int preemptible
     String docker
     Int cpu
@@ -146,29 +90,55 @@ task star_fusion {
     Float extra_disk_space
     Float fastq_disk_space_multiplier
     Float genome_disk_space_multiplier
-    String? fusion_inspector
-    String? additional_flags
     Boolean use_ssd
   }
 
 
   command <<<
 
-    set -e
+    set -ex
 
     mkdir -p ~{sample_id}
+
+    if [[ ! -z "~{fastq_pair_tar_gz}" ]]; then
+        # untar the fq pair
+        tar xvf ~{fastq_pair_tar_gz}
+
+        left_fq=(*_1.fastq*)
+        right_fq=(*_2.fastq*)
+    else
+        left_fq="~{left_fq}"
+        right_fq="~{right_fq}"
+    fi
+
+
+    if [[ -z "${left_fq[0]}" && -z "${right_fq[0]}" ]]; then
+        echo "Error, not finding fastq files here"
+        ls -ltr
+        exit 1
+    fi
+
+    left_fqs=$(IFS=, ; echo "${left_fq[*]}")
+    
+    read_params="--left_fq ${left_fqs}"
+    if [[ "${right_fq[0]}" != "" ]]; then
+      right_fqs=$(IFS=, ; echo "${right_fq[*]}")   
+      read_params="${read_params} --right_fq ${right_fqs}"
+    fi
+    
     mkdir -p genome_dir
 
     pbzip2 -dc ~{genome} | tar x -C genome_dir --strip-components 1
 
     /usr/local/src/STAR-Fusion/STAR-Fusion \
     --genome_lib_dir `pwd`/genome_dir/ctat_genome_lib_build_dir \
-    --left_fq ~{left_fq} \
-    ~{"--right_fq " + right_fq} \
+    ${read_params} \
     --output_dir ~{sample_id} \
     --CPU ~{cpu} \
     ~{"--FusionInspector " + fusion_inspector} \
     ~{"" + additional_flags}
+
+
   >>>
 
   output {
