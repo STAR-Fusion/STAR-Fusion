@@ -31,6 +31,21 @@ workflow star_fusion_hg19_wf {
 
   }
 
+
+  parameter_meta {
+
+    sample_id:{help:"Sample id"}
+    genome_plug_n_play_tar_gz:{help:"ctat genome lib plug-n-play version, pre-configured for hg38"}
+    left_fq:{help:"left (/1) fastq file for paired-end reads"}
+    right_fq:{help:"right (/2) fastq file for paired-end reads"}
+    fastq_pair_tar_gz:{help:"left (/1) and right (/2) fastq files as a tar.gz file - used instead of specifying left_fq and right_fq separately"}
+    fusion_inspector:{help:"optionally run FusionInspector as a post-process in 'inspect' or 'validate' mode (indicate which)"}
+    examine_coding_effect:{help:"include analysis of coding effect on fused coding regions"}
+    
+
+  }
+
+  
     
   call SFW.star_fusion_workflow as star_fusion_hg19 {
       input:
