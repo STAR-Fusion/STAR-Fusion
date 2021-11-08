@@ -16,7 +16,7 @@ workflow star_fusion_workflow {
 
     # STAR-Fusion parameters
     String? fusion_inspector  # inspect or validate
-    String? additional_flags
+    Boolean examine_coding_effect = false
     
     # runtime params
     String docker = "trinityctat/starfusion:latest"
@@ -38,6 +38,7 @@ workflow star_fusion_workflow {
         fastq_pair_tar_gz = fastq_pair_tar_gz,
         genome = genome_plug_n_play_tar_gz,
         sample_id = sample_id,
+        examine_coding_effect = examine_coding_effect,
         preemptible = preemptible,
         docker = docker,
         cpu = num_cpu,
@@ -46,26 +47,29 @@ workflow star_fusion_workflow {
         fastq_disk_space_multiplier = fastq_disk_space_multiplier,
         genome_disk_space_multiplier = genome_disk_space_multiplier,
         fusion_inspector = fusion_inspector,
-        additional_flags = additional_flags,
         use_ssd = use_ssd
     
   }
 
   output {
-    File? reads_per_gene = star_fusion.reads_per_gene
+    
+    File fusion_predictions = star_fusion.fusion_predictions
+    File fusion_predictions_abridged = star_fusion.fusion_predictions_abridged
+    File junction = star_fusion.junction
+    File bam = star_fusion.bam
+    File sj = star_fusion.sj
+    
     File? coding_effect = star_fusion.coding_effect
-    Array[File]? fusion_inspector_inspect_web = star_fusion.fusion_inspector_inspect_web
     Array[File]? extract_fusion_reads = star_fusion.extract_fusion_reads
-    Array[File]? fusion_inspector_inspect_fusions_abridged = star_fusion.fusion_inspector_inspect_fusions_abridged
-    File? sj = star_fusion.sj
-    File? bam = star_fusion.bam
-    Array[File]? fusion_inspector_validate_fusions_abridged = star_fusion.fusion_inspector_validate_fusions_abridged
-    File? star_log_final = star_fusion.star_log_final
-    File? junction = star_fusion.junction
-    File? fusion_predictions = star_fusion.fusion_predictions
-    Array[File]? fusion_inspector_validate_web = star_fusion.fusion_inspector_validate_web
-    File? fusion_predictions_abridged = star_fusion.fusion_predictions_abridged
 
+    File star_log_final = star_fusion.star_log_final
+
+    File? fusion_inspector_validate_fusions_abridged = star_fusion.fusion_inspector_validate_fusions_abridged
+    File? fusion_inspector_validate_web = star_fusion.fusion_inspector_validate_web
+
+    File? fusion_inspector_inspect_fusions_abridged = star_fusion.fusion_inspector_inspect_fusions_abridged
+    File? fusion_inspector_inspect_web = star_fusion.fusion_inspector_inspect_web
+    
   }
 }
 
@@ -81,7 +85,7 @@ task star_fusion {
     File genome
     
     String? fusion_inspector
-    String? additional_flags
+    Boolean examine_coding_effect
     
     Int preemptible
     String docker
@@ -131,30 +135,37 @@ task star_fusion {
     pbzip2 -dc ~{genome} | tar x -C genome_dir --strip-components 1
 
     /usr/local/src/STAR-Fusion/STAR-Fusion \
-    --genome_lib_dir `pwd`/genome_dir/ctat_genome_lib_build_dir \
-    ${read_params} \
-    --output_dir ~{sample_id} \
-    --CPU ~{cpu} \
-    ~{"--FusionInspector " + fusion_inspector} \
-    ~{"" + additional_flags}
-
+      --genome_lib_dir `pwd`/genome_dir/ctat_genome_lib_build_dir \
+      ${read_params} \
+      --output_dir ~{sample_id} \
+      --CPU ~{cpu} \
+      ~{"--FusionInspector " + fusion_inspector} \
+      ~{true='--examine_coding_effect' false='' examine_coding_effect}
+    
 
   >>>
 
   output {
-    File star_log_final = "~{sample_id}/Log.final.out"
-    File junction = "~{sample_id}/Chimeric.out.junction"
-    File? coding_effect = "~{sample_id}/star-fusion.fusion_predictions.abridged.coding_effect.tsv"
+    
     File fusion_predictions = "~{sample_id}/star-fusion.fusion_predictions.tsv"
     File fusion_predictions_abridged = "~{sample_id}/star-fusion.fusion_predictions.abridged.tsv"
+    File junction = "~{sample_id}/Chimeric.out.junction"
     File bam = "~{sample_id}/Aligned.out.bam"
-    File reads_per_gene = "~{sample_id}/ReadsPerGene.out.tab"
     File sj = "~{sample_id}/SJ.out.tab"
+
+    File? coding_effect = "~{sample_id}/star-fusion.fusion_predictions.abridged.coding_effect.tsv"
+    
     Array[File] extract_fusion_reads = glob("~{sample_id}/star-fusion.fusion_evidence_*.fq")
-    Array[File] fusion_inspector_validate_fusions_abridged = glob("~{sample_id}/FusionInspector-validate/finspector.FusionInspector.fusions.abridged.tsv")
-    Array[File] fusion_inspector_validate_web = glob("~{sample_id}/FusionInspector-validate/finspector.fusion_inspector_web.html")
-    Array[File] fusion_inspector_inspect_web = glob("~{sample_id}/FusionInspector-inspect/finspector.fusion_inspector_web.html")
-    Array[File] fusion_inspector_inspect_fusions_abridged = glob("~{sample_id}/FusionInspector-inspect/finspector.FusionInspector.fusions.abridged.tsv")
+
+    File star_log_final = "~{sample_id}/Log.final.out"
+
+    
+    File? fusion_inspector_validate_fusions_abridged = "~{sample_id}/FusionInspector-validate/finspector.FusionInspector.fusions.abridged.tsv"
+    File? fusion_inspector_validate_web = "~{sample_id}/FusionInspector-validate/finspector.fusion_inspector_web.html"
+
+    File? fusion_inspector_inspect_fusions_abridged = "~{sample_id}/FusionInspector-inspect/finspector.FusionInspector.fusions.abridged.tsv"
+    File? fusion_inspector_inspect_web = "~{sample_id}/FusionInspector-inspect/finspector.fusion_inspector_web.html"
+
   }
 
 
