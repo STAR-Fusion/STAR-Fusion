@@ -1,48 +1,46 @@
 version 1.0
-import "https://api.firecloud.org/ga4gh/v1/tools/CTAT:star_fusion_tasks/versions/2/plain-WDL/descriptor" as star_fusion_tasks
 
 
 workflow star_fusion_workflow {
   input {
+    
+    String sample_id
+
+    File genome_plug_n_play_tar_gz
+    
+    # input data options
+    File? left_fq
+    File? right_fq
+    File? fastq_pair_tar_gz
+    File? chimeric_out_junction
+    
+
+    # STAR-Fusion parameters
+    String? fusion_inspector  # inspect or validate
     String? additional_flags
-    Boolean use_ssd = true
-    String config_docker = "continuumio/miniconda3:4.6.14"
-    String? fusion_inspector
+    
+    # runtime params
+    String docker = "trinityctat/starfusion:latest"
+    Int num_cpu = 12
+    Float fastq_disk_space_multiplier = 3.25
+    String memory = "50G"
+    Float genome_disk_space_multiplier = 2.5
     Int preemptible = 2
     Float extra_disk_space = 10
-    String sample_id
-    Float genome_disk_space_multiplier = 2.5
-    File? left_fq
-    String docker = "trinityctat/starfusion:1.8.1b"
-    File? chimeric_out_junction
-    Int? num_cpu
-    File? right_fq
-    String acronym_file = "gs://regev-lab/resources/ctat/star_fusion/index.json"
-    Float fastq_disk_space_multiplier = 3.25
-    String genome
-    String? memory
-  }
+    Boolean use_ssd = true
 
-  call star_fusion_tasks.star_fusion_config as star_fusion_config {
-    input:
-      genome = genome,
-      acronym_file = acronym_file,
-      cpus = num_cpu,
-      memory = memory,
-      docker = config_docker,
-      preemptible = preemptible
   }
 
   if (defined(chimeric_out_junction)) {
     call star_fusion_kickstart {
       input:
         chimeric_out_junction = chimeric_out_junction,
-        genome = star_fusion_config.star_genome,
+        genome = genome_plug_n_play_tar_gz,
         sample_id = sample_id,
         preemptible = preemptible,
         docker = docker,
-        cpu = star_fusion_config.star_cpus_output,
-        memory = star_fusion_config.star_memory_output,
+        cpu = num_cpu,
+        memory = memory,
         extra_disk_space = extra_disk_space,
         fastq_disk_space_multiplier = fastq_disk_space_multiplier,
         genome_disk_space_multiplier = genome_disk_space_multiplier,
@@ -55,12 +53,12 @@ workflow star_fusion_workflow {
       input:
         left_fq = left_fq,
         right_fq = right_fq,
-        genome = star_fusion_config.star_genome,
+        genome = genome_plug_n_play_tar_gz,
         sample_id = sample_id,
         preemptible = preemptible,
         docker = docker,
-        cpu = star_fusion_config.star_cpus_output,
-        memory = star_fusion_config.star_memory_output,
+        cpu = num_cpu,
+        memory = memory,
         extra_disk_space = extra_disk_space,
         fastq_disk_space_multiplier = fastq_disk_space_multiplier,
         genome_disk_space_multiplier = genome_disk_space_multiplier,
