@@ -132,7 +132,7 @@ task star_fusion {
     
     mkdir -p genome_dir
 
-    pbzip2 -dc ~{genome} | tar x -C genome_dir --strip-components 1
+    tar xf ~{genome} -C genome_dir --strip-components 1
 
     /usr/local/src/STAR-Fusion/STAR-Fusion \
       --genome_lib_dir `pwd`/genome_dir/ctat_genome_lib_build_dir \
