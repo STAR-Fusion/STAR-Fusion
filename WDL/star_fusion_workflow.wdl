@@ -101,15 +101,20 @@ task star_fusion {
   command <<<
 
     set -ex
+    shopt -s nullglob
 
     mkdir -p ~{sample_id}
 
     if [[ ! -z "~{fastq_pair_tar_gz}" ]]; then
         # untar the fq pair
-        tar xvf ~{fastq_pair_tar_gz}
+        mv ~{fastq_pair_tar_gz} reads.tar.gz
+        tar xvf reads.tar.gz
 
         left_fq=(*_1.fastq*)
-        right_fq=(*_2.fastq*)
+    
+        if [[ ! -z "*_2.fastq*" ]]; then
+             right_fq=(*_2.fastq*)
+        fi
     else
         left_fq="~{left_fq}"
         right_fq="~{right_fq}"
