@@ -110,10 +110,10 @@ task star_fusion {
         mv ~{fastq_pair_tar_gz} reads.tar.gz
         tar xvf reads.tar.gz
 
-        left_fq=(*_1.fastq*)
+        left_fq=(*_1.fastq* *_1.fq*)
     
-        if [[ ! -z "*_2.fastq*" ]]; then
-             right_fq=(*_2.fastq*)
+        if [[ ! -z "*_2.fastq*" ]] || [[ ! -z "*_2.fq*" ]]; then
+             right_fq=(*_2.fastq* *_2.fq*)
         fi
     else
         left_fq="~{left_fq}"
