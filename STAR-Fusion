@@ -156,6 +156,7 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #          --STAR_chimMultimapScoreRange <int>     the score range for multi-mapping chimeras below the best chimeric score. (default: $STAR_chimMultimapScoreRange)
 #          --STAR_chimMultimapNmax <int>           maximum number of multi-alignments for the chimera (default: $STAR_chimMultimapNmax)
 #          --STAR_chimNonchimScoreDropMin <int>    to trigger chimeric detection, the drop in the best non-chimeric alignment score with respect to the read length has to be smaller than this value (default: $STAR_chimNonchimScoreDropMin)
+#          --STAR_outSAMattrRGline <str>           pass through string value to STAR as --outSAMattrRGline  for setting read group name info in bam.  ie. --STAR_outSAMattrRGline "ID:myGRP"
 #
 # Chimeric read filtering parameters:
 #
@@ -305,6 +306,8 @@ my $SHOW_FULL_USAGE_INFO;
 
 my $MISC_FI_OPTS = "";
 
+my $outSAMattrRGline = "";
+
 
 &GetOptions ( 'help|h' => \$help_flag,
 
@@ -370,6 +373,8 @@ my $MISC_FI_OPTS = "";
               'STAR_chimMultimapNmax=i' => \$STAR_chimMultimapNmax,
               'STAR_chimNonchimScoreDropMin=i' => \$STAR_chimNonchimScoreDropMin,
 
+              "STAR_outSAMattrRGline=s" => \$outSAMattrRGline,
+              
               'extract_fusion_reads' => \$EXTRACT_FUSION_READS,
               'FusionInspector=s' => \$FUSIONINSPECTOR_MODE,
               'denovo_reconstruct' => \$DENOVO_RECONSTRUCT,
@@ -390,6 +395,7 @@ my $MISC_FI_OPTS = "";
               'skip_FFPM' => \$SKIP_FFPM_FLAG,
 
               'misc_FI_opts=s' => \$MISC_FI_OPTS,
+
               
     );
 
@@ -974,6 +980,9 @@ sub run_STAR {
         $cmd .= " --readFilesIn $reads ";
         if ($read_group_ids) {
             $cmd .= " --outSAMattrRGline $read_group_ids ";
+        }
+        elsif ($outSAMattrRGline) {
+            $cmd .= "--outSAMattrRGline $outSAMattrRGline";
         }
         else {
             $cmd .= " --outSAMattrRGline ID:GRPundef ";
