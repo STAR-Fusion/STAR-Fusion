@@ -14,7 +14,7 @@ kickstart_hg19:
 
 
 standard:
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir --STAR_outSAMattrRGline \'ID:testing\'
 
 
 standard_run_star_only:
