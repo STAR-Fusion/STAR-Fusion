@@ -622,8 +622,9 @@ main: {
     my $cmd = "$UTILDIR/STAR-Fusion.map_chimeric_reads_to_genes "
         . " --genome_lib_dir $genome_lib_dir "
         . " -J $chimeric_out_junctions_file "
-        . " > $preliminary_outdir/star-fusion.junction_breakpts_to_genes.txt";
-
+        . " -O $preliminary_outdir/star-fusion.junction_breakpts_to_genes.txt"
+        . " --CPU $CPU ";
+    
     $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/$out_prefix.map_chim_to_genes.ok"));
 
 

@@ -37,7 +37,7 @@ my $usage = <<__EOUSAGE__;
 #
 #    --genome_lib_dir <string>          path to genome lib dir 
 #
-#    --output_filename <string>         name of output filename
+#    --output_filename|O <string>         name of output filename
 #
 #
 #  Optional:
@@ -60,7 +60,7 @@ my $DEBUG;
               'genome_lib_dir=s' => \$genome_lib_dir,
               'CPU=i' => \$CPU,
               'd' => \$DEBUG,
-              'output_filename=s' => \$output_filename
+              'output_filename|O=s' => \$output_filename
     );
 
 
