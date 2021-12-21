@@ -10,7 +10,7 @@ ifeq ("", "$(CTAT_GENOME_LIB)")
 endif
 
 kickstart_hg19:
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  -J __kickstart_data/hg19.Chimeric.out.junction -O star_fusion_kickstart_hg19ed_outdir 
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  -J __kickstart_data/hg19.Chimeric.out.junction -O star_fusion_kickstart_hg19ed_outdir --CPU 2
 
 
 standard:
@@ -129,6 +129,9 @@ clean:
 	rm -rf ./star_fusion_outdir_starOnly
 	rm -rf ./test_singularity_outdir
 	rm -rf ./star_fusion_SingleCellPE*
+	rm -rf ./star_fusion_outdir.full_Monty
+	rm -rf ./star_fusion_outdir.max_sens
+
 
 purge:
 	../STAR-Fusion --STAR_Remove
