@@ -393,7 +393,7 @@ sub merge_neighboring_nonref_splice {
         }
     }
 
-    foreach my $fusion_name (keys %fusion_name_to_nonref_splice) {
+    foreach my $fusion_name (sort keys %fusion_name_to_nonref_splice) {
 
         my $fusion_list_aref = $fusion_name_to_nonref_splice{$fusion_name};
         
