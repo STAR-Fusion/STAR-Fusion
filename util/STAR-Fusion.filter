@@ -808,3 +808,30 @@ sub sort_fusions {
     return @fusions;
     
 }
+
+
+####
+sub dump_fusions {
+    my ($fusions_aref, $filename) = @_;
+
+    open(my $ofh, ">$filename") or die $!;
+
+    for my $fusion (@$fusions_aref) {
+
+        print $ofh join("\t", $fusion->{fusion_name},
+                        $fusion->{splice_type},
+                        $fusion->{brkptA},
+                        $fusion->{brkptB},
+                        $fusion->{J},
+                        $fusion->{S},
+                        $fusion->{score},
+                        $fusion->{SpliceType}) . "\n";
+
+        
+    }
+
+    close $ofh;
+
+    return;
+}
+
