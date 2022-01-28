@@ -98,6 +98,8 @@ my $chimeric_out_junctions_file;
 my $NO_SINGLE_FUSION_PER_BREAKPOINT = 0;
 
 my $SKIP_EM_FLAG = 0;
+my $DEBUG = 0;
+
 
 &GetOptions ( 'h' => \$help_flag, 
               
@@ -126,7 +128,8 @@ my $SKIP_EM_FLAG = 0;
               'no_single_fusion_per_breakpoint' => \$NO_SINGLE_FUSION_PER_BREAKPOINT,
               
               'skip_EM' => \$SKIP_EM_FLAG,
-              
+
+              'd' => \$DEBUG,
     );
 
 if (@ARGV) {
@@ -190,6 +193,13 @@ main: {
         my $junction_reads = $tab_reader->get_row_val($row, "JunctionReads");
         my $spanning_frags = $tab_reader->get_row_val($row, "SpanningFrags");
         my $long_double_anchor_support = $tab_reader->get_row_val($row, "LargeAnchorSupport");
+
+        # ensure consistent read ordering.
+        $junction_reads = join(",", sort(split(/,/, $junction_reads)));
+        $spanning_frags = join(",", sort(split(/,/, $spanning_frags)));
+
+        $row->{JunctionReads} =	$junction_reads;
+        $row->{SpanningFrags} =	$spanning_frags;
         
                 
         #TODO: use keys that match the column headers for sanity sake
@@ -229,21 +239,16 @@ main: {
     my @filter_col_headers = (@column_headers, "Note");
     my $filter_tab_writer = new DelimParser::Writer($filter_ofh, "\t", \@filter_col_headers);
     my $stage1_tab_writer = new DelimParser::Writer($stage1_ofh, "\t", \@column_headers);
-    
-    @fusions = reverse sort {$a->{score} <=> $b->{score}
-                             ||
-                                 $a->{brkptA} cmp $b->{brkptA}  # need deterministic ordering
-                             ||
-                                 $a->{brkptB} cmp $b->{brkptB} } @fusions;
+
+    @fusions = &sort_fusions(@fusions);
+
+    if ($DEBUG) { &dump_fusions(\@fusions, "A.init_sort.fusions"); }
     
     @fusions = &merge_neighboring_nonref_splice(\@fusions, $filter_tab_writer);
 
-    @fusions = reverse sort {$a->{score} <=> $b->{score} 
-                             ||
-                                 $a->{brkptA} cmp $b->{brkptA}  # need deterministic ordering
-                             ||
-                                 $a->{brkptB} cmp $b->{brkptB} } @fusions;
-    
+    @fusions = &sort_fusions(@fusions);
+
+    if ($DEBUG) { &dump_fusions(\@fusions, "B.post_merge_nonref_splice.fusions"); }
     
     my %read_mapping_counts = &parse_read_mapping_counts($chimeric_out_junctions_file);
     
@@ -253,19 +258,17 @@ main: {
     
     ## initial filter removes the lions share of fusions not of interest.
     
-    @fusions = reverse sort {$a->{score} <=> $b->{score} 
-                             ||
-                                 $a->{brkptA} cmp $b->{brkptA} # need deterministic ordering
-                             ||
-                                 $a->{brkptB} cmp $b->{brkptB} } @fusions;
-    
     @fusions = &remove_fusions_with_insufficient_support(\@fusions, $filter_tab_writer, 
                                                          $MIN_JUNCTION_READS, $MIN_SUM_FRAGS,
                                                          $MIN_SPANNING_FRAGS_ONLY);
     
 
+    if ($DEBUG) { &dump_fusions(\@fusions, "C.remove_fusions_insufficient_support.fusions"); }
+    
     unless ($NO_SINGLE_FUSION_PER_BREAKPOINT) {
         @fusions = &select_highest_scoring_fusion_per_breakpoint(\@fusions, $filter_tab_writer);
+
+        if ($DEBUG) {  &dump_fusions(\@fusions, "D.highest_scoring_per_brkpt.fusions"); }
     }
     
     
@@ -276,24 +279,27 @@ main: {
         ## removing minor nonref isoforms - after first EM adjusting read support values.
         
         &EM_assign_reads_and_penalize_multimaps(\@fusions, \%read_mapping_counts, $intermediates_out_prefix);
+
+        if ($DEBUG) {  &dump_fusions(\@fusions, "E.redid_EM.fusions"); }
         
     }
     
-    @fusions = reverse sort {$a->{score} <=> $b->{score} 
-                             ||
-                                 $a->{brkptA} cmp $b->{brkptA} # need deterministic ordering
-                             ||
-                                 $a->{brkptB} cmp $b->{brkptB} } @fusions;
-    
+
+    @fusions = &sort_fusions(@fusions);
+
+        
     
     unless ($SKIP_EM_FLAG) {
         my $removed_flag = 0;
         @fusions = &remove_minor_nonref_isoforms(\@fusions, $filter_tab_writer, \$removed_flag);
     
-
+        if ($DEBUG) { &dump_fusions(\@fusions, "F.remove_minor_isoforms.fusions"); }
+        
         if ($removed_flag) {
             ## must redo the quant
             &EM_assign_reads_and_penalize_multimaps(\@fusions, \%read_mapping_counts, $intermediates_out_prefix);
+
+            if ($DEBUG) { &dump_fusions(\@fusions, "F2.remove_minor_isoforms.reEM.fusions"); }
         }
     }
     
@@ -310,15 +316,17 @@ main: {
         my $junction_read_count = 0;
         my $junction_reads = $fusion->{junction_reads};
         if ($junction_reads ne ".") {
-            my @junction_reads_array = split(/,/, $junction_reads);
+            my @junction_reads_array = sort(split(/,/, $junction_reads));
             $junction_read_count = scalar(@junction_reads_array);
+            $junction_reads = join(",", @junction_reads_array);
         }
 
         my $spanning_frag_count = 0;
         my $spanning_frags = $fusion->{spanning_frags};
         if ($spanning_frags ne ".") {
-            my @spanning_frags_array = split(/,/, $spanning_frags);
+            my @spanning_frags_array = sort(split(/,/, $spanning_frags));
             $spanning_frag_count = scalar(@spanning_frags_array);
+            $spanning_frags = join(",", @spanning_frags_array);
         }
         
         my %rowadj = ('#FusionName' => $fusion->{fusion_name}, 
@@ -385,11 +393,13 @@ sub merge_neighboring_nonref_splice {
         }
     }
 
-    foreach my $fusion_list_aref (values %fusion_name_to_nonref_splice) {
+    foreach my $fusion_name (keys %fusion_name_to_nonref_splice) {
+
+        my $fusion_list_aref = $fusion_name_to_nonref_splice{$fusion_name};
         
         my @nonref_fusions = @$fusion_list_aref;
         
-        @nonref_fusions = reverse sort {$a->{score}<=>$b->{score}} @nonref_fusions;
+        @nonref_fusions = &sort_fusions( @nonref_fusions );
 
         
         do {
@@ -776,5 +786,25 @@ sub select_highest_scoring_fusion_per_breakpoint {
     return(@fusions_ret);
 }
 
+####
+sub sort_fusions {
+    my @fusions = @_;
 
+      @fusions = reverse sort {$a->{score} <=> $b->{score}
+                             ||
+                                 $a->{brkptA} cmp $b->{brkptA}  # need deterministic ordering
+                             ||
+                                 
+                                 $a->{brkptB} cmp $b->{brkptB} 
+                               ||
+                                   $b->{fusion_name} cmp $a->{fusion_name}
+                               ||
+                                   $b->{row}->{LeftGene} cmp $a->{row}->{LeftGene}
+                               ||
+                                   $b->{row}->{RightGene} cmp $a->{row}->{RightGene}
+      } @fusions;
+    
 
+    return @fusions;
+    
+}
