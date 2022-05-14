@@ -148,6 +148,9 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #
 #    --run_STAR_only                       stop after running STAR aligner (essentially just generating the Chimeric.out.junction file)
 #
+#    --STAR_onepass                        do STAR one pass instead of two pass (two pass is default)
+#
+#
 #   Stitching overlapping reads settings:
 #          --STAR_peOverlapNbasesMin <int>    minimum number of bases in the overlap (default: $STAR_peOverlapNbasesMin)
 #          --STAR_peOverlapMMp <int>          the max proportion of mismatches in the overlap (default: $STAR_peOverlapMMp)
@@ -296,6 +299,7 @@ my $DEVEL_STAR;
 
 my $STAR_LOAD_AND_EXIT;
 my $STAR_REMOVE;
+my $STAR_onepass = 0;
 
 my $NO_ANNOTATION_FILTER = 0;
 my $NO_RT_ARTIFACT_FILTER = 0;
@@ -375,6 +379,8 @@ my $outSAMattrRGline = "";
 
               "STAR_outSAMattrRGline=s" => \$outSAMattrRGline,
               
+              "STAR_onepass" => \$STAR_onepass,
+
               'extract_fusion_reads' => \$EXTRACT_FUSION_READS,
               'FusionInspector=s' => \$FUSIONINSPECTOR_MODE,
               'denovo_reconstruct' => \$DENOVO_RECONSTRUCT,
@@ -1006,9 +1012,15 @@ sub run_STAR {
     else {
         # note, twopassMode is incompatible with shared memory (--genomeLoad LoadAndKeep)
         $cmd .= " --genomeLoad NoSharedMemory ";
-        $cmd .= " --twopassMode Basic ";
+        
+        if ($STAR_onepass) {
+            $cmd .= " --twopassMode None ";
+        } 
+        else {
+            $cmd .= " --twopassMode Basic ";
+        }
     }
-
+    
     if ($left_fq_filename =~ /\.gz$/) {
         $cmd .= " --readFilesCommand 'gunzip -c' ";
     }
