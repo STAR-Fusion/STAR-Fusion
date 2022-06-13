@@ -13,7 +13,7 @@ use Data::Dumper;
 use Set::IntervalTree;
 use JSON::XS;
 use ChimericCigarParser;
-
+use Thread_helper;
 
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
@@ -24,7 +24,8 @@ my $out_prefix = "star-fusion";
 my $chimeric_junction_file;
 my $help_flag;
 my $genome_lib_dir;
-
+my $output_filename;
+my $CPU = 1;
 
 my $usage = <<__EOUSAGE__;
 
@@ -35,6 +36,13 @@ my $usage = <<__EOUSAGE__;
 #    --chimeric_junction|J <string>     Chimeric.out.junction file
 #
 #    --genome_lib_dir <string>          path to genome lib dir 
+#
+#    --output_filename|O <string>         name of output filename
+#
+#
+#  Optional:
+#
+#    --CPU <int>                        num threads (default: $CPU)
 #
 ###################################################################################
 
@@ -50,15 +58,16 @@ my $DEBUG;
               
               'chimeric_junction|J=s' => \$chimeric_junction_file,
               'genome_lib_dir=s' => \$genome_lib_dir,
-              
+              'CPU=i' => \$CPU,
               'd' => \$DEBUG,
+              'output_filename|O=s' => \$output_filename
     );
 
 
 if ($help_flag) {
     die $usage;
 }
-unless ($chimeric_junction_file && $genome_lib_dir) {
+unless ($chimeric_junction_file && $genome_lib_dir && $output_filename) {
     die $usage;
 }
 
@@ -78,10 +87,9 @@ my $JSON_ENCODER = JSON::XS->new();
 
 main: {
 
-    &build_interval_tree($ref_features_file);
     
     print STDERR "-parsing fusion evidence: $chimeric_junction_file\n";
-    &map_chimeric_reads_to_genes($chimeric_junction_file);
+    &map_chimeric_reads_to_genes($chimeric_junction_file, $CPU, $output_filename);
     
     exit(0);
 
@@ -323,24 +331,81 @@ sub get_overlapping_features {
 
 ####
 sub map_chimeric_reads_to_genes {
-    my ($junctions_file) = @_;
-    
-    print STDERR "-mapping reads to genes\n";
+    my ($junctions_file, $CPU, $final_output_filename) = @_;
 
-    
     if ($junctions_file =~ /\.gz$/) {
-        $junctions_file = "gunzip -c $junctions_file | ";
+        $junctions_file = "gunzip -c $junctions_file > $junctions_file.txt";
+        $junctions_file = "$junctions_file.txt";
+    }
+        
+    open(my $fh, $junctions_file);
+    seek($fh, 0, 2) or confess "Error, cannot seek to end of file $junctions_file";
+    
+    my $start_begin_pos = 0;
+    my $file_end_pos = tell($fh);
+    close $fh;
+
+    my $file_range_per_thread = int($file_end_pos / $CPU);
+
+
+    my $tmpdir = "tmp_chim_read_mappings_dir";
+    if (! -d $tmpdir) {
+        mkdir($tmpdir) or die "Error, cannot mkdir $tmpdir";
     }
 
+
+    my @outfiles;
+    my $thread_helper = new Thread_helper($CPU);
+    for (my $thread_num = 1; $thread_num <= $CPU; $thread_num++) {
+        my $file_begin = $start_begin_pos;
+        my $file_end = $file_begin + $file_range_per_thread;
+        my $output_filename = "$tmpdir/chimJ_gene_mappings.thread_$thread_num";
+        my $thread = threads->create(\&map_chimeric_reads_to_genes_OneThread, $junctions_file, $file_begin, $file_end, $thread_num, $output_filename);
+        $thread_helper->add_thread($thread);
+        push (@outfiles, $output_filename);
+        $start_begin_pos = $file_end;
+        
+    }
+    $thread_helper->wait_for_all_threads_to_complete();
+
+    my @failures = $thread_helper->get_failed_threads();
+    if (@failures) {
+        confess "Error, encountered failures: " . Dumper(\@failures);
+    }
+
+    # gather final outputs
+    my $cmd = "cat @outfiles > $final_output_filename";
+    my $ret = system($cmd);
+    if ($ret) {
+        die "Error, cmd $cmd died with ret $ret";
+    }
+
+
+    return;
+}
+
+
+####
+sub map_chimeric_reads_to_genes_OneThread {
+    my ($junctions_file, $start_pos, $end_pos, $thread_count, $outfilename) = @_;
+
+    &build_interval_tree($ref_features_file);
+        
+    print STDERR "-mapping reads to genes\n";
+
+    open(my $ofh, ">$outfilename");
+    
     my $start_time = time();
     my $counter = 0;
     open (my $fh, $junctions_file) or die "Error, cannot open file $junctions_file";
+    seek($fh, $start_pos, 0);
     while (<$fh>) {
         if (/^\#/) { next; }
         if (/^chr_donorA\tbrkpt/) { 
             # header line
             next;
         }
+        
         $counter++;
         if ($counter % 100 == 0) {
             my $time = time();
@@ -353,6 +418,7 @@ sub map_chimeric_reads_to_genes {
         chomp;
         my $line = $_;
         my @x = split(/\t/);
+        if (scalar(@x) != 21) { next; }
         
         # from star doc:
         #The rst 9 columns give information about the chimeric junction:
@@ -418,9 +484,16 @@ sub map_chimeric_reads_to_genes {
             push (@x, ".");
         }
     
-        print join("\t", @x) . "\n";
+        print $ofh join("\t", @x) . "\n";
+
+        if (tell($fh) >= $end_pos) {
+            last;
+        }
     }
-        
+
+    close $ofh;
+    close $fh;
+    
     return;
     
 }

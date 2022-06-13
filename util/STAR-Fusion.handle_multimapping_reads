@@ -568,7 +568,7 @@ sub progress_monitor {
 
     my $time_delta = $end_time - $START_TIME;
 
-    my $reads_per_min = $READ_COUNTER / ($time_delta/60);
+    my $reads_per_min = ($time_delta > 0) ? ($READ_COUNTER / ($time_delta/60)) : 0;
 
     print STDERR "\r " . sprintf("%.2f", $reads_per_min) . " reads per min processed...  ";
 
