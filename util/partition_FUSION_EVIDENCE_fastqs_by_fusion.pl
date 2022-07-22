@@ -100,6 +100,8 @@ main: {
     unlink($sorted_tmp_file);
 
 
+    print STDERR "Done.\n";
+    
     exit(0);
     
 }
