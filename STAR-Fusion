@@ -707,8 +707,8 @@ main: {
 
     }
 
-
-    unless ($SKIP_FFPM_FLAG) {
+    
+    if ( $num_total_rnaseq_frags > 0 && (! $SKIP_FFPM_FLAG)) {
         ## convert vals to FFPM
         $cmd = "$UTILDIR/incorporate_FFPM_into_final_report.pl $prelim_fusion_file $num_total_rnaseq_frags > $prelim_fusion_file.FFPM";
         $pipeliner->add_commands(new Command($cmd, "$checkpoints_dir/FFPM.ok") );
@@ -756,8 +756,8 @@ main: {
 
     }
 
-
-    if ( (! $SKIP_FFPM_FLAG) && $MIN_FFPM > 0) {
+    
+    if ( ($num_total_rnaseq_frags > 0) && (! $SKIP_FFPM_FLAG) && $MIN_FFPM > 0) {
 
         # filter based on min FFPM value
 
