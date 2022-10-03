@@ -1,6 +1,6 @@
 # STAR-Fusion
 
-Click the 'wiki' link at top for the STAR-Fusion documentation. 
+Click the [wiki](https://github.com/STAR-Fusion/STAR-Fusion/wiki) link at top for the STAR-Fusion documentation. 
 
 To download the software, click the 'Releases' tab and download the 'FULL'-labeled version.
 
