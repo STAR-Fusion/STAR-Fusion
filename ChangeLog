@@ -1,4 +1,7 @@
+STAR-Fusion Release v1.11.1, Oct 3, 2022
+	- incorporates FusionInspector 2.8.0
 
+	
 STAR-Fusion Release v1.11.0, June 13, 2022
 	- incorporates FusionInspector 2.7.0
 	- uses STAR one-pass mode by default, avoiding input-dataset-specific effects on results.
