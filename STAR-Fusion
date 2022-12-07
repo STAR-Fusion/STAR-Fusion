@@ -983,6 +983,9 @@ sub run_STAR {
         if ($read_group_ids) {
             print $ofh "outSAMattrRGline $read_group_ids\n";
         }
+        elsif ($outSAMattrRGline) {
+            print $ofh "outSAMattrRGline $outSAMattrRGline\n";
+        }
         else {
             print $ofh "outSAMattrRGline ID:GRPundef\n";
         }
