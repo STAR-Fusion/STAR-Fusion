@@ -8,7 +8,7 @@ STAR-Fusion Release v1.11.1, Oct 3, 2022
 	
 STAR-Fusion Release v1.11.0, June 13, 2022
 	- incorporates FusionInspector 2.7.0
-	- uses STAR one-pass mode by default, avoiding input-dataset-specific effects on results.
+	- provides option for STAR one-pass mode, for avoiding input-dataset-specific effects on results.
 	- updates for improved reproducibility
 	- added multithreading for chimeric read mapping to genes for faster execution times.
 
