@@ -10,7 +10,10 @@ ifeq ("", "$(CTAT_GENOME_LIB)")
 endif
 
 kickstart_hg19:
-	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  -J __kickstart_data/hg19.Chimeric.out.junction -O star_fusion_kickstart_hg19ed_outdir --CPU 2
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  -J __kickstart_data/hg19.Chimeric.out.junction -O star_fusion_kickstarted_hg19_outdir --CPU 2
+
+kickstart_hg38:
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  -J __kickstart_data/hg38.Chimeric.out.junction -O star_fusion_kickstarted_hg38_outdir --CPU 2
 
 
 standard:
