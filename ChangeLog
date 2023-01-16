@@ -1,10 +1,14 @@
 STAR-Fusion Release v1.11.1, Oct 3, 2022
 	- incorporates FusionInspector 2.8.0
+	- by default, FFPM calculations performed based on uniquely aligned reads.
+	    If --no_remove_dups, FFPM calculations performed using total aligned reads (including multi-mapped).
+	    For FFPM calculations based on total reads in the sample (original behavior from release 1.11.0 and earlier),
+	    set the flag parameter --FFPM_via_total_reads
 
 	
 STAR-Fusion Release v1.11.0, June 13, 2022
 	- incorporates FusionInspector 2.7.0
-	- uses STAR one-pass mode by default, avoiding input-dataset-specific effects on results.
+	- provides option for STAR one-pass mode, for avoiding input-dataset-specific effects on results.
 	- updates for improved reproducibility
 	- added multithreading for chimeric read mapping to genes for faster execution times.
 
