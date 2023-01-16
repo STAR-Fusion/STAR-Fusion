@@ -203,10 +203,6 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #    --min_FFPM <float>                    minimum FFPM (fusion fragments per million rna-seq frags)  (default: $MIN_FFPM)
 #
 #    --no_remove_dups                      do not remove duplicate reads
-#                                          Note: by default, FFPM calculations performed based on uniquely aligned reads.
-#                                          If --no_remove_dups, FFPM calculations performed using total aligned reads (including multi-mapped).
-#                                          For FFPM calculations based on total reads in the sample (original behavior from release 1.11.0 and earlier),
-#                                           set the flag parameter --FFPM_via_total_reads
 #
 #    --skip_EM                             skips expectation maximization based fractional assignment of spanning fragments across multiple splice breakpoint fusion calls.
 #
@@ -316,7 +312,6 @@ my $MISC_FI_OPTS = "";
 
 my $outSAMattrRGline = "";
 
-my $FFPM_via_total_reads = 0;
 
 
 &GetOptions ( 'help|h' => \$help_flag,
@@ -407,7 +402,6 @@ my $FFPM_via_total_reads = 0;
               'skip_FFPM' => \$SKIP_FFPM_FLAG,
 
               'misc_FI_opts=s' => \$MISC_FI_OPTS,
-              'FFPM_via_total_reads' => $FFPM_via_total_reads,
 
               
     );
@@ -1214,17 +1208,8 @@ sub get_num_total_rnaseq_frags {
         my $num_reads_multi = $3;
 
 
-        if ($FFPM_via_total_reads) {
-            return($total_reads);
-        }
-        elsif ($NO_REMOVE_DUPS) {
-            return($num_reads_unique + $num_reads_multi);
-        }
-        else {
-            # by default (since June 30, 2022 dev code) using uniquely aligned reads
-            return($num_reads_unique);
-        }
-        
+        return ($total_reads);
+
     }
     else {
         my $v_letter = pop @MIN_STAR_MAJOR_MINOR_VERSION;
