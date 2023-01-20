@@ -113,8 +113,10 @@ main: {
                 my $right_gene_id = $right_gene_struct->{gene_id};
                 $right_gene_id =~ s/\^.*$//;
                 
-                print join("\t", $left_gene_id, $chrom_left, $strand_left, &dump_coords($genome_coords_A_aref), 
+                print join("\t", $left_gene_id, 
+                           $chrom_left, $strand_left, &dump_coords($genome_coords_A_aref), 
                            &dump_coords($read_coords_A_aref), 
+                           $right_gene_id,
                            $chrom_right, $strand_right, &dump_coords($genome_coords_B_aref),
                            &dump_coords($read_coords_B_aref))
                     . "\n";
