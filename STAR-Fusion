@@ -1004,6 +1004,7 @@ sub run_STAR {
     $cmd .= " --chimMultimapScoreRange $STAR_chimMultimapScoreRange "
           . " --chimScoreJunctionNonGTAG $STAR_chimScoreJunctionNonGTAG "
           . " --chimMultimapNmax $STAR_chimMultimapNmax "
+          . " --chimOutType Junctions WithinBAM "
           . " --chimNonchimScoreDropMin $STAR_chimNonchimScoreDropMin ";
 
     # merge overlapping reads
