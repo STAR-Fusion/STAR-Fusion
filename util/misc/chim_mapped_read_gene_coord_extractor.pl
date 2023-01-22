@@ -64,6 +64,8 @@ main: {
         
         chomp $line;
         my @x = split(/\t/, $line);
+
+        my $read_name = $x[9];
         
         my $json_left = $x[$#x-1];
         my $json_right = $x[$#x];
@@ -113,7 +115,8 @@ main: {
                 my $right_gene_id = $right_gene_struct->{gene_id};
                 $right_gene_id =~ s/\^.*$//;
                 
-                print join("\t", $left_gene_id, 
+                print join("\t", $read_name, 
+                           $left_gene_id, 
                            $chrom_left, $strand_left, &dump_coords($genome_coords_A_aref), 
                            &dump_coords($read_coords_A_aref), 
                            $right_gene_id,
