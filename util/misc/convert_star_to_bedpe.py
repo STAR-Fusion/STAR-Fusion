@@ -1,7 +1,6 @@
 #! /usr/bin/env python
-# KKD for Sage Bionetworks
-# June 13, 2016
-# Convert star-fusion output to BEDPE
+
+# bedpe described: https://www.synapse.org/#!Synapse:syn2813589/wiki/401442
 
 import sys
 import csv
