@@ -107,6 +107,8 @@ sub _parse_gene_span_info {
     while (<$fh>) {
         chomp;
         my @x = split(/\t/);
+        
+        my $gene_id = $x[0];
         my $gene_symbol = $x[5];
         my $chr = $x[1];
         my ($lend, $rend) = sort {$a<=>$b} ($x[2], $x[3]); # should already be sorted, but just in case.
@@ -114,6 +116,12 @@ sub _parse_gene_span_info {
         $GENE_TO_SPAN_INFO{$gene_symbol} = { chr => $chr,
                                              lend => $lend,
                                              rend => $rend };
+
+        $GENE_TO_SPAN_INFO{$gene_id} = { chr => $chr,
+                                         lend => $lend,
+                                         rend => $rend };
+        
+        
         
     }
     
