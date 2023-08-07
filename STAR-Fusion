@@ -409,12 +409,14 @@ my $outSAMattrRGline = "";
 
 
 if ($SHOW_FULL_USAGE_INFO) {
-    die "$usage$extended_usage_info";
+    print "$usage$extended_usage_info";
+    exit(0);
 }
 
 
 if ($help_flag) {
-    die $usage;
+    print "$usage";
+    exit(0);
 }
 
 if ($REPORT_VERSION) {
