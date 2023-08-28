@@ -17,7 +17,9 @@ workflow star_fusion_workflow {
     # STAR-Fusion parameters
     String? fusion_inspector  # inspect or validate
     Boolean examine_coding_effect = false
-    
+    Boolean coord_sort_bam = false
+    Float min_FFPM = 0.1
+
     # runtime params
     String docker = "trinityctat/starfusion:latest"
     Int num_cpu = 12
@@ -39,6 +41,10 @@ workflow star_fusion_workflow {
         genome = genome_plug_n_play_tar_gz,
         sample_id = sample_id,
         examine_coding_effect = examine_coding_effect,
+        coord_sort_bam = coord_sort_bam,
+        min_FFPM = min_FFPM,
+
+
         preemptible = preemptible,
         docker = docker,
         cpu = num_cpu,
@@ -86,7 +92,9 @@ task star_fusion {
     
     String? fusion_inspector
     Boolean examine_coding_effect
-    
+    Boolean coord_sort_bam
+    Float min_FFPM
+
     Int preemptible
     String docker
     Int cpu
@@ -145,24 +153,46 @@ task star_fusion {
       --output_dir ~{sample_id} \
       --CPU ~{cpu} \
       ~{"--FusionInspector " + fusion_inspector} \
-      ~{true='--examine_coding_effect' false='' examine_coding_effect}
+      ~{true='--examine_coding_effect' false='' examine_coding_effect} \
+      ~{"--min_FFPM " + min_FFPM}
     
+
+    if [ "~{coord_sort_bam}" == "true" ]; then
+        samtools sort -@~{cpu} -o ~{sample_id}.STAR.aligned.coordsorted.bam 
+        samtools index ~{sample_id}.STAR.aligned.coordsorted.bam
+    else
+       mv ~{sample_id}.Aligned.out.bam ~{sample_id}.STAR.aligned.UNsorted.bam
+    fi
+
+
+    # rename outputs to include the sample ID
+    mv ~{sample_id}/star-fusion.fusion_predictions.tsv ~{sample_id}.star-fusion.fusion_predictions.tsv && gzip ~{sample_id}.star-fusion.fusion_predictions.tsv
+    mv ~{sample_id}/star-fusion.fusion_predictions.abridged.tsv ~{sample_id}.star-fusion.fusion_predictions.abridged.tsv && gzip ~{sample_id}.star-fusion.fusion_predictions.abridged.tsv
+    mv ~{sample_id}/Chimeric.out.junction ~{sample_id}.Chimeric.out.junction && gzip ~{sample_id}.Chimeric.out.junction
+    mv ~{sample_id}/SJ.out.tab ~{sample_id}.SJ.out.tab && gzip ~{sample_id}.SJ.out.tab 
+    mv ~{sample_id}/Log.final.out ~{sample_id}.Log.final.out
+
+    gzip -c ~{sample_id}/star-fusion.preliminary/star-fusion.fusion_candidates.preliminary > ~{sample_id}.star-fusion.fusion_candidates.preliminary.tsv.gz
 
   >>>
 
   output {
     
-    File fusion_predictions = "~{sample_id}/star-fusion.fusion_predictions.tsv"
-    File fusion_predictions_abridged = "~{sample_id}/star-fusion.fusion_predictions.abridged.tsv"
-    File junction = "~{sample_id}/Chimeric.out.junction"
-    File bam = "~{sample_id}/Aligned.out.bam"
-    File sj = "~{sample_id}/SJ.out.tab"
+    File fusion_predictions = "~{sample_id}.star-fusion.fusion_predictions.tsv.gz"
+    File fusion_predictions_abridged = "~{sample_id}.star-fusion.fusion_predictions.abridged.tsv.gz"
+
+    File preliminary_fusion_predictions = "~{sample_id}.star-fusion.fusion_candidates.preliminary.tsv.gz"
+
+    File junction = "~{sample_id}.Chimeric.out.junction.gz"
+    File bam = if (coord_sort_bam) then "~{sample_id}.STAR.aligned.coordsorted.bam" else "~{sample_id}.STAR.aligned.UNsorted.bam"
+    File? bai = "~{sample_id}.STAR.aligned.coordsorted.bam.bai"
+    File sj = "~{sample_id}.SJ.out.tab.gz"
 
     File? coding_effect = "~{sample_id}/star-fusion.fusion_predictions.abridged.coding_effect.tsv"
     
     Array[File] extract_fusion_reads = glob("~{sample_id}/star-fusion.fusion_evidence_*.fq")
 
-    File star_log_final = "~{sample_id}/Log.final.out"
+    File star_log_final = "~{sample_id}.Log.final.out"
 
     
     File? fusion_inspector_validate_fusions_abridged = "~{sample_id}/FusionInspector-validate/finspector.FusionInspector.fusions.abridged.tsv"
