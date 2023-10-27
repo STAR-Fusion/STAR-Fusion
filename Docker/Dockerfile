@@ -67,4 +67,4 @@ ENV STAR_FUSION_HOME $SRC/STAR-Fusion
 ENV PATH="$SRC/STAR-Fusion:$SRC/STAR-Fusion/FusionInspector:${PATH}"
 
 
-RUN pip install numpy
+
