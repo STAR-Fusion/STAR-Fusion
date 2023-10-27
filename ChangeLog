@@ -1,4 +1,9 @@
-
+STAR-Fusion Release v1.13.0, Oct 27, 2023
+	- uses STAR aligner 2.7.11a
+	- includes updated FusionInspector 2.9.0
+	- chimeric read alignments are included in the main bam file.
+	- submodule updates
+	
 STAR-Fusion Release v1.12.0, Jan 18, 2023
 	- reverting FFPM calculation to using total reads (not unique reads as v1.11.1-only) as denominator.
 	- use STAR one-pass alignment by default as faster and provides fusion results based not influenced by other reads in the sample.
