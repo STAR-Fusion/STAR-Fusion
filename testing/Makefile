@@ -30,6 +30,7 @@ all: standard \
      kickstart_hg19_FI_inspect \
      standard_denovo_reconstruct \
      standard_coding_effect \
+     standard_FI_validate \
      standard_SE \
      kickstart_hg19_SE \
      standard_run_star_only \
@@ -59,6 +60,9 @@ kickstart_hg19_FI_inspect: kickstart_hg19_coding_effect
 ###################################
 #### Full mode, starting from reads
 
+
+standard_FI_validate: standard
+	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --denovo_reconstruct --FusionInspector validate --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir
 
 standard_denovo_reconstruct: standard
 	../STAR-Fusion --genome_lib_dir ${CTAT_GENOME_LIB}  --denovo_reconstruct --FusionInspector validate --left_fq ${left_fq} --right_fq ${right_fq} -O star_fusion_outdir  
