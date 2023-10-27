@@ -49,7 +49,7 @@ ENV PICARD_HOME $SRC
 WORKDIR $SRC
 
 ENV STAR_FUSION_VERSION=1.13.0
-ENV STARF_CHECKOUT=54719ec9bedbb4fefda0b70e78cbc9dd912f4fad
+ENV STARF_CHECKOUT=1e12a4e154bd2ba8cf9aed1d063cf7b6bc8ac931
 
 
 RUN apt-get update && apt-get install -y git
