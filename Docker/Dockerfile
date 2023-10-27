@@ -1,4 +1,4 @@
-FROM trinityctat/fusioninspector:2.8.0
+FROM trinityctat/fusioninspector:2.9.0
 
 MAINTAINER bhaas@broadinstitute.org
 
@@ -48,8 +48,8 @@ ENV PICARD_HOME $SRC
 ## STAR-Fusion:
 WORKDIR $SRC
 
-ENV STAR_FUSION_VERSION=1.12.0
-ENV STARF_CHECKOUT=be8db5a5ef8a1c268984045dcd9e6e37e8180b8d
+ENV STAR_FUSION_VERSION=1.13.0
+ENV STARF_CHECKOUT=1e12a4e154bd2ba8cf9aed1d063cf7b6bc8ac931
 
 
 RUN apt-get update && apt-get install -y git
@@ -65,5 +65,6 @@ ENV STAR_FUSION_HOME $SRC/STAR-Fusion
 
 
 ENV PATH="$SRC/STAR-Fusion:$SRC/STAR-Fusion/FusionInspector:${PATH}"
+
 
 

@@ -20,7 +20,7 @@ workflow star_fusion_hg38_wf {
     Boolean examine_coding_effect = false
     
     # runtime params
-    String docker = "trinityctat/starfusion:1.10.1"
+    String docker = "trinityctat/starfusion:latest"
     Int num_cpu = 12
     Float fastq_disk_space_multiplier = 3.25
     String memory = "50G"

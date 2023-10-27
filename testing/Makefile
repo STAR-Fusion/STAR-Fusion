@@ -127,7 +127,7 @@ full_Monty:
 
 clean:
 	rm -rf ./star_fusion_outdir
-	rm -rf ./star_fusion_kickstart_hg19ed_outdir
+	rm -rf ./star_fusion_kickstarted_*
 	rm -rf ./star_fusion_SE_outdir
 	rm -rf ./star_fusion_SE_outdir_kickstart_hg19
 	rm -rf ./star_fusion_bbmerge_outdir
