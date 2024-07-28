@@ -1,0 +1,8 @@
+version: 1.2
+workflows:
+   - name: star_fusion_hg38v22
+     subclass: WDL
+     primaryDescriptorPath: /WDL/star_fusion_hg38_wf.wdl
+     authors:
+         - name: Brian Haas
+           email: bhaas@broadinstitute.org
