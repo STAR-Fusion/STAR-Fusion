@@ -6,3 +6,9 @@ workflows:
      authors:
          - name: Brian Haas
            email: bhaas@broadinstitute.org
+   - name: star_fusion_hg19
+     subclass: WDL
+     primaryDescriptorPath: /WDL/star_fusion_hg19_wf.wdl
+     authors:
+         - name: Brian Haas
+           email: bhaas@broadinstitute.org
