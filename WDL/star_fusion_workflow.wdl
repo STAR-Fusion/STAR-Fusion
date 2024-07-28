@@ -158,10 +158,10 @@ task star_fusion {
     
 
     if [ "~{coord_sort_bam}" == "true" ]; then
-        samtools sort -@~{cpu} -o ~{sample_id}.STAR.aligned.coordsorted.bam 
+        samtools sort -@~{cpu} -o ~{sample_id}.STAR.aligned.coordsorted.bam  ~{sample_id}/Aligned.out.bam 
         samtools index ~{sample_id}.STAR.aligned.coordsorted.bam
     else
-       mv ~{sample_id}.Aligned.out.bam ~{sample_id}.STAR.aligned.UNsorted.bam
+       mv ~{sample_id}/Aligned.out.bam ~{sample_id}.STAR.aligned.UNsorted.bam
     fi
 
 
