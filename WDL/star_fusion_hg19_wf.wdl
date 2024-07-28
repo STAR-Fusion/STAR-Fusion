@@ -7,7 +7,7 @@ workflow star_fusion_hg19_wf {
     
     String sample_id
 
-    File genome_plug_n_play_tar_gz = "gs://ctat_genome_libs/__genome_libs_StarFv1.10/GRCh37_gencode_v19_CTAT_lib_Mar012021.plug-n-play.tar.gz"
+    File genome_plug_n_play_tar_gz = "gs://mdl-ctat-genome-libs/__genome_libs_StarFv1.10/GRCh37_gencode_v19_CTAT_lib_Mar012021.plug-n-play.tar.gz"
     
     # input data options
     File? left_fq
@@ -20,7 +20,7 @@ workflow star_fusion_hg19_wf {
     Boolean examine_coding_effect = false
     
     # runtime params
-    String docker = "trinityctat/starfusion:1.10.1"
+    String docker = "trinityctat/starfusion:latest"
     Int num_cpu = 12
     Float fastq_disk_space_multiplier = 3.25
     String memory = "50G"

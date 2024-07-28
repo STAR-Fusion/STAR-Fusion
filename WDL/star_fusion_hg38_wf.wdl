@@ -7,7 +7,7 @@ workflow star_fusion_hg38_wf {
     
     String sample_id
 
-    File genome_plug_n_play_tar_gz = "gs://ctat_genome_libs/__genome_libs_StarFv1.10/GRCh38_gencode_v22_CTAT_lib_Mar012021.plug-n-play.tar.gz"
+    File genome_plug_n_play_tar_gz = "gs://mdl-ctat-genome-libs/__genome_libs_StarFv1.10/GRCh38_gencode_v22_CTAT_lib_Mar012021.plug-n-play.tar.gz"
     
     # input data options
     File? left_fq
