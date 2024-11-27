@@ -1,3 +1,10 @@
+
+STAR-Fusion Release v1.14.0, Nov 27, 2024
+	- uses FusionInspector v2.10.0
+	- fusionfilter update, adjusted prioritization of fusions according to splice breakpoints in filtering
+	- check header line of chimeric junctions file formatting to ensure compatibility
+
+
 STAR-Fusion Release v1.13.0, Oct 27, 2023
 	- uses STAR aligner 2.7.11a
 	- includes updated FusionInspector 2.9.0
