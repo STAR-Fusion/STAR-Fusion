@@ -339,6 +339,18 @@ sub map_chimeric_reads_to_genes {
     }
         
     open(my $fh, $junctions_file);
+
+    ## validate chimeric junctions formatting.\
+    my $header_line = <$fh>;
+    my @vals = split(/\t/, $header_line);
+    if ($vals[0] ne "chr_donorA") {
+        croak "Error, file: $junctions_file doesn't have a header line consistent with expectations - doesn't start with chr_donorA. Check that your version of STAR is compatible.";
+    }
+    if (scalar(@vals) != 21) {
+        croak "Error, file: $junctions_file doesn't have 21 columns as is expected. Check that your version of STAR is compatible.";
+    }
+    
+    
     seek($fh, 0, 2) or confess "Error, cannot seek to end of file $junctions_file";
     
     my $start_begin_pos = 0;
