@@ -9,7 +9,7 @@ use Process_cmd;
 use File::Basename;
 use Getopt::Long qw(:config posix_default no_ignore_case bundling pass_through);
 
-my $usage = "\n\n\tusage: $0 samples.txt num_parallel [--de_remove] [starF options passthru]\n\n";
+my $usage = "\n\n\tusage: $0 samples.txt num_parallel [--do_remove] [starF options passthru]\n\n";
 
 if (! $ENV{CTAT_GENOME_LIB}) {
     die "Error, no env var set for CTAT_GENOME_LIB";
