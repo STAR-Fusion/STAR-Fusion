@@ -1,4 +1,8 @@
-
+STAR-Fusion Release v1.15.0, May 5, 2025
+	- prep CTAT genome lib will recognize GRCH38 in the reference name and know how to mask the PAR regions.
+	- no filtering of IGH or DUX4 fusions as likely RT artifacts given that most of these do not have splice breakpoints.
+	
+	
 STAR-Fusion Release v1.14.0, Nov 27, 2024
 	- uses FusionInspector v2.10.0
 	- fusionfilter update, adjusted prioritization of fusions according to splice breakpoints in filtering
