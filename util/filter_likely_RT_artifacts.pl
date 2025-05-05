@@ -71,6 +71,21 @@ require $annot_filt_module;
 
 
 
+sub fusion_has_junction_reads_exception {
+    my ($fusion) = @_;
+
+    # these are fusions that are known to  have complex breakpoints, so we make an exception for them.
+    
+    if ($fusion =~ /IGH|DUX4/) {
+        return(1);
+    }
+    
+    return(0); # by default, no exemption given.
+}
+
+
+
+
 main: {
     
     open(my $fh, $fusion_preds_file) or die "Error, cannot open file: $fusion_preds_file";
@@ -135,6 +150,10 @@ main: {
             
             ||
 
+            &fusion_has_junction_reads_exception($fusion_name) # (IGH or DUX4 fusions tend to lack spliced breakpoints)
+
+            ||
+            
             &AnnotFilterRule::fusion_has_junction_reads_exception($fusion_name) # ie. IGH--CRLF2
             
             ) {
