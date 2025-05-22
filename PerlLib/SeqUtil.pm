@@ -9,6 +9,8 @@ use warnings;
 sub compute_entropy {
     my ($sequence) = @_;
 
+    $sequence = uc($sequence);
+    
     my @chars = split(//, $sequence);
     my %char_counter;
 
