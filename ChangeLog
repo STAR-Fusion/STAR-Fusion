@@ -1,5 +1,8 @@
+STAR-Fusion Release v1.15.1, July 1, 2025
+	- prep CTAT genome lib will recognize GRCH38 in the reference name and know how to mask the PAR regions.	
+	- convert to uppercase before entropy calc
+	
 STAR-Fusion Release v1.15.0, May 5, 2025
-	- prep CTAT genome lib will recognize GRCH38 in the reference name and know how to mask the PAR regions.
 	- no filtering of IGH or DUX4 fusions as likely RT artifacts given that most of these do not have splice breakpoints.
 	
 	
@@ -7,7 +10,6 @@ STAR-Fusion Release v1.14.0, Nov 27, 2024
 	- uses FusionInspector v2.10.0
 	- fusionfilter update, adjusted prioritization of fusions according to splice breakpoints in filtering
 	- check header line of chimeric junctions file formatting to ensure compatibility
-
 
 STAR-Fusion Release v1.13.0, Oct 27, 2023
 	- uses STAR aligner 2.7.11a
