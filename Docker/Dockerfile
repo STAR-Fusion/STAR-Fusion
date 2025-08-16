@@ -1,4 +1,4 @@
-FROM trinityctat/fusioninspector:2.10.0
+FROM trinityctat/fusioninspector:2.10.0-b
 
 MAINTAINER bhaas@broadinstitute.org
 
