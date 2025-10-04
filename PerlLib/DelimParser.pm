@@ -263,7 +263,8 @@ sub write_row {
     for my $column_header (@column_headers) {
         my $field = $dict_href->{$column_header};
         unless (defined $field) {
-            confess "Error, missing value for required column field: $column_header";
+            print STDERR "Error, missing value for required column field: $column_header\n";
+            $field = "";
         }
         if ($field =~ /$delim/) {
             # don't allow any delimiters to contaminate the field value, otherwise it'll introduce offsets.
