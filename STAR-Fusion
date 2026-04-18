@@ -153,7 +153,7 @@ my $extended_usage_info = <<__EXTENDED_USAGE__
 #
 #   Stitching overlapping reads settings:
 #          --STAR_peOverlapNbasesMin <int>    minimum number of bases in the overlap (default: $STAR_peOverlapNbasesMin)
-#          --STAR_peOverlapMMp <int>          the max proportion of mismatches in the overlap (default: $STAR_peOverlapMMp)
+#          --STAR_peOverlapMMp <float>          the max proportion of mismatches in the overlap (default: $STAR_peOverlapMMp)
 #
 #   STAR chim multi-map opts:
 #          --STAR_chimMultimapScoreRange <int>     the score range for multi-mapping chimeras below the best chimeric score. (default: $STAR_chimMultimapScoreRange)
@@ -372,7 +372,7 @@ my $outSAMattrRGline = "";
 
               # other STAR settings
               'STAR_peOverlapNbasesMin=i' => \$STAR_peOverlapNbasesMin,
-              'STAR_peOverlapMMp=i' => \$STAR_peOverlapMMp,
+              'STAR_peOverlapMMp=f' => \$STAR_peOverlapMMp,
 
               'STAR_chimMultimapScoreRange=i' => \$STAR_chimMultimapScoreRange,
               'STAR_chimMultimapNmax=i' => \$STAR_chimMultimapNmax,
