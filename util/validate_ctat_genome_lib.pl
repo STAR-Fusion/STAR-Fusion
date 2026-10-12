@@ -36,6 +36,10 @@ main: {
     }
 
 
+    if (-e "supplemental/manifest.json") {
+        print STDERR "-NOTE: ctat genome lib [$genome_lib_dir] has been supplemented with additional annotations (see $genome_lib_dir/supplemental/manifest.json)\n";
+    }
+
     print STDERR "-ctat genome lib [$genome_lib_dir] validates.\n";
     
     exit(0);
