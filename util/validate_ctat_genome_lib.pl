@@ -36,6 +36,17 @@ main: {
     }
 
 
+    if (-e "supplemental/manifest.json") {
+        print STDERR "-NOTE: ctat genome lib [$genome_lib_dir] has been supplemented with additional annotations (see $genome_lib_dir/supplemental/manifest.json)\n";
+        if (open(my $fh, "supplemental/manifest.json")) {
+            my ($source_lib) = (join("", <$fh>) =~ /"source_lib"\s*:\s*"([^"]+)"/);
+            close $fh;
+            if ($source_lib) {
+                print STDERR "-NOTE: it is a linked copy of [$source_lib]\n";
+            }
+        }
+    }
+
     print STDERR "-ctat genome lib [$genome_lib_dir] validates.\n";
     
     exit(0);
