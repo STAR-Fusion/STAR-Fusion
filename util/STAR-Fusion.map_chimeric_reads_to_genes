@@ -370,7 +370,7 @@ sub map_chimeric_reads_to_genes {
     my $thread_helper = new Thread_helper($CPU);
     for (my $thread_num = 1; $thread_num <= $CPU; $thread_num++) {
         my $file_begin = $start_begin_pos;
-        my $file_end = $file_begin + $file_range_per_thread;
+        my $file_end = ($thread_num == $CPU) ? $file_end_pos : $file_begin + $file_range_per_thread;
         my $output_filename = "$tmpdir/chimJ_gene_mappings.thread_$thread_num";
         my $thread = threads->create(\&map_chimeric_reads_to_genes_OneThread, $junctions_file, $file_begin, $file_end, $thread_num, $output_filename);
         $thread_helper->add_thread($thread);
@@ -410,8 +410,16 @@ sub map_chimeric_reads_to_genes_OneThread {
     my $start_time = time();
     my $counter = 0;
     open (my $fh, $junctions_file) or die "Error, cannot open file $junctions_file";
-    seek($fh, $start_pos, 0);
-    while (<$fh>) {
+    # each thread handles the lines that begin within [$start_pos, $end_pos).
+    # $start_pos may fall mid-line, and that line belongs to the previous thread,
+    # so skip ahead to the first line beginning at or after $start_pos.
+    if ($start_pos > 0) {
+        seek($fh, $start_pos - 1, 0) or confess "Error, cannot seek to $start_pos in $junctions_file";
+        <$fh>;
+    }
+    while (tell($fh) < $end_pos) {
+        $_ = <$fh>;
+        last unless defined($_);
         if (/^\#/) { next; }
         if (/^chr_donorA\tbrkpt/) { 
             # header line
@@ -497,10 +505,6 @@ sub map_chimeric_reads_to_genes_OneThread {
         }
     
         print $ofh join("\t", @x) . "\n";
-
-        if (tell($fh) >= $end_pos) {
-            last;
-        }
     }
 
     close $ofh;
