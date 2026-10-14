@@ -43,7 +43,7 @@ my $usage = <<__EOUSAGE__;
 #                                 Required formatting is:  
 #                                 geneA--geneB (tab) junction_read_count (tab) spanning_read_count (tab) ... rest
 #
-#  --chimeric_junction|J <string>        Chimeric.out.junction file
+#  --chimeric_junction|J <string>        Chimeric.out.junction file (may be gzipped: .gz)
 #
 #  --out_prefix <string>          prefix for output filename (will tack on .final and .final.abridged)
 #
@@ -681,7 +681,13 @@ sub parse_read_mapping_counts {
 
     my %read_counts;
     
-    open(my $fh, $chimeric_junctions_file) or die "Error, cannot open file $chimeric_junctions_file";
+    my $fh;
+    if ($chimeric_junctions_file =~ /\.gz$/) {
+        open($fh, "-|", "gzip", "-cd", $chimeric_junctions_file) or die "Error, cannot read file $chimeric_junctions_file";
+    }
+    else {
+        open($fh, $chimeric_junctions_file) or die "Error, cannot open file $chimeric_junctions_file";
+    }
     while (<$fh>) {
         if (/^\#/) { next; }
         chomp;
@@ -695,7 +701,7 @@ sub parse_read_mapping_counts {
         }
         $read_counts{$read_name}++;
     }
-    close $fh;
+    close $fh or die "Error, reading file $chimeric_junctions_file failed";
     
     return(%read_counts);
     

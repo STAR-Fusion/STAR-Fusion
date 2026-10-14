@@ -33,7 +33,7 @@ my $usage = <<__EOUSAGE__;
 #
 #  Required:
 #
-#    --chimeric_junction|J <string>     Chimeric.out.junction file
+#    --chimeric_junction|J <string>     Chimeric.out.junction file (may be gzipped: .gz)
 #
 #    --genome_lib_dir <string>          path to genome lib dir 
 #
@@ -333,12 +333,24 @@ sub get_overlapping_features {
 sub map_chimeric_reads_to_genes {
     my ($junctions_file, $CPU, $final_output_filename) = @_;
 
+    my $tmpdir = "tmp_chim_read_mappings_dir";
+    if (! -d $tmpdir) {
+        mkdir($tmpdir) or die "Error, cannot mkdir $tmpdir";
+    }
+
+    my $uncompressed_junctions_file;
     if ($junctions_file =~ /\.gz$/) {
-        $junctions_file = "gunzip -c $junctions_file > $junctions_file.txt";
-        $junctions_file = "$junctions_file.txt";
+        # threads seek to byte offsets within the file, so it must be uncompressed
+        $uncompressed_junctions_file = "$tmpdir/" . basename($junctions_file, ".gz");
+        my $cmd = "gzip -cd $junctions_file > $uncompressed_junctions_file";
+        my $ret = system($cmd);
+        if ($ret) {
+            die "Error, cmd $cmd died with ret $ret";
+        }
+        $junctions_file = $uncompressed_junctions_file;
     }
         
-    open(my $fh, $junctions_file);
+    open(my $fh, $junctions_file) or die "Error, cannot open file $junctions_file";
 
     ## validate chimeric junctions formatting.\
     my $header_line = <$fh>;
@@ -358,12 +370,6 @@ sub map_chimeric_reads_to_genes {
     close $fh;
 
     my $file_range_per_thread = int($file_end_pos / $CPU);
-
-
-    my $tmpdir = "tmp_chim_read_mappings_dir";
-    if (! -d $tmpdir) {
-        mkdir($tmpdir) or die "Error, cannot mkdir $tmpdir";
-    }
 
 
     my @outfiles;
@@ -392,6 +398,9 @@ sub map_chimeric_reads_to_genes {
         die "Error, cmd $cmd died with ret $ret";
     }
 
+    if ($uncompressed_junctions_file) {
+        unlink($uncompressed_junctions_file);
+    }
 
     return;
 }

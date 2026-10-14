@@ -103,7 +103,7 @@ $logo
 
 #  Or use output from earlier STAR run:
 #
-#      --chimeric_junction|J <string>        Chimeric.out.junction file
+#      --chimeric_junction|J <string>        Chimeric.out.junction file (may be gzipped: .gz)
 #
 #
 #    --genome_lib_dir <string>             directory containing genome lib (see http://STAR-Fusion.github.io)
@@ -619,6 +619,17 @@ main: {
         exit(0);
     }
 
+
+    if ($chimeric_out_junctions_file =~ /\.gz$/) {
+        # several steps read the junction file, and read-to-gene mapping needs random access
+        # to it, so decompress it once (to a temp name, so an interrupted run doesn't leave a partial file)
+        my $uncompressed_junctions_file = "$preliminary_outdir/" . basename($chimeric_out_junctions_file, ".gz");
+        unless (-e $uncompressed_junctions_file) {
+            &process_cmd("gzip -cd $chimeric_out_junctions_file > $uncompressed_junctions_file.tmp");
+            rename("$uncompressed_junctions_file.tmp", $uncompressed_junctions_file) or die "Error, cannot rename $uncompressed_junctions_file.tmp to $uncompressed_junctions_file";
+        }
+        $chimeric_out_junctions_file = $uncompressed_junctions_file;
+    }
 
     ## Get total number of rnaseq fragments reported by STAR:
     my $num_total_rnaseq_frags = &get_num_total_rnaseq_frags($chimeric_out_junctions_file);
